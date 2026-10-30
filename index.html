@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#2563eb">
+  <meta name="description" content="App para registro de compras con IA, control de gastos, historial de precios y planificador inteligente de mercado.">
+  <title>Control de Precios y Gastos</title>
+  <link rel="manifest" href="./manifest.json">
+  <link rel="icon" type="image/svg+xml" href="./icons/icon.svg">
+  <link rel="apple-touch-icon" href="./icons/icon.svg">
+  <link rel="stylesheet" href="./css/styles.css">
+  <!-- Tailwind Utilities (CDN for instant responsive styling) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eff6ff',
+              500: '#3b82f6',
+              600: '#2563eb',
+              700: '#1d4ed8',
+            }
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-slate-950 text-slate-100 antialiased selection:bg-blue-500 selection:text-white">
+
+  <!-- Top App Header -->
+  <header class="app-header">
+    <div class="brand-wrapper">
+      <img src="./icons/icon.svg" alt="Logo" class="brand-logo shadow-lg">
+      <div>
+        <h1 class="brand-title">Precios & Gastos</h1>
+        <p class="brand-subtitle">Control Inteligente con IA</p>
+      </div>
+    </div>
+
+    <!-- Desktop Navigation Tabs -->
+    <nav class="desktop-nav" id="desktopNav">
+      <button class="nav-btn active" data-view="stores">🏪 Tiendas</button>
+      <button class="nav-btn" data-view="products">🏷️ Productos</button>
+      <button class="nav-btn" data-view="scanner">📸 Escanear IA</button>
+      <button class="nav-btn" data-view="planner">🛒 Programar Mercado</button>
+      <button class="nav-btn" data-view="accounting">📊 Contabilidad</button>
+      <button class="nav-btn" data-view="invoices">🗃️ Facturas</button>
+      <button class="nav-btn" data-view="settings">⚙️ Ajustes</button>
+    </nav>
+
+    <!-- Header Actions (BCV & Drive Pills) -->
+    <div class="header-actions">
+      <!-- BCV Rate Pill -->
+      <button id="bcvPillBtn" class="bcv-pill" title="Haga clic para actualizar o cambiar la tasa del BCV">
+        <span class="w-2 h-2 rounded-full bg-blue-400 animate-pulse"></span>
+        <span id="bcvPillText">BCV: Bs. --</span>
+      </button>
+
+      <!-- Drive Sync Pill -->
+      <button id="drivePillBtn" class="drive-pill disabled" title="Estado de respaldo en Google Drive">
+        <span>☁️</span>
+        <span id="drivePillText" class="hidden sm:inline">Drive</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="app-container">
+
+    <!-- 1. VIEW: TIENDAS (STORES) -->
+    <section id="view-stores" class="view-panel active">
+      <div class="section-header">
+        <div>
+          <h2 class="section-title">Comercios y Tiendas</h2>
+          <p class="section-desc">Gestiona tus tiendas favoritas con su ubicación en Google Maps.</p>
+        </div>
+        <button id="btnNewStore" class="btn btn-primary shadow-lg shadow-blue-500/20">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+          Nueva Tienda
+        </button>
+      </div>
+
+      <!-- Filter Bar -->
+      <div class="filter-bar">
+        <div class="search-input-wrapper">
+          <svg class="search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+          <input type="text" id="storeSearchInput" class="search-input" placeholder="Buscar tienda por nombre o descripción...">
+        </div>
+      </div>
+
+      <!-- Stores Grid -->
+      <div id="storesGrid" class="cards-grid">
+        <!-- Rendered dynamically -->
+      </div>
+    </section>
+
+    <!-- 2. VIEW: PRODUCTOS (PRODUCTS) -->
+    <section id="view-products" class="view-panel">
+      <div class="section-header">
+        <div>
+          <h2 class="section-title">Catálogo de Productos</h2>
+          <p class="section-desc">Consulta precios en USD y Bs, califica calidad (1-5 ⭐) y analiza la gráfica de evolución.</p>
+        </div>
+        <button id="btnNewProduct" class="btn btn-primary shadow-lg shadow-blue-500/20">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+          Nuevo Producto
+        </button>
+      </div>
+
+      <!-- Filter Bar -->
+      <div class="filter-bar">
+        <div class="search-input-wrapper">
+          <svg class="search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+          <input type="text" id="productSearchInput" class="search-input" placeholder="Buscar por nombre de producto...">
+        </div>
+        <select id="productStoreFilter" class="form-select max-w-xs">
+          <option value="ALL">Todas las tiendas</option>
+        </select>
+      </div>
+
+      <!-- Products Grid -->
+      <div id="productsGrid" class="cards-grid">
+        <!-- Rendered dynamically -->
+      </div>
+    </section>
+
+    <!-- 3. VIEW: ESCANEAR CON IA (SCANNER) -->
+    <section id="view-scanner" class="view-panel">
+      <div class="section-header">
+        <div>
+          <h2 class="section-title">Escanear con IA</h2>
+          <p class="section-desc">Toma una foto a tu factura o lista de precios. La IA extraerá los productos, actualizará precios y registrará el gasto.</p>
+        </div>
+      </div>
+
+      <!-- Document Mode Selector -->
+      <div class="grid grid-cols-2 gap-3 max-w-md mx-auto mb-6">
+        <button id="scanModeInvoiceBtn" class="p-3 rounded-xl border border-blue-500 bg-blue-500/10 text-blue-400 font-semibold text-sm flex items-center justify-center gap-2">
+          <span>🧾</span> Factura Completa
+        </button>
+        <button id="scanModeTableBtn" class="p-3 rounded-xl border border-slate-700 bg-slate-800 text-slate-400 font-semibold text-sm flex items-center justify-center gap-2">
+          <span>📋</span> Tablita de Precios
+        </button>
+      </div>
+
+      <!-- Dropzone / Camera Capture -->
+      <div class="max-w-xl mx-auto">
+        <div id="scannerDropzone" class="scanner-dropzone mb-4">
+          <input type="file" id="cameraFileInput" accept="image/*" capture="environment" class="hidden">
+          <input type="file" id="galleryFileInput" accept="image/*" class="hidden">
+          
+          <div class="flex flex-col items-center justify-center gap-3">
+            <div class="w-16 h-16 rounded-full bg-blue-500/10 text-blue-400 flex items-center justify-center">
+              <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+            </div>
+            <div>
+              <p class="font-bold text-base text-slate-100">Toma una foto o sube la imagen</p>
+              <p class="text-xs text-slate-400 mt-1">Se comprimirá automáticamente a WebP (~25 KB) para no saturar tu memoria</p>
+            </div>
+            <div class="flex gap-3 mt-2">
+              <button type="button" id="btnTriggerCamera" class="btn btn-primary btn-sm">
+                📷 Abrir Cámara
+              </button>
+              <button type="button" id="btnTriggerGallery" class="btn btn-secondary btn-sm">
+                🖼️ Explorar Archivos
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Image Preview & Extreme Compression Stats -->
+        <div id="scanPreviewCard" class="hidden bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-6">
+          <div class="flex flex-col sm:flex-row gap-4 items-center">
+            <div class="relative w-36 h-48 bg-black rounded-lg overflow-hidden border border-slate-700 flex-shrink-0">
+              <img id="scanPreviewImg" src="" alt="Foto comprimida" class="w-full h-full object-cover">
+              <span class="absolute bottom-1 right-1 bg-black/80 text-[10px] text-emerald-400 font-bold px-1.5 py-0.5 rounded">WebP</span>
+            </div>
+            <div class="flex-1 w-full space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="text-xs uppercase font-bold tracking-wider text-slate-400">Compresión Extrema</span>
+                <span id="compressionSavingsBadge" class="px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">99% Ahorro</span>
+              </div>
+              <div class="text-xs text-slate-300 space-y-1">
+                <p>Foto Original: <span id="compOrigSize" class="font-bold text-slate-100">0 MB</span></p>
+                <p>Guardada en BD: <span id="compFinalSize" class="font-bold text-emerald-400">0 KB</span></p>
+                <p class="text-[11px] text-slate-400">Filtro aplicado: Escala de grises + Alto contraste térmico</p>
+              </div>
+
+              <!-- Action button -->
+              <div class="pt-2">
+                <button id="btnProcessAI" class="btn btn-primary w-full py-2.5 text-sm font-bold shadow-lg shadow-blue-500/25">
+                  ✨ Analizar Factura con Gemini Flash
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- AI Extraction Results Confirmation Box -->
+        <div id="scanResultBox" class="hidden bg-slate-900 border border-blue-500/30 rounded-2xl p-5">
+          <div class="flex items-center justify-between pb-3 border-b border-slate-800 mb-4">
+            <div>
+              <span class="text-xs font-bold uppercase text-blue-400">Resultados Extraídos por IA</span>
+              <h3 id="extractedStoreName" class="text-lg font-extrabold text-white">Tienda Detectada</h3>
+            </div>
+            <div class="text-right">
+              <span class="text-xs text-slate-400 block">Total Factura</span>
+              <span id="extractedTotalAmount" class="text-lg font-bold text-emerald-400">$ 0.00</span>
+            </div>
+          </div>
+
+          <!-- Items Table -->
+          <div class="max-h-60 overflow-y-auto mb-4 border border-slate-800 rounded-xl">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-800/80 text-slate-400 sticky top-0">
+                <tr>
+                  <th class="p-2.5">Producto</th>
+                  <th class="p-2.5 text-center">Cant.</th>
+                  <th class="p-2.5 text-right">Precio Unit.</th>
+                  <th class="p-2.5 text-right">Total</th>
+                </tr>
+              </thead>
+              <tbody id="extractedItemsTableBody" class="divide-y divide-slate-800">
+                <!-- Rendered dynamically -->
+              </tbody>
+            </table>
+          </div>
+
+          <p class="text-xs text-amber-400/90 mb-4 flex items-center gap-1.5">
+            <span>ℹ️</span> 
+            <span>Las valoraciones de calidad (1-5 ⭐) permanecen intactas en productos existentes o en blanco para que las califiques manualmente.</span>
+          </p>
+
+          <div class="flex gap-3 justify-end">
+            <button id="btnDiscardScan" class="btn btn-secondary btn-sm">Descartar</button>
+            <button id="btnConfirmScan" class="btn btn-success btn-sm">
+              💾 Confirmar y Guardar en BD
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4. VIEW: PROGRAMAR MERCADO (GROCERY PLANNER) -->
+    <section id="view-planner" class="view-panel">
+      <div class="section-header">
+        <div>
+          <h2 class="section-title">Programar Mercado</h2>
+          <p class="section-desc">Selecciona los productos que necesitas y la app optimizará tu compra por precio, cercanía o calidad.</p>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Left: Product Selector -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4">
+          <h3 class="text-sm font-bold uppercase tracking-wider text-slate-400 mb-3">1. Selecciona tus productos</h3>
+          
+          <input type="text" id="plannerSearchInput" class="form-input w-full text-xs mb-3" placeholder="Filtrar productos disponibles...">
+          
+          <div id="plannerChecklist" class="max-h-80 overflow-y-auto space-y-1.5 pr-1 mb-4">
+            <!-- List of products with checkboxes -->
+          </div>
+
+          <div class="pt-2 border-t border-slate-800 flex items-center justify-between">
+            <span id="plannerSelectedCount" class="text-xs font-semibold text-slate-400">0 seleccionados</span>
+            <button id="btnExecutePlanner" class="btn btn-primary btn-sm">
+              🔍 Optimizar Compras
+            </button>
+          </div>
+        </div>
+
+        <!-- Right: Optimization Results -->
+        <div class="lg:col-span-2 space-y-4">
+          <!-- Top 3 Featured Criteria Cards -->
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-3" id="plannerFeaturedCards">
+            <!-- Más Barata -->
+            <div id="cardBestCheapest" class="bg-slate-900 border border-emerald-500/30 rounded-2xl p-4 flex flex-col justify-between">
+              <div>
+                <div class="flex items-center gap-1.5 text-xs font-bold uppercase text-emerald-400 mb-1">
+                  <span>💰</span> La Más Barata
+                </div>
+                <h4 class="font-extrabold text-slate-100 text-sm store-name">--</h4>
+                <p class="text-xs text-slate-400 mt-1 store-summary">Calculando canasta...</p>
+              </div>
+              <div class="mt-3 pt-2 border-t border-slate-800 text-right">
+                <span class="text-lg font-black text-emerald-400 store-price">$ 0.00</span>
+              </div>
+            </div>
+
+            <!-- Más Cercana -->
+            <div id="cardBestClosest" class="bg-slate-900 border border-blue-500/30 rounded-2xl p-4 flex flex-col justify-between">
+              <div>
+                <div class="flex items-center gap-1.5 text-xs font-bold uppercase text-blue-400 mb-1">
+                  <span>📍</span> La Más Cercana
+                </div>
+                <h4 class="font-extrabold text-slate-100 text-sm store-name">--</h4>
+                <p class="text-xs text-slate-400 mt-1 store-summary">Ubicación GPS...</p>
+              </div>
+              <div class="mt-3 pt-2 border-t border-slate-800 text-right">
+                <span class="text-sm font-bold text-blue-400 store-distance">-- km</span>
+              </div>
+            </div>
+
+            <!-- Mejor Valorada -->
+            <div id="cardBestRated" class="bg-slate-900 border border-amber-500/30 rounded-2xl p-4 flex flex-col justify-between">
+              <div>
+                <div class="flex items-center gap-1.5 text-xs font-bold uppercase text-amber-400 mb-1">
+                  <span>⭐</span> Mejor Valorada
+                </div>
+                <h4 class="font-extrabold text-slate-100 text-sm store-name">--</h4>
+                <p class="text-xs text-slate-400 mt-1 store-summary">Calidad de productos...</p>
+              </div>
+              <div class="mt-3 pt-2 border-t border-slate-800 text-right">
+                <span class="text-sm font-bold text-amber-400 store-rating">⭐ --</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- All Stores Comparison Details -->
+          <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4">
+            <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Comparativa Completa de Tiendas</h4>
+            <div id="plannerResultsList" class="space-y-3">
+              <p class="text-xs text-slate-500 py-6 text-center">Selecciona productos a la izquierda y pulsa "Optimizar Compras" para ver el análisis.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 5. VIEW: CONTABILIDAD (EXPENSES) -->
+    <section id="view-accounting" class="view-panel">
+      <div class="section-header">
+        <div>
+          <h2 class="section-title">Contabilidad y Gastos</h2>
+          <p class="section-desc">Controla tus gastos diarios generados automáticamente por facturas y gastos manuales.</p>
+        </div>
+        <button id="btnNewManualExpense" class="btn btn-primary shadow-lg shadow-blue-500/20">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+          + Cargar Gasto Manual
+        </button>
+      </div>
+
+      <!-- Period Filter Selector -->
+      <div class="flex gap-2 mb-6 overflow-x-auto pb-1">
+        <button class="btn btn-secondary btn-sm font-semibold active-period" data-period="TODAY">Hoy</button>
+        <button class="btn btn-secondary btn-sm font-semibold" data-period="WEEK">Esta Semana</button>
+        <button class="btn btn-secondary btn-sm font-semibold" data-period="MONTH">Este Mes</button>
+        <button class="btn btn-secondary btn-sm font-semibold" data-period="ALL">Todo</button>
+      </div>
+
+      <!-- Financial Metric Cards -->
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+        <div class="stat-card">
+          <span class="stat-label">Total Gastado (USD)</span>
+          <span id="statTotalUSD" class="stat-value text-blue-400">$ 0.00</span>
+          <span id="statSubUSD" class="stat-sub">0 registros</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Total Gastado (Bolívares)</span>
+          <span id="statTotalVES" class="stat-value text-emerald-400">Bs. 0.00</span>
+          <span id="statSubVES" class="stat-sub">A tasa oficial BCV</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Origen de Gastos</span>
+          <div class="flex items-center gap-3 mt-2 text-xs">
+            <span class="px-2 py-1 bg-slate-800 rounded font-semibold text-slate-300" id="statFacturasCount">🧾 0 Facturas</span>
+            <span class="px-2 py-1 bg-slate-800 rounded font-semibold text-slate-300" id="statManualesCount">✍️ 0 Manuales</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Expenses List -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4">
+        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Movimientos de Gastos</h3>
+        <div id="expensesList" class="space-y-2">
+          <!-- Rendered dynamically -->
+        </div>
+      </div>
+    </section>
+
+    <!-- 6. VIEW: ARCHIVO DE FACTURAS (INVOICE ARCHIVE) -->
+    <section id="view-invoices" class="view-panel">
+      <div class="section-header">
+        <div>
+          <h2 class="section-title">Archivo de Facturas Comprimidas</h2>
+          <p class="section-desc">Zona apartada para consultar fotos y comprobantes históricos con compresión extrema (~25 KB c/u).</p>
+        </div>
+      </div>
+
+      <div id="invoicesGrid" class="cards-grid">
+        <!-- Rendered dynamically -->
+      </div>
+    </section>
+
+    <!-- 7. VIEW: AJUSTES Y RESPALDO (SETTINGS & BACKUP) -->
+    <section id="view-settings" class="view-panel">
+      <div class="section-header">
+        <div>
+          <h2 class="section-title">Ajustes y Respaldo</h2>
+          <p class="section-desc">Configuración de Google Drive, IA de facturas, tasas y respaldo selectivo con numeración.</p>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- Card 1: IA Google Gemini Flash -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5">
+          <div class="flex items-center gap-2 mb-3">
+            <span class="text-xl">✨</span>
+            <h3 class="font-bold text-slate-100 text-sm">IA para Facturas (Google Gemini Flash)</h3>
+          </div>
+          <p class="text-xs text-slate-400 mb-4">
+            Gemini Flash es 100% gratuito vía Google AI Studio. Lee tickets arrugados, tablas y productos de forma limpia.
+          </p>
+          <div class="form-group mb-3">
+            <label class="form-label">Clave API de Gemini:</label>
+            <input type="password" id="inputGeminiApiKey" class="form-input" placeholder="AIzaSy...">
+          </div>
+          <div class="flex items-center justify-between">
+            <a href="https://aistudio.google.com/app/apikey" target="_blank" class="text-xs text-blue-400 hover:underline">
+              Obtener clave gratuita en Google AI Studio ↗
+            </a>
+            <button id="btnSaveGeminiKey" class="btn btn-primary btn-sm">Guardar Clave</button>
+          </div>
+        </div>
+
+        <!-- Card 2: Google Drive Auto-Sync -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5">
+          <div class="flex items-center gap-2 mb-3">
+            <span class="text-xl">☁️</span>
+            <h3 class="font-bold text-slate-100 text-sm">Sincronización con Google Drive</h3>
+          </div>
+          <p class="text-xs text-slate-400 mb-4">
+            Mantén automáticamente actualizada la base de datos entre tu teléfono y tu computadora.
+          </p>
+          <div class="flex items-center justify-between p-3 bg-slate-800/60 rounded-xl border border-slate-700/60 mb-4">
+            <div>
+              <span class="text-xs font-bold text-slate-200 block">Sincronización en la Nube</span>
+              <span id="driveStatusDesc" class="text-[11px] text-slate-400">Desactivada por el usuario</span>
+            </div>
+            <label class="relative inline-flex items-center cursor-pointer">
+              <input type="checkbox" id="toggleDriveSync" class="sr-only peer">
+              <div class="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:width-5 after:transition-all peer-checked:bg-emerald-600"></div>
+            </label>
+          </div>
+          <button id="btnManualDriveSync" class="btn btn-secondary btn-sm w-full">
+            🔄 Sincronizar Ahora con Drive
+          </button>
+        </div>
+
+        <!-- Card 3: Respaldo Selectivo y Compartir -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 md:col-span-2">
+          <div class="flex items-center gap-2 mb-3">
+            <span class="text-xl">📦</span>
+            <h3 class="font-bold text-slate-100 text-sm">Respaldo Granular y Compartir Datos</h3>
+          </div>
+          <p class="text-xs text-slate-400 mb-4">
+            Exporta tus tiendas y productos. Puedes elegir exactamente qué tiendas incluir y renombrarlas con un número para no sobreescribir datos propios de otra persona al compartir.
+          </p>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+            <!-- Export Section -->
+            <div class="p-4 bg-slate-800/40 border border-slate-800 rounded-xl space-y-3">
+              <h4 class="text-xs font-bold uppercase text-slate-300">Exportar Datos</h4>
+              
+              <label class="flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
+                <input type="checkbox" id="chkExportNumberedStores" class="rounded bg-slate-900 border-slate-700 text-blue-500">
+                <span>Guardar tiendas con <strong>número identificador</strong> (ej: Plaza's (1))</span>
+              </label>
+
+              <label class="flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
+                <input type="checkbox" id="chkExportIncludeHistory" checked class="rounded bg-slate-900 border-slate-700 text-blue-500">
+                <span>Incluir historial de precios y gráficas</span>
+              </label>
+
+              <label class="flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
+                <input type="checkbox" id="chkExportIncludeExpenses" checked class="rounded bg-slate-900 border-slate-700 text-blue-500">
+                <span>Incluir asientos de contabilidad</span>
+              </label>
+
+              <button id="btnDownloadBackup" class="btn btn-primary btn-sm w-full">
+                📥 Descargar Respaldo JSON
+              </button>
+            </div>
+
+            <!-- Import Section -->
+            <div class="p-4 bg-slate-800/40 border border-slate-800 rounded-xl space-y-3">
+              <h4 class="text-xs font-bold uppercase text-slate-300">Importar / Restaurar Respaldo</h4>
+              <p class="text-xs text-slate-400">Selecciona un archivo de respaldo (.json) para previsualizarlo e importarlo sin sobrescribir tus datos.</p>
+              
+              <input type="file" id="inputImportBackupFile" accept=".json" class="hidden">
+              <button id="btnTriggerImportFile" class="btn btn-secondary btn-sm w-full">
+                📂 Seleccionar Archivo JSON
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Mobile Bottom Navigation Bar -->
+  <nav class="mobile-nav" id="mobileNav">
+    <button class="mobile-nav-item active" data-view="stores">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+      <span>Tiendas</span>
+    </button>
+    <button class="mobile-nav-item" data-view="products">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/></svg>
+      <span>Productos</span>
+    </button>
+    <button class="mobile-nav-item scan-highlight" data-view="scanner">
+      <div class="scan-highlight-btn">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+      </div>
+      <span>Escanear</span>
+    </button>
+    <button class="mobile-nav-item" data-view="planner">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+      <span>Mercado</span>
+    </button>
+    <button class="mobile-nav-item" data-view="accounting">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+      <span>Gastos</span>
+    </button>
+  </nav>
+
+  <!-- MODAL: NUEVA / EDITAR TIENDA -->
+  <div id="modalStore" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="modalStoreTitle" class="modal-title">Nueva Tienda</h3>
+        <button class="modal-close" data-modal="modalStore">&times;</button>
+      </div>
+      <form id="formStore" class="modal-body">
+        <input type="hidden" id="inputStoreId">
+        <div class="form-group">
+          <label class="form-label">Nombre de la Tienda *</label>
+          <input type="text" id="inputStoreName" class="form-input" required placeholder="Ej: Automercados Plaza's, Bodegón Express">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Ubicación con Google Maps (Enlace o Nombre)</label>
+          <input type="text" id="inputStoreMapsUrl" class="form-input" placeholder="Ej: https://maps.google.com/?q=... o Las Mercedes, Caracas">
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div class="form-group">
+            <label class="form-label">Latitud (Opcional GPS)</label>
+            <input type="number" step="any" id="inputStoreLat" class="form-input" placeholder="10.4910">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Longitud (Opcional GPS)</label>
+            <input type="number" step="any" id="inputStoreLng" class="form-input" placeholder="-66.8530">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Descripción Opcional</label>
+          <textarea id="inputStoreDesc" class="form-textarea" placeholder="Ej: Sucursal principal, abre los domingos..."></textarea>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-modal="modalStore">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Guardar Tienda</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: NUEVO / EDITAR PRODUCTO -->
+  <div id="modalProduct" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="modalProductTitle" class="modal-title">Nuevo Producto</h3>
+        <button class="modal-close" data-modal="modalProduct">&times;</button>
+      </div>
+      <form id="formProduct" class="modal-body">
+        <input type="hidden" id="inputProductId">
+        <div class="form-group">
+          <label class="form-label">Tienda donde se vende *</label>
+          <select id="inputProductStoreId" class="form-select" required>
+            <!-- Store options -->
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Nombre del Producto *</label>
+          <input type="text" id="inputProductName" class="form-input" required placeholder="Ej: Harina PAN 1kg, Arroz Mary 1kg">
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div class="form-group">
+            <label class="form-label">Precio *</label>
+            <input type="number" step="0.01" min="0" id="inputProductPrice" class="form-input" required placeholder="0.00">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Moneda de Registro *</label>
+            <select id="inputProductCurrency" class="form-select">
+              <option value="USD">Dólares ($)</option>
+              <option value="VES">Bolívares (Bs.)</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Valoración Personal de Calidad (1 a 5 ⭐)</label>
+          <div class="flex items-center gap-3">
+            <div id="productModalRatingStars" class="star-rating">
+              <span class="star" data-val="1">★</span>
+              <span class="star" data-val="2">★</span>
+              <span class="star" data-val="3">★</span>
+              <span class="star" data-val="4">★</span>
+              <span class="star" data-val="5">★</span>
+            </div>
+            <input type="hidden" id="inputProductRating" value="">
+            <button type="button" id="btnClearProductRating" class="text-xs text-slate-400 hover:text-slate-200">Limpiar</button>
+          </div>
+          <span class="text-[11px] text-slate-500">Exclusivo y personal. La IA nunca modifica esta calificación.</span>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Descripción Opcional</label>
+          <textarea id="inputProductDesc" class="form-textarea" placeholder="Marca, presentación, notas..."></textarea>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-modal="modalProduct">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Guardar Producto</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: HISTORIAL DE PRECIO Y GRÁFICA INTERACTIVA -->
+  <div id="modalPriceChart" class="modal-overlay">
+    <div class="modal-content max-w-2xl">
+      <div class="modal-header">
+        <div>
+          <h3 id="modalChartProductName" class="modal-title">Evolución de Precio</h3>
+          <p id="modalChartStoreName" class="text-xs text-slate-400">Tienda</p>
+        </div>
+        <button class="modal-close" data-modal="modalPriceChart">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div id="productChartContainer">
+          <!-- Rendered by ProductPriceChart -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: GASTO MANUAL -->
+  <div id="modalExpense" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title">Nuevo Gasto Manual</h3>
+        <button class="modal-close" data-modal="modalExpense">&times;</button>
+      </div>
+      <form id="formExpense" class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Concepto o Detalle *</label>
+          <input type="text" id="inputExpenseConcept" class="form-input" required placeholder="Ej: Pasaje de autobús, Almuerzo en la calle">
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div class="form-group">
+            <label class="form-label">Monto *</label>
+            <input type="number" step="0.01" min="0" id="inputExpenseAmount" class="form-input" required placeholder="0.00">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Moneda *</label>
+            <select id="inputExpenseCurrency" class="form-select">
+              <option value="USD">Dólares ($)</option>
+              <option value="VES">Bolívares (Bs.)</option>
+            </select>
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div class="form-group">
+            <label class="form-label">Categoría *</label>
+            <select id="inputExpenseCategory" class="form-select">
+              <option value="Alimentos / Mercado">Alimentos / Mercado</option>
+              <option value="Transporte">Transporte</option>
+              <option value="Servicios">Servicios</option>
+              <option value="Salud / Farmacia">Salud / Farmacia</option>
+              <option value="Hogar">Hogar</option>
+              <option value="Ocio / Salidas">Ocio / Salidas</option>
+              <option value="Otros">Otros</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Fecha *</label>
+            <input type="date" id="inputExpenseDate" class="form-input" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Nota Adicional</label>
+          <input type="text" id="inputExpenseNote" class="form-input" placeholder="Pago en efectivo, propina, etc.">
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-modal="modalExpense">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Guardar Gasto</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: AJUSTE DE TASA BCV -->
+  <div id="modalBcv" class="modal-overlay">
+    <div class="modal-content max-w-sm">
+      <div class="modal-header">
+        <h3 class="modal-title">Tasa Banco de Venezuela / BCV</h3>
+        <button class="modal-close" data-modal="modalBcv">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="text-xs text-slate-400">
+          La tasa oficial se consulta automáticamente en internet. Puedes forzar una actualización o escribir un valor manual si no tienes conexión.
+        </p>
+        <div class="form-group">
+          <label class="form-label">Tasa Actual (Bs. por 1 USD):</label>
+          <input type="number" step="0.01" min="0" id="inputManualBcvRate" class="form-input text-lg font-bold text-blue-400">
+        </div>
+        <button id="btnFetchOnlineBcv" class="btn btn-secondary btn-sm w-full">
+          🔄 Consultar API Oficial Ahora
+        </button>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-modal="modalBcv">Cerrar</button>
+        <button id="btnSaveManualBcv" class="btn btn-primary">Aplicar Tasa</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: DETALLE DE FACTURA ARCHIVADA -->
+  <div id="modalInvoiceDetail" class="modal-overlay">
+    <div class="modal-content max-w-lg">
+      <div class="modal-header">
+        <div>
+          <h3 id="invDetailStore" class="modal-title">Factura</h3>
+          <p id="invDetailDate" class="text-xs text-slate-400">Fecha</p>
+        </div>
+        <button class="modal-close" data-modal="modalInvoiceDetail">&times;</button>
+      </div>
+      <div class="modal-body">
+        <!-- Receipt Image Viewer -->
+        <div id="invDetailPhotoContainer" class="bg-black/60 rounded-xl p-2 flex items-center justify-center max-h-72 overflow-hidden border border-slate-800">
+          <img id="invDetailPhoto" src="" alt="Factura" class="max-h-64 object-contain rounded">
+        </div>
+        <div class="flex items-center justify-between text-xs text-slate-400">
+          <span id="invDetailSize">Peso comprimido: ~25 KB</span>
+          <span id="invDetailTotals" class="font-bold text-emerald-400 text-sm">$ 0.00 / Bs. 0.00</span>
+        </div>
+        <!-- Items Table -->
+        <div class="max-h-48 overflow-y-auto border border-slate-800 rounded-lg">
+          <table class="w-full text-left text-xs">
+            <thead class="bg-slate-800 text-slate-400 sticky top-0">
+              <tr>
+                <th class="p-2">Producto</th>
+                <th class="p-2 text-right">Precio</th>
+              </tr>
+            </thead>
+            <tbody id="invDetailItemsTable" class="divide-y divide-slate-800">
+              <!-- Rendered dynamically -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: INSPECTOR E IMPORTADOR DE RESPALDOS -->
+  <div id="modalImportInspector" class="modal-overlay">
+    <div class="modal-content max-w-xl">
+      <div class="modal-header">
+        <h3 class="modal-title">Inspección de Respaldo</h3>
+        <button class="modal-close" data-modal="modalImportInspector">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div id="importStatsOverview" class="p-3 bg-slate-800/40 rounded-xl border border-slate-800 text-xs space-y-1">
+          <!-- Summary info -->
+        </div>
+
+        <div class="form-group">
+          <label class="form-label font-bold text-slate-200">Resolución de Tiendas Duplicadas:</label>
+          <select id="importConflictStrategy" class="form-select text-xs">
+            <option value="RENAME_WITH_NUMBER">(Recomendado) Evitar reemplazo: Renombrar con número identificador ej: Tienda (2)</option>
+            <option value="UPDATE_PRICES_ONLY">Actualizar sólo los precios más recientes (conservar estrellas y descripción)</option>
+            <option value="KEEP_EXISTING_SKIP">Omitir duplicados e importar sólo las tiendas y productos nuevos</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Selecciona qué tiendas deseas importar:</label>
+          <div id="importStoresList" class="max-h-44 overflow-y-auto space-y-1.5 border border-slate-800 rounded-lg p-2">
+            <!-- Checkbox list of stores in backup -->
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-modal="modalImportInspector">Cancelar</button>
+        <button id="btnExecuteFinalImport" class="btn btn-success">Importar Seleccionados</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toastContainer" class="toast-container"></div>
+
+  <!-- Core Scripts -->
+  <script src="./js/db.js"></script>
+  <script src="./js/bcv.js"></script>
+  <script src="./js/image-compressor.js"></script>
+  <script src="./js/ai-scanner.js"></script>
+  <script src="./js/charts.js"></script>
+  <script src="./js/grocery-planner.js"></script>
+  <script src="./js/accounting.js"></script>
+  <script src="./js/backup-drive.js"></script>
+  <script src="./js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,42 @@
+{
+  "name": "Control de Precios y Gastos",
+  "short_name": "Precios & Gastos",
+  "description": "App para registro de compras con IA, control de gastos, historial de precios y planificador inteligente de mercado.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0f172a",
+  "theme_color": "#2563eb",
+  "categories": ["finance", "productivity", "utilities"],
+  "icons": [
+    {
+      "src": "./icons/icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Escanear Factura IA",
+      "short_name": "Escanear",
+      "description": "Toma foto y extrae datos con Gemini Flash",
+      "url": "./index.html?action=scan",
+      "icons": [{ "src": "./icons/icon.svg", "sizes": "192x192" }]
+    },
+    {
+      "name": "Programar Mercado",
+      "short_name": "Mercado",
+      "description": "Optimizar canasta de compras más barata o cercana",
+      "url": "./index.html?action=planner",
+      "icons": [{ "src": "./icons/icon.svg", "sizes": "192x192" }]
+    },
+    {
+      "name": "Cargar Gasto Manual",
+      "short_name": "Nuevo Gasto",
+      "description": "Registrar gasto en contabilidad",
+      "url": "./index.html?action=expense",
+      "icons": [{ "src": "./icons/icon.svg", "sizes": "192x192" }]
+    }
+  ]
+}
