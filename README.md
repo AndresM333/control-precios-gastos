@@ -4,6 +4,37 @@ Aplicación Web Progresiva (PWA) instalable para **teléfono (Android / iOS)** y
 
 ---
 
+## ⚡ Instalación y Accesos Rápidos con Shortcut Manager
+
+Esta aplicación incluye integración total con **Shortcut Manager** y la API nativa de atajos rápidos de Android y Windows para que puedas abrir funciones específicas en 1 solo toque.
+
+### Método 1: Atajos Nativos de Android (Mantener pulsado el icono)
+1. Instala la aplicación en la pantalla de inicio de tu teléfono desde el navegador.
+2. **Mantén presionado el icono de la app** durante 1 segundo.
+3. El administrador de atajos de Android desplegará el menú con 3 accesos instantáneos:
+   - 📸 **Escanear Factura IA**: Abre directo la cámara y el analizador de facturas.
+   - 🛒 **Programar Mercado**: Te lleva directo a optimizar tu lista de compras.
+   - 💵 **Cargar Gasto Manual**: Abre de inmediato la ventana para registrar un gasto rápido.
+4. **Tip**: Puedes arrastrar cualquiera de estos atajos a un espacio vacío de tu pantalla de inicio para tener un botón dedicado.
+
+### Método 2: Usando Apps de "Shortcut Manager" / "Shortcut Maker" en Android
+Si utilizas aplicaciones de gestión de atajos en Android (como **Shortcut Manager**, **Shortcut Maker** o **QuickShortcutMaker**):
+1. Abre tu aplicación de **Shortcut Manager**.
+2. Selecciona la opción **"Web Link" / "Enlace Web"** (o Crear atajo de navegador).
+3. Ingresa la URL de la función que deseas abrir directamente:
+   - **Para abrir el Escáner de Facturas**: `http://TU_IP_O_DOMINIO:8080/index.html?action=scan`
+   - **Para abrir Programar Mercado**: `http://TU_IP_O_DOMINIO:8080/index.html?action=planner`
+   - **Para cargar un Gasto Rápido**: `http://TU_IP_O_DOMINIO:8080/index.html?action=expense`
+4. Selecciona el icono personalizado (puedes usar el archivo `icons/icon.svg` incluido).
+5. Pulsa en **"Create Shortcut" (Crear Acceso Directo)** para colocarlo en tu pantalla.
+
+### Método 3: En la Computadora (Windows / Mac con extensiones de atajos)
+Si usas extensiones de navegador como **Shortcut Manager**:
+1. Crea un nuevo atajo asignando la combinación de teclas que prefieras (por ejemplo, `Ctrl + Shift + F` para Facturas o `Ctrl + Shift + G` para Gastos).
+2. Asigna la URL local `http://localhost:8080/index.html?action=scan` para abrir instantáneamente la pantalla de captura sin navegar manualmente por el menú.
+
+---
+
 ## 🚀 Cómo Iniciar la Aplicación
 
 ### En Windows (Computadora):
