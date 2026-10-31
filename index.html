@@ -1083,43 +1083,35 @@
           </div>
 
           <!-- Botón Oficial de Google Identity Services -->
-          <div class="my-3 flex flex-col items-center justify-center min-h-[44px]">
-            <div id="googleGisButtonContainer" class="flex justify-center"></div>
+          <div class="my-4 flex flex-col items-center justify-center min-h-[50px]">
+            <div id="googleGisButtonContainer" class="flex justify-center w-full"></div>
           </div>
 
-          <div class="p-2.5 bg-blue-500/10 border border-blue-500/25 rounded-xl text-left text-[11px] text-slate-300 space-y-1">
-            <span class="font-bold text-blue-300 block">🔒 Seguridad Oficial de Google:</span>
-            <span>La verificación de contraseña y 2FA se realiza de forma directa y oficial en la ventana emergente de Google (GIS / OAuth 2.0). Tus credenciales nunca pasan por servidores de terceros.</span>
+          <div class="p-3 bg-blue-500/10 border border-blue-500/25 rounded-xl text-left text-[11px] text-slate-300 space-y-1.5">
+            <span class="font-bold text-blue-300 block flex items-center gap-1.5">
+              <span>🔒</span> Autenticación Oficial Exclusiva de Google
+            </span>
+            <span class="leading-relaxed block">
+              El inicio de sesión se realiza únicamente mediante la pasarela oficial de Google (GIS / OAuth 2.0). Ingresas tu contraseña personal y verificación en 2 pasos (2FA) en la ventana protegida de Google (<code class="text-blue-300">accounts.google.com</code>).
+            </span>
           </div>
 
-          <!-- Formulario Directo (Modo Local / Personal) -->
-          <form id="formGoogleLogin" class="space-y-2.5 text-left pt-2 border-t border-slate-800">
-            <div class="text-[11px] font-bold uppercase text-slate-400">O ingresar correo manualmente:</div>
-            <div class="form-group">
-              <input type="email" id="inputGoogleEmail" class="form-input text-xs" required placeholder="tu_correo@gmail.com">
+          <!-- Configurar Google OAuth Client ID si se requiere -->
+          <div id="googleClientSetupNotice" class="text-left text-xs bg-slate-900/80 p-3 rounded-xl border border-slate-800 space-y-2">
+            <div class="flex items-center justify-between text-slate-300 font-bold text-[11px]">
+              <span>⚙️ Google OAuth Client ID</span>
+              <span class="text-blue-400">Requerido por Google</span>
             </div>
-            <div class="form-group">
-              <input type="text" id="inputGoogleName" class="form-input text-xs" placeholder="Tu Nombre o Apodo (Opcional)">
-            </div>
-            <button type="submit" class="btn btn-secondary w-full text-xs py-2 font-bold">
-              Continuar con este Correo
-            </button>
-          </form>
-
-          <!-- Configurar Google OAuth Client ID -->
-          <details class="text-left text-xs bg-slate-900/60 p-2.5 rounded-xl border border-slate-800">
-            <summary class="cursor-pointer font-semibold text-slate-400 hover:text-white flex items-center justify-between text-[11px]">
-              <span>⚙️ Configurar Google Client ID Oficial</span>
-              <span class="text-blue-400">Abrir</span>
-            </summary>
-            <div class="mt-2.5 space-y-2 text-[11px] text-slate-400">
-              <p>Para mostrar la ventana oficial de Google en este dominio, ingresa tu Client ID de Google Cloud:</p>
+            <p class="text-[11px] text-slate-400 leading-normal">
+              Para desplegar el botón oficial en este dominio (<code class="text-slate-300">andresm333.github.io</code>), ingresa tu Client ID de Google Cloud Console:
+            </p>
+            <div class="form-group mb-1">
               <input type="text" id="inputGoogleClientId" class="form-input text-xs" placeholder="xxxx.apps.googleusercontent.com">
-              <button type="button" id="btnSaveGoogleClientId" class="btn btn-secondary btn-sm w-full text-xs">
-                💾 Guardar Client ID
-              </button>
             </div>
-          </details>
+            <button type="button" id="btnSaveGoogleClientId" class="btn btn-primary btn-sm w-full font-bold text-xs py-1.5">
+              💾 Guardar Client ID y Activar Botón
+            </button>
+          </div>
         </div>
 
         <!-- Vista Cuando SÍ está logueado -->
