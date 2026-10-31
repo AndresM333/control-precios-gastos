@@ -8,6 +8,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   await window.backupDrive.init();
   await window.authGroups.init();
 
+  // 2. Verificar retorno de redirección OAuth de Google (accounts.google.com)
+  await checkGoogleOAuthCallback();
+
   // Sembrar datos de demostración si la base de datos está vacía
   await window.db.seedInitialDataIfEmpty(window.bcvService.rate);
 
@@ -2049,26 +2052,124 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
+  // Redirección oficial a Google OAuth 2.0 (accounts.google.com)
+  function redirectToGoogleOAuth(clientId) {
+    if (!clientId) {
+      showToast('Se requiere un Client ID de Google Cloud para abrir accounts.google.com', 'error');
+      const notice = document.getElementById('googleClientSetupNotice');
+      if (notice) notice.classList.remove('hidden');
+      const input = document.getElementById('inputGoogleClientId');
+      if (input) input.focus();
+      return;
+    }
+
+    const redirectUri = window.location.origin + window.location.pathname;
+    const state = 'google_oauth_' + Math.random().toString(36).substring(2, 12);
+    try {
+      sessionStorage.setItem('oauth_state', state);
+    } catch (e) {}
+
+    const scope = encodeURIComponent('email profile openid');
+    const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
+      `client_id=${encodeURIComponent(clientId)}&` +
+      `redirect_uri=${encodeURIComponent(redirectUri)}&` +
+      `response_type=token&` +
+      `scope=${scope}&` +
+      `state=${encodeURIComponent(state)}&` +
+      `prompt=select_account`;
+
+    showToast('Abriendo ventana oficial de Google...', 'info');
+    setTimeout(() => {
+      window.location.href = authUrl;
+    }, 250);
+  }
+
+  // Verificación de callback tras la redirección desde accounts.google.com
+  async function checkGoogleOAuthCallback() {
+    const hash = window.location.hash;
+    if (!hash || !hash.includes('access_token=')) {
+      return;
+    }
+
+    try {
+      const rawHash = hash.startsWith('#') ? hash.slice(1) : hash;
+      const params = new URLSearchParams(rawHash);
+      const accessToken = params.get('access_token');
+      const error = params.get('error');
+
+      // Limpiar el hash de la barra de direcciones inmediatamente para proteger el token
+      const cleanUrl = window.location.pathname + window.location.search;
+      window.history.replaceState(null, '', cleanUrl);
+
+      if (error) {
+        console.error('Google OAuth error:', error);
+        showToast(`Error de autenticación con Google: ${error}`, 'error');
+        return;
+      }
+
+      if (!accessToken) return;
+
+      showToast('Verificando credenciales oficiales con Google...', 'info');
+
+      // Obtener perfil verificado desde la API oficial de Google UserInfo
+      const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`
+        }
+      });
+
+      if (!res.ok) {
+        throw new Error(`Google API respondió con código HTTP ${res.status}`);
+      }
+
+      const profile = await res.json();
+      if (!profile || !profile.email) {
+        throw new Error('Google no devolvió un correo válido.');
+      }
+
+      // Iniciar sesión y guardar correo verificado
+      await window.authGroups.signInWithGoogle(profile.email, profile.name, profile.picture);
+      closeModal('modalGoogleLogin');
+      showToast(`¡Sesión oficial verificada! Bienvenido/a, ${profile.name || profile.email}`, 'success');
+    } catch (err) {
+      console.error('Error al procesar callback de Google OAuth:', err);
+      showToast(`Error al validar cuenta con Google: ${err.message}`, 'error');
+    }
+  }
+
   async function initGoogleOfficialGis() {
     const savedClientId = await window.db.getSetting('google_client_id');
     const inputClientEl = document.getElementById('inputGoogleClientId');
     const setupCard = document.getElementById('googleClientSetupNotice');
     const container = document.getElementById('googleGisButtonContainer');
+    const btnDirect = document.getElementById('btnGoogleDirectRedirect');
 
     if (inputClientEl && savedClientId) {
       inputClientEl.value = savedClientId;
+    }
+
+    // Vincular botón directo a accounts.google.com
+    if (btnDirect) {
+      btnDirect.onclick = async () => {
+        const clientId = await window.db.getSetting('google_client_id');
+        if (clientId && clientId.trim()) {
+          redirectToGoogleOAuth(clientId.trim());
+        } else {
+          if (setupCard) setupCard.classList.remove('hidden');
+          if (inputClientEl) {
+            inputClientEl.focus();
+            inputClientEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+          showToast('Ingresa tu Client ID de Google Cloud para abrir accounts.google.com', 'info');
+        }
+      };
     }
 
     if (!container) return;
 
     if (!savedClientId) {
       if (setupCard) setupCard.classList.remove('hidden');
-      container.innerHTML = `
-        <div class="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-center text-xs text-amber-300 w-full space-y-1">
-          <p class="font-bold">⚠️ Client ID de Google Requerido</p>
-          <p class="text-[11px] text-slate-400">Ingresa tu Client ID de Google Cloud abajo para habilitar el botón oficial de Google.</p>
-        </div>
-      `;
+      container.innerHTML = '';
       return;
     }
 
@@ -2105,7 +2206,6 @@ document.addEventListener('DOMContentLoaded', async () => {
           console.warn('GIS renderButton error:', err);
         }
       } else {
-        // Reintentar si el script de Google aún se está descargando asíncronamente
         setTimeout(renderGis, 300);
       }
     }
@@ -2115,24 +2215,26 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const btnSaveGClient = document.getElementById('btnSaveGoogleClientId');
   if (btnSaveGClient) {
-    btnSaveGClient.addEventListener('click', async () => {
+    btnSaveGClient.onclick = async () => {
       const val = (document.getElementById('inputGoogleClientId').value || '').trim();
       if (!val) {
         showToast('Ingresa un Client ID de Google Cloud válido', 'error');
         return;
       }
       await window.db.setSetting('google_client_id', val);
-      showToast('Client ID de Google guardado con éxito', 'success');
+      showToast('Client ID de Google guardado. Conectando con Google...', 'success');
       initGoogleOfficialGis();
-    });
+      redirectToGoogleOAuth(val);
+    };
   }
 
   // ----------------------------------------------------
   // REGISTRO DE SERVICE WORKER (PWA)
   // ----------------------------------------------------
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js').then((reg) => {
+    navigator.serviceWorker.register('./sw.js?v=6').then((reg) => {
       console.log('Service Worker registrado con éxito:', reg.scope);
+      reg.update();
     }).catch((err) => {
       console.warn('Registro de Service Worker falló:', err);
     });
