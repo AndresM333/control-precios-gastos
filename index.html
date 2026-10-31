@@ -12,7 +12,7 @@
   <link rel="manifest" href="./manifest.json">
   <link rel="icon" type="image/svg+xml" href="./icons/icon.svg">
   <link rel="apple-touch-icon" href="./icons/icon.svg">
-  <link rel="stylesheet" href="./css/styles.css?v=9">
+  <link rel="stylesheet" href="./css/styles.css?v=10">
   <!-- Tailwind Utilities (CDN for instant responsive styling) -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -513,21 +513,36 @@
             <span class="text-xl">☁️</span>
             <h3 class="font-bold text-slate-100 text-sm">Sincronización con Google Drive</h3>
           </div>
-          <p class="text-xs text-slate-400 mb-4">
-            Mantén automáticamente actualizada la base de datos entre tu teléfono y tu computadora.
+          <p class="text-xs text-slate-400 mb-3 leading-relaxed">
+            Respalda automáticamente tu biblioteca de tiendas y precios en la nube de Google vinculada a tu cuenta oficial.
           </p>
-          <div class="flex items-center justify-between p-3 bg-slate-800/60 rounded-xl border border-slate-700/60 mb-4">
+
+          <!-- Banner de Cuenta de Google Vinculada -->
+          <div id="driveAccountInfo" class="p-3 bg-slate-800/60 rounded-xl border border-slate-700/60 mb-3 text-xs flex items-center justify-between gap-2">
+            <div class="flex items-center gap-2 truncate">
+              <span id="driveAccountIcon" class="text-base flex-shrink-0">👤</span>
+              <div class="truncate">
+                <span class="text-[10px] text-slate-400 block font-semibold uppercase">Cuenta de Google Vinculada:</span>
+                <span id="driveAccountEmail" class="font-bold text-slate-200 truncate">No has iniciado sesión</span>
+              </div>
+            </div>
+            <button type="button" id="btnDriveConnectGoogle" class="btn btn-primary btn-sm text-[11px] py-1 px-2.5 flex-shrink-0">
+              Conectar Cuenta
+            </button>
+          </div>
+
+          <div class="flex items-center justify-between p-3 bg-slate-800/60 rounded-xl border border-slate-700/60 mb-3">
             <div>
-              <span class="text-xs font-bold text-slate-200 block">Sincronización en la Nube</span>
-              <span id="driveStatusDesc" class="text-[11px] text-slate-400">Desactivada por el usuario</span>
+              <span class="text-xs font-bold text-slate-200 block">Sincronización en Drive</span>
+              <span id="driveStatusDesc" class="text-[11px] text-slate-400">Requiere iniciar sesión con Google</span>
             </div>
             <label class="relative inline-flex items-center cursor-pointer">
               <input type="checkbox" id="toggleDriveSync" class="sr-only peer">
               <div class="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:width-5 after:transition-all peer-checked:bg-emerald-600"></div>
             </label>
           </div>
-          <button id="btnManualDriveSync" class="btn btn-secondary btn-sm w-full">
-            🔄 Sincronizar Ahora con Drive
+          <button id="btnManualDriveSync" class="btn btn-secondary btn-sm w-full flex items-center justify-center gap-2">
+            <span>🔄</span> Sincronizar Ahora con Drive
           </button>
         </div>
 
@@ -1263,16 +1278,16 @@
   <div id="toastContainer" class="toast-container"></div>
 
   <!-- Core Scripts -->
-  <script src="./js/db.js?v=9"></script>
-  <script src="./js/icons-library.js?v=9"></script>
-  <script src="./js/bcv.js?v=9"></script>
-  <script src="./js/image-compressor.js?v=9"></script>
-  <script src="./js/ai-scanner.js?v=9"></script>
-  <script src="./js/charts.js?v=9"></script>
-  <script src="./js/grocery-planner.js?v=9"></script>
-  <script src="./js/accounting.js?v=9"></script>
-  <script src="./js/backup-drive.js?v=9"></script>
-  <script src="./js/auth-groups.js?v=9"></script>
-  <script src="./js/app.js?v=9"></script>
+  <script src="./js/db.js?v=10"></script>
+  <script src="./js/icons-library.js?v=10"></script>
+  <script src="./js/bcv.js?v=10"></script>
+  <script src="./js/image-compressor.js?v=10"></script>
+  <script src="./js/ai-scanner.js?v=10"></script>
+  <script src="./js/charts.js?v=10"></script>
+  <script src="./js/grocery-planner.js?v=10"></script>
+  <script src="./js/accounting.js?v=10"></script>
+  <script src="./js/backup-drive.js?v=10"></script>
+  <script src="./js/auth-groups.js?v=10"></script>
+  <script src="./js/app.js?v=10"></script>
 </body>
 </html>

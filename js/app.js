@@ -206,6 +206,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Cerrar sesión
   document.getElementById('btnSignOutGoogle').addEventListener('click', async () => {
     await window.authGroups.signOut();
+    await window.backupDrive.toggleDriveSync(false, null);
+    updateDriveStatusUI(false);
     showToast('Sesión de Google cerrada', 'info');
     closeModal('modalGoogleLogin');
   });
@@ -327,12 +329,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   window.authGroups.subscribe(() => {
     updateWorkspaceUI();
     updateGoogleAuthUI();
+    updateDriveStatusUI(window.backupDrive.syncEnabled);
     if (currentActiveView === 'stores') renderStores();
     if (currentActiveView === 'products') renderProducts();
     if (currentActiveView === 'planner') loadPlannerProductList();
   });
   updateWorkspaceUI();
   updateGoogleAuthUI();
+  updateDriveStatusUI(window.backupDrive.syncEnabled);
 
   // Modal Copiar Todo del Grupo al Espacio Personal
   document.getElementById('btnBannerCopyAll').addEventListener('click', () => {
@@ -1871,7 +1875,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const syncEnabled = await window.db.getSetting('drive_sync_enabled', false);
     const driveToggle = document.getElementById('toggleDriveSync');
-    driveToggle.checked = syncEnabled;
+    if (driveToggle) {
+      driveToggle.checked = syncEnabled && window.authGroups.isLoggedIn();
+    }
     updateDriveStatusUI(syncEnabled);
   }
 
@@ -1879,15 +1885,48 @@ document.addEventListener('DOMContentLoaded', async () => {
     const statusDesc = document.getElementById('driveStatusDesc');
     const pill = document.getElementById('drivePillBtn');
     const pillText = document.getElementById('drivePillText');
+    const emailEl = document.getElementById('driveAccountEmail');
+    const iconEl = document.getElementById('driveAccountIcon');
+    const btnConnect = document.getElementById('btnDriveConnectGoogle');
+    const driveToggle = document.getElementById('toggleDriveSync');
 
-    if (enabled) {
-      statusDesc.textContent = 'Activada: Se sincroniza automáticamente';
-      pill.classList.remove('disabled');
-      pillText.textContent = 'Drive: Activo';
+    const user = window.authGroups ? window.authGroups.getCurrentUser() : null;
+
+    if (user && user.email) {
+      if (emailEl) emailEl.textContent = user.email;
+      if (iconEl) {
+        iconEl.innerHTML = user.photoURL 
+          ? `<img src="${user.photoURL}" class="w-5 h-5 rounded-full inline object-cover border border-blue-500 shadow">` 
+          : '👤';
+      }
+      if (btnConnect) {
+        btnConnect.textContent = 'Cambiar Cuenta';
+        btnConnect.className = 'btn btn-secondary btn-sm text-[11px] py-1 px-2.5 flex-shrink-0';
+      }
+
+      if (enabled) {
+        if (statusDesc) statusDesc.textContent = `Sincronizando con ${user.email}`;
+        if (pill) pill.classList.remove('disabled');
+        if (pillText) pillText.textContent = 'Drive: Activo';
+        if (driveToggle) driveToggle.checked = true;
+      } else {
+        if (statusDesc) statusDesc.textContent = 'Pausada por el usuario';
+        if (pill) pill.classList.add('disabled');
+        if (pillText) pillText.textContent = 'Drive: Pausado';
+        if (driveToggle) driveToggle.checked = false;
+      }
     } else {
-      statusDesc.textContent = 'Desactivada por el usuario';
-      pill.classList.add('disabled');
-      pillText.textContent = 'Drive';
+      // Sin sesión iniciada con Google
+      if (emailEl) emailEl.textContent = 'No has iniciado sesión con Google';
+      if (iconEl) iconEl.textContent = '⚠️';
+      if (btnConnect) {
+        btnConnect.textContent = 'Iniciar Sesión';
+        btnConnect.className = 'btn btn-primary btn-sm text-[11px] py-1 px-2.5 flex-shrink-0';
+      }
+      if (statusDesc) statusDesc.textContent = 'Requiere iniciar sesión con Google';
+      if (pill) pill.classList.add('disabled');
+      if (pillText) pillText.textContent = 'Drive';
+      if (driveToggle) driveToggle.checked = false;
     }
   }
 
@@ -1897,22 +1936,71 @@ document.addEventListener('DOMContentLoaded', async () => {
     showToast('Clave de Gemini guardada correctamente', 'success');
   });
 
+  const btnDriveConnect = document.getElementById('btnDriveConnectGoogle');
+  if (btnDriveConnect) {
+    btnDriveConnect.addEventListener('click', () => {
+      openModal('modalGoogleLogin');
+    });
+  }
+
   document.getElementById('toggleDriveSync').addEventListener('change', async (e) => {
+    const user = window.authGroups ? window.authGroups.getCurrentUser() : null;
+    if (!user || !user.email) {
+      e.target.checked = false;
+      showToast('⚠️ Es necesario iniciar sesión con Google para sincronizar con Google Drive', 'error');
+      openModal('modalGoogleLogin');
+      return;
+    }
+
     const enabled = e.target.checked;
-    await window.backupDrive.toggleDriveSync(enabled);
+    await window.backupDrive.toggleDriveSync(enabled, user.email);
     updateDriveStatusUI(enabled);
-    showToast(enabled ? 'Sincronización en la nube activada' : 'Sincronización desactivada', 'info');
+    showToast(enabled ? `Sincronización con Google Drive activada para ${user.email}` : 'Sincronización con Google Drive pausada', 'info');
   });
 
   document.getElementById('btnManualDriveSync').addEventListener('click', async () => {
+    const user = window.authGroups ? window.authGroups.getCurrentUser() : null;
+    if (!user || !user.email) {
+      showToast('⚠️ Es necesario iniciar sesión con Google para respaldar en Google Drive', 'error');
+      openModal('modalGoogleLogin');
+      return;
+    }
+
     try {
-      showToast('Sincronizando con Google Drive...', 'info');
+      showToast(`Sincronizando con Google Drive (${user.email})...`, 'info');
       await window.backupDrive.syncToGoogleDrive();
-      showToast('¡Base de datos sincronizada exitosamente con la nube!', 'success');
+      showToast(`¡Base de datos respaldada en Google Drive con la cuenta ${user.email}!`, 'success');
+      updateDriveStatusUI(true);
     } catch (err) {
       showToast(err.message, 'error');
     }
   });
+
+  // Píldora de Drive en cabecera
+  const drivePillBtn = document.getElementById('drivePillBtn');
+  if (drivePillBtn) {
+    drivePillBtn.addEventListener('click', async () => {
+      const user = window.authGroups ? window.authGroups.getCurrentUser() : null;
+      if (!user || !user.email) {
+        showToast('⚠️ Es necesario iniciar sesión con Google para respaldar en Google Drive', 'error');
+        openModal('modalGoogleLogin');
+        return;
+      }
+
+      if (!window.backupDrive.syncEnabled) {
+        await window.backupDrive.toggleDriveSync(true, user.email);
+        updateDriveStatusUI(true);
+      }
+
+      try {
+        showToast(`Sincronizando con Google Drive (${user.email})...`, 'info');
+        await window.backupDrive.syncToGoogleDrive();
+        showToast(`¡Respaldo sincronizado en Google Drive (${user.email})!`, 'success');
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    });
+  }
 
   // Exportar Respaldo
   document.getElementById('btnDownloadBackup').addEventListener('click', async () => {
@@ -2287,7 +2375,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // REGISTRO DE SERVICE WORKER (PWA)
   // ----------------------------------------------------
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js?v=9').then((reg) => {
+    navigator.serviceWorker.register('./sw.js?v=10').then((reg) => {
       console.log('Service Worker registrado con éxito:', reg.scope);
       reg.update();
     }).catch((err) => {

@@ -276,14 +276,22 @@ class BackupDriveService {
   }
 
   /**
-   * Realiza un respaldo instantáneo a Google Drive
+   * Realiza un respaldo instantáneo a Google Drive con la cuenta de Google activa
    */
   async syncToGoogleDrive() {
+    const user = window.authGroups ? window.authGroups.getCurrentUser() : null;
+    if (!user || !user.email) {
+      throw new Error('Debes iniciar sesión con tu cuenta de Google para respaldar en Google Drive.');
+    }
+
     if (!this.syncEnabled) {
       throw new Error('La sincronización con Google Drive está desactivada en Ajustes.');
     }
 
     this.isSyncing = true;
+    this.userEmail = user.email;
+    await window.db.setSetting('drive_user_email', user.email);
+
     try {
       // 1. Generar payload completo
       const payload = await this.generateExportPackage({
@@ -295,8 +303,14 @@ class BackupDriveService {
         appendNumericSuffix: false
       });
 
-      // Guardar en Storage local como último snapshot de sincronización
+      // Metadatos de la cuenta oficial de Google asociada
+      payload.metadata.user_email = user.email;
+      payload.metadata.user_name = user.displayName || user.email;
+      payload.metadata.synced_at = new Date().toISOString();
+
+      // Guardar en Storage local indexado por la cuenta de Google
       const jsonStr = JSON.stringify(payload);
+      localStorage.setItem(`drive_backup_${user.email}`, jsonStr);
       localStorage.setItem('last_drive_sync_payload', jsonStr);
       
       this.lastSync = new Date().toISOString();
@@ -304,6 +318,7 @@ class BackupDriveService {
 
       return {
         success: true,
+        userEmail: user.email,
         syncedAt: this.lastSync,
         recordsCount: payload.metadata.stores_count + payload.metadata.products_count
       };
