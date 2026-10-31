@@ -2137,8 +2137,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
+  // Client ID de Google OAuth 2.0 fijado para la aplicación
+  // Al integrarse aquí, ningún usuario final ve solicitudes de credenciales técnicas
+  const GOOGLE_CLIENT_ID_CONFIG = '';
+
+  async function getAppGoogleClientId() {
+    if (GOOGLE_CLIENT_ID_CONFIG && GOOGLE_CLIENT_ID_CONFIG.trim()) {
+      return GOOGLE_CLIENT_ID_CONFIG.trim();
+    }
+    const saved = await window.db.getSetting('google_client_id');
+    return saved ? saved.trim() : '';
+  }
+
   async function initGoogleOfficialGis() {
-    const savedClientId = await window.db.getSetting('google_client_id');
+    const savedClientId = await getAppGoogleClientId();
     const inputClientEl = document.getElementById('inputGoogleClientId');
     const setupCard = document.getElementById('googleClientSetupNotice');
     const container = document.getElementById('googleGisButtonContainer');
@@ -2151,16 +2163,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Vincular botón directo a accounts.google.com
     if (btnDirect) {
       btnDirect.onclick = async () => {
-        const clientId = await window.db.getSetting('google_client_id');
-        if (clientId && clientId.trim()) {
-          redirectToGoogleOAuth(clientId.trim());
+        const clientId = await getAppGoogleClientId();
+        if (clientId) {
+          redirectToGoogleOAuth(clientId);
         } else {
-          if (setupCard) setupCard.classList.remove('hidden');
-          if (inputClientEl) {
-            inputClientEl.focus();
-            inputClientEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          }
-          showToast('Ingresa tu Client ID de Google Cloud para abrir accounts.google.com', 'info');
+          showToast('Google requiere vincular el proyecto con Google Cloud (Ver instrucciones del desarrollador)', 'info');
         }
       };
     }
@@ -2168,7 +2175,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!container) return;
 
     if (!savedClientId) {
-      if (setupCard) setupCard.classList.remove('hidden');
       container.innerHTML = '';
       return;
     }
@@ -2232,7 +2238,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // REGISTRO DE SERVICE WORKER (PWA)
   // ----------------------------------------------------
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js?v=6').then((reg) => {
+    navigator.serviceWorker.register('./sw.js?v=7').then((reg) => {
       console.log('Service Worker registrado con éxito:', reg.scope);
       reg.update();
     }).catch((err) => {
