@@ -166,6 +166,8 @@ class AppDB {
     if (!storeData.workspace_id) {
       storeData.workspace_id = window.authGroups ? window.authGroups.getActiveWorkspaceId() : 'personal';
     }
+    if (!storeData.image_type) storeData.image_type = 'icon';
+    if (!storeData.image_data) storeData.image_data = 'supermarket';
     if (storeData.id) {
       storeData.updated_at = now;
       await this.put('stores', storeData);
@@ -383,13 +385,18 @@ class AppDB {
   }
 
   // Expenses (Contabilidad)
-  async getExpenses() {
+  async getExpenses(workspaceId = null) {
     const items = await this.getAll('expenses');
-    return items.sort((a, b) => new Date(b.date) - new Date(a.date));
+    if (workspaceId === 'ALL') return items.sort((a, b) => new Date(b.date) - new Date(a.date));
+    const targetWs = workspaceId || (window.authGroups ? window.authGroups.getActiveWorkspaceId() : 'personal');
+    return items.filter(e => (e.workspace_id || 'personal') === targetWs).sort((a, b) => new Date(b.date) - new Date(a.date));
   }
 
   async saveExpense(expenseData) {
     const now = new Date().toISOString();
+    if (!expenseData.workspace_id) {
+      expenseData.workspace_id = window.authGroups ? window.authGroups.getActiveWorkspaceId() : 'personal';
+    }
     if (expenseData.id) {
       expenseData.updated_at = now;
       await this.put('expenses', expenseData);
@@ -398,6 +405,10 @@ class AppDB {
       expenseData.created_at = now;
       return this.add('expenses', expenseData);
     }
+  }
+
+  async deleteExpense(expenseId) {
+    return this.delete('expenses', parseInt(expenseId, 10) || expenseId);
   }
 
   // Settings

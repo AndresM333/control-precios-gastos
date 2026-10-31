@@ -97,6 +97,14 @@ const AppIcons = {
       color: '#94a3b8',
       bg: 'rgba(148, 163, 184, 0.15)',
       svg: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>`
+    },
+    'restaurant': {
+      id: 'restaurant',
+      name: 'Comida / Platos Preparados / Menú',
+      category: 'Restaurante',
+      color: '#f97316',
+      bg: 'rgba(249, 115, 22, 0.15)',
+      svg: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 2v20M2 13h10a4 4 0 0 0 4-4V2H6a4 4 0 0 0-4 4v7z"/><line x1="2" y1="2" x2="2" y2="7"/><line x1="6" y1="2" x2="6" y2="7"/></svg>`
     }
   },
 
@@ -108,6 +116,13 @@ const AppIcons = {
       color: '#3b82f6',
       bg: 'rgba(59, 130, 246, 0.15)',
       svg: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg>`
+    },
+    'restaurant': {
+      id: 'restaurant',
+      name: 'Restaurante / Cafetería / Comida Rápida',
+      color: '#f97316',
+      bg: 'rgba(249, 115, 22, 0.15)',
+      svg: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 2v20M2 13h10a4 4 0 0 0 4-4V2H6a4 4 0 0 0-4 4v7z"/><line x1="2" y1="2" x2="2" y2="7"/><line x1="6" y1="2" x2="6" y2="7"/></svg>`
     },
     'shop': {
       id: 'shop',

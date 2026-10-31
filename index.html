@@ -12,7 +12,7 @@
   <link rel="manifest" href="./manifest.json">
   <link rel="icon" type="image/svg+xml" href="./icons/icon.svg">
   <link rel="apple-touch-icon" href="./icons/icon.svg">
-  <link rel="stylesheet" href="./css/styles.css?v=11">
+  <link rel="stylesheet" href="./css/styles.css?v=12">
   <!-- Tailwind Utilities (CDN for instant responsive styling) -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -897,14 +897,15 @@
     </div>
   </div>
 
-  <!-- MODAL: GASTO MANUAL -->
+  <!-- MODAL: GASTO MANUAL / EDICIÓN -->
   <div id="modalExpense" class="modal-overlay">
     <div class="modal-content">
       <div class="modal-header">
-        <h3 class="modal-title">Nuevo Gasto Manual</h3>
+        <h3 id="modalExpenseTitle" class="modal-title">Nuevo Gasto Manual</h3>
         <button class="modal-close" data-modal="modalExpense">&times;</button>
       </div>
       <form id="formExpense" class="modal-body">
+        <input type="hidden" id="inputExpenseId" value="">
         <div class="form-group">
           <label class="form-label">Concepto o Detalle *</label>
           <input type="text" id="inputExpenseConcept" class="form-input" required placeholder="Ej: Pasaje de autobús, Almuerzo en la calle">
@@ -1320,16 +1321,16 @@
   <div id="toastContainer" class="toast-container"></div>
 
   <!-- Core Scripts -->
-  <script src="./js/db.js?v=11"></script>
-  <script src="./js/icons-library.js?v=11"></script>
-  <script src="./js/bcv.js?v=11"></script>
-  <script src="./js/image-compressor.js?v=11"></script>
-  <script src="./js/ai-scanner.js?v=11"></script>
-  <script src="./js/charts.js?v=11"></script>
-  <script src="./js/grocery-planner.js?v=11"></script>
-  <script src="./js/accounting.js?v=11"></script>
-  <script src="./js/backup-drive.js?v=11"></script>
-  <script src="./js/auth-groups.js?v=11"></script>
-  <script src="./js/app.js?v=11"></script>
+  <script src="./js/db.js?v=12"></script>
+  <script src="./js/icons-library.js?v=12"></script>
+  <script src="./js/bcv.js?v=12"></script>
+  <script src="./js/image-compressor.js?v=12"></script>
+  <script src="./js/ai-scanner.js?v=12"></script>
+  <script src="./js/charts.js?v=12"></script>
+  <script src="./js/grocery-planner.js?v=12"></script>
+  <script src="./js/accounting.js?v=12"></script>
+  <script src="./js/backup-drive.js?v=12"></script>
+  <script src="./js/auth-groups.js?v=12"></script>
+  <script src="./js/app.js?v=12"></script>
 </body>
 </html>

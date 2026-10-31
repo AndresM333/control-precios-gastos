@@ -1719,7 +1719,8 @@ document.addEventListener('DOMContentLoaded', async () => {
           price: parseFloat(item.price) || 0,
           quantity: parseFloat(item.quantity) || 1,
           selected: true,
-          icon: window.aiScanner.guessProductIcon(cleanName),
+          icon: window.aiScanner.guessProductIcon(cleanName, item.category_hint),
+          category_hint: item.category_hint || '',
           isExisting: false
         };
       }).filter(item => item.name.length > 0);
@@ -2102,23 +2103,74 @@ document.addEventListener('DOMContentLoaded', async () => {
     list.innerHTML = summary.expenses.map(exp => {
       const isInvoice = exp.source === 'FACTURA';
       return `
-        <div class="flex items-center justify-between p-3 rounded-xl bg-slate-800/40 border border-slate-800 text-xs hover:border-slate-700 transition">
-          <div class="flex items-center gap-3">
-            <span class="w-8 h-8 rounded-lg flex items-center justify-center ${isInvoice ? 'bg-blue-500/10 text-blue-400' : 'bg-emerald-500/10 text-emerald-400'} font-bold">
+        <div class="flex items-center justify-between p-3 rounded-xl bg-slate-800/40 border border-slate-800 text-xs hover:border-slate-700 transition gap-2">
+          <div class="flex items-center gap-3 flex-1 min-w-0 pr-2">
+            <span class="w-8 h-8 rounded-lg flex items-center justify-center ${isInvoice ? 'bg-blue-500/10 text-blue-400' : 'bg-emerald-500/10 text-emerald-400'} font-bold flex-shrink-0">
               ${isInvoice ? '🧾' : '✍️'}
             </span>
-            <div>
-              <span class="font-bold text-slate-100 block">${escapeHtml(exp.concept)}</span>
-              <span class="text-[11px] text-slate-400">${exp.date} • <span class="text-slate-300 font-semibold">${escapeHtml(exp.category || 'Otros')}</span></span>
+            <div class="min-w-0 flex-1">
+              <span class="font-bold text-slate-100 block truncate" title="${escapeHtml(exp.concept)}">${escapeHtml(exp.concept)}</span>
+              <span class="text-[11px] text-slate-400">${exp.date} • <span class="text-slate-300 font-semibold">${escapeHtml(exp.category || 'Otros')}</span>${exp.note ? ' • ' + escapeHtml(exp.note) : ''}</span>
             </div>
           </div>
-          <div class="text-right">
-            <span class="text-sm font-bold text-slate-100 block">$ ${parseFloat(exp.amount_usd || 0).toFixed(2)}</span>
-            <span class="text-[10px] text-emerald-400 font-medium">Bs. ${parseFloat(exp.amount_ves || 0).toFixed(2)}</span>
+          <div class="flex items-center gap-2.5 flex-shrink-0">
+            <div class="text-right">
+              <span class="text-sm font-bold text-slate-100 block">$ ${parseFloat(exp.amount_usd || 0).toFixed(2)}</span>
+              <span class="text-[10px] text-emerald-400 font-medium">Bs. ${parseFloat(exp.amount_ves || 0).toFixed(2)}</span>
+            </div>
+            <div class="flex items-center gap-1 border-l border-slate-700/60 pl-2">
+              <button type="button" class="btn-edit-expense p-1.5 rounded-lg text-slate-400 hover:text-blue-400 hover:bg-slate-700/60 transition" data-id="${exp.id}" title="Editar gasto">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+              </button>
+              <button type="button" class="btn-delete-expense p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-slate-700/60 transition" data-id="${exp.id}" title="Eliminar gasto">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+              </button>
+            </div>
           </div>
         </div>
       `;
     }).join('');
+
+    // Listeners para editar gastos
+    list.querySelectorAll('.btn-edit-expense').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = parseInt(btn.dataset.id, 10);
+        const exp = await window.db.getById('expenses', id);
+        if (!exp) return;
+
+        document.getElementById('inputExpenseId').value = exp.id;
+        const modalTitle = document.getElementById('modalExpenseTitle');
+        if (modalTitle) modalTitle.textContent = 'Editar Gasto';
+        document.getElementById('inputExpenseConcept').value = exp.concept || '';
+
+        const curr = exp.original_currency || 'USD';
+        document.getElementById('inputExpenseCurrency').value = curr;
+        const amt = (curr === 'VES' ? exp.amount_ves : exp.amount_usd) || 0;
+        document.getElementById('inputExpenseAmount').value = parseFloat(amt).toFixed(2);
+
+        document.getElementById('inputExpenseCategory').value = exp.category || 'Otros';
+        document.getElementById('inputExpenseDate').value = exp.date || new Date().toISOString().split('T')[0];
+        document.getElementById('inputExpenseNote').value = exp.note || '';
+
+        openModal('modalExpense');
+      });
+    });
+
+    // Listeners para eliminar gastos
+    list.querySelectorAll('.btn-delete-expense').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = parseInt(btn.dataset.id, 10);
+        const exp = await window.db.getById('expenses', id);
+        if (!exp) return;
+
+        const concept = exp.concept || 'este gasto';
+        if (confirm(`¿Eliminar el gasto "${concept}"? Esta acción no se puede deshacer.`)) {
+          await window.accountingService.deleteExpense(id);
+          showToast('Gasto eliminado correctamente', 'info');
+          renderAccounting();
+        }
+      });
+    });
   }
 
   document.querySelectorAll('[data-period]').forEach(btn => {
@@ -2132,12 +2184,16 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   document.getElementById('btnNewManualExpense').addEventListener('click', () => {
     document.getElementById('formExpense').reset();
+    document.getElementById('inputExpenseId').value = '';
+    const modalTitle = document.getElementById('modalExpenseTitle');
+    if (modalTitle) modalTitle.textContent = 'Nuevo Gasto Manual';
     document.getElementById('inputExpenseDate').value = new Date().toISOString().split('T')[0];
     openModal('modalExpense');
   });
 
   document.getElementById('formExpense').addEventListener('submit', async (e) => {
     e.preventDefault();
+    const id = document.getElementById('inputExpenseId').value;
     const concept = document.getElementById('inputExpenseConcept').value.trim();
     const amount = parseFloat(document.getElementById('inputExpenseAmount').value);
     const currency = document.getElementById('inputExpenseCurrency').value;
@@ -2145,18 +2201,34 @@ document.addEventListener('DOMContentLoaded', async () => {
     const date = document.getElementById('inputExpenseDate').value;
     const note = document.getElementById('inputExpenseNote').value.trim();
 
-    await window.accountingService.addManualExpense({
-      concept,
-      amount,
-      currency,
-      category,
-      date,
-      note
-    });
-
-    showToast('Gasto manual registrado con éxito', 'success');
-    closeModal('modalExpense');
-    renderAccounting();
+    try {
+      if (id) {
+        await window.accountingService.updateExpense(id, {
+          concept,
+          amount,
+          currency,
+          category,
+          date,
+          note
+        });
+        showToast('Gasto actualizado con éxito', 'success');
+      } else {
+        await window.accountingService.addManualExpense({
+          concept,
+          amount,
+          currency,
+          category,
+          date,
+          note
+        });
+        showToast('Gasto manual registrado con éxito', 'success');
+      }
+      closeModal('modalExpense');
+      renderAccounting();
+    } catch (err) {
+      console.error(err);
+      showToast('Error al guardar el gasto: ' + err.message, 'error');
+    }
   });
 
   // ----------------------------------------------------
@@ -2747,7 +2819,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // REGISTRO DE SERVICE WORKER (PWA)
   // ----------------------------------------------------
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js?v=11').then((reg) => {
+    navigator.serviceWorker.register('./sw.js?v=12').then((reg) => {
       console.log('Service Worker registrado con éxito:', reg.scope);
       reg.update();
     }).catch((err) => {

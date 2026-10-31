@@ -128,6 +128,51 @@ class AccountingService {
     newExpense.id = id;
     return newExpense;
   }
+
+  /**
+   * Actualiza un gasto existente
+   */
+  async updateExpense(id, { concept, category, amount, currency, date, note }) {
+    const existing = await window.db.getById('expenses', parseInt(id, 10) || id);
+    if (!existing) {
+      throw new Error('El gasto a editar no existe');
+    }
+
+    const currentRate = window.bcvService.rate;
+    const val = parseFloat(amount);
+    if (isNaN(val) || val <= 0) {
+      throw new Error('El monto del gasto debe ser mayor a 0');
+    }
+
+    const curr = (currency || existing.original_currency || 'USD').toUpperCase();
+    let amountUsd = val;
+    let amountVes = val;
+
+    if (curr === 'USD') {
+      amountVes = window.bcvService.usdToVes(val, currentRate);
+    } else {
+      amountUsd = window.bcvService.vesToUsd(val, currentRate);
+    }
+
+    existing.concept = (concept || existing.concept || 'Gasto').trim();
+    existing.category = category || existing.category || 'Otros';
+    existing.amount_usd = amountUsd;
+    existing.amount_ves = amountVes;
+    existing.original_currency = curr;
+    existing.bcv_rate = currentRate;
+    existing.date = date || existing.date;
+    existing.note = (note !== undefined ? note : (existing.note || '')).trim();
+
+    await window.db.saveExpense(existing);
+    return existing;
+  }
+
+  /**
+   * Elimina un gasto
+   */
+  async deleteExpense(id) {
+    return await window.db.deleteExpense(id);
+  }
 }
 
 window.accountingService = new AccountingService();

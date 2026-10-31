@@ -13,14 +13,25 @@ class AIScannerService {
   }
 
   /**
-   * Deduce el icono temático de producto más apropiado según el nombre
+   * Deduce el icono temático de producto más apropiado según el nombre y sugerencia
    * @param {string} name 
+   * @param {string} categoryHint
    * @returns {string} ID del icono en AppIcons.products
    */
-  guessProductIcon(name) {
+  guessProductIcon(name, categoryHint = '') {
+    const validIcons = ['restaurant', 'bakery', 'coffee', 'meat', 'dairy', 'produce', 'grain', 'canned', 'snack', 'cleaning', 'hygiene', 'pharmacy', 'general'];
+    if (categoryHint && typeof categoryHint === 'string') {
+      const hint = categoryHint.toLowerCase().trim();
+      if (validIcons.includes(hint)) return hint;
+    }
+
     if (!name || typeof name !== 'string') return 'general';
     const n = name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
+    // Platos preparados / Restaurante / Comida rápida
+    if (/(hamburguesa|burger|pizza|perro caliente|hot dog|pepito|shawarma|sushi|plato|combo|almuerzo|cena|desayuno|wrap|club house|pasticho|lasana|parrilla|sopa|hervido|racion|tostones|alitas|pollo asado|pollo frito|crepe|taco|burrito|chuzo|arepa|cachapa|empanada de|pastelito de)/.test(n)) {
+      return 'restaurant';
+    }
     // Panadería / Repostería / Masas / Desayunos
     if (/(pan|panaderia|baguette|canilla|campesino|croissant|donut|dona|galleta|pastel|torta|hojaldre|empanada|tequeno|pastelito|ponque|bizcocho|waffle|brownie|muffin|sandwich|sanduche|bagel|panqueque)/.test(n)) {
       return 'bakery';
@@ -29,8 +40,8 @@ class AIScannerService {
     if (/(cafe|espresso|capuchino|cappuccino|latte|moka|te|infusion|bebida|refresco|malta|jugo|chicha|agua|soda|cerveza|vino|licor|ron|vodka|whisky|coctel|smoothie|batido|merengada|energizante|monster|redbull|gatorade|coca|pepsi|chinotto|frescolita)/.test(n)) {
       return 'coffee';
     }
-    // Carnes / Pollo / Pescado / Hamburguesas
-    if (/(carne|molida|mechada|solomo|bistec|lomito|pollo|pechuga|muslo|ala|alas|milanesa|pescado|atun|salmon|sardina|camaron|marisco|cerdo|cochino|chuleta|jamon|salchicha|tocineta|mortadela|chorizo|costilla|hamburguesa|burger|nugget|albondiga|parrilla)/.test(n)) {
+    // Carnes / Pollo / Pescado
+    if (/(carne|molida|mechada|solomo|bistec|lomito|pollo|pechuga|muslo|ala|alas|milanesa|pescado|atun|salmon|sardina|camaron|marisco|cerdo|cochino|chuleta|jamon|salchicha|tocineta|mortadela|chorizo|costilla|nugget|albondiga)/.test(n)) {
       return 'meat';
     }
     // Lácteos / Huevos / Quesos
@@ -62,11 +73,51 @@ class AIScannerService {
       return 'hygiene';
     }
     // Farmacia / Medicinas / Cuidado
-    if (/(pastilla|jarabe|antibiotico|ibuprofeno|acetaminofen|paracetamol|aspirina|medicina|alcohol|algodon|gasa|curita|ampolla|gotas|vitamina|capsula|analgesico|antihistaminico|pedialyte)/.test(n)) {
+    if (/(pastilla|jarabe|antibiotico|ibuprofeno|acetaminofen|paracetamol|aspirina|medicina|alcohol|algodon|gasa|curita|ampolla|gotas|vitamina|capsula|analgesico|antihistaminico|pedialyte|suero)/.test(n)) {
       return 'pharmacy';
     }
 
     return 'general';
+  }
+
+  /**
+   * Deduce el icono temático de tienda más apropiado según su nombre o tipo de documento
+   * @param {string} storeName 
+   * @param {string} docType 
+   * @returns {string} ID del icono en AppIcons.stores
+   */
+  guessStoreIcon(storeName, docType = 'FACTURA') {
+    if (!storeName || typeof storeName !== 'string') {
+      return docType === 'MENU_LISTA' ? 'restaurant' : 'supermarket';
+    }
+    const s = storeName.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+    if (/(farmacia|farma|botica|drogueria|boticario|saas|farmatodo|locatel)/.test(s)) {
+      return 'pharmacy';
+    }
+    if (/(panaderia|pasteleria|dulceria|croissant|panificadora|bakery)/.test(s)) {
+      return 'bakery';
+    }
+    if (/(carniceria|frigorifico|charcuteria|carnes|pescaderia)/.test(s)) {
+      return 'butcher';
+    }
+    if (/(fruteria|verduleria|hortalizas|mercado libre|huerto)/.test(s)) {
+      return 'produce';
+    }
+    if (/(restaurant|restaurante|cafe|cafeteria|bistro|pizzeria|burger|hamburguesas|sushi|comida|fast food|diner|bar|tasca|churrasqueria|pollo|arepera)/.test(s) || docType === 'MENU_LISTA') {
+      return 'restaurant';
+    }
+    if (/(bodegon|licoreria|licores|importados|delicateses)/.test(s)) {
+      return 'bodegon';
+    }
+    if (/(mall|centro comercial|tienda|departamentos|traki|daka|multimax)/.test(s)) {
+      return 'mall';
+    }
+    if (/(abasto|bodega|minimarket|quiosco|kiosko)/.test(s)) {
+      return 'shop';
+    }
+
+    return 'supermarket';
   }
 
   /**
@@ -118,19 +169,34 @@ Devuelve EXCLUSIVAMENTE los siguientes campos en formato JSON estricto:
       "name": "Nombre descriptivo y limpio del producto o plato (Ej: Hamburguesa Especial, Pizza Mediana, Harina PAN 1kg, Refresco 1.5L, Café con Leche)",
       "price": 0.00,
       "quantity": 1.0,
-      "total": 0.00
+      "total": 0.00,
+      "category_hint": "restaurant | bakery | coffee | meat | dairy | produce | grain | canned | snack | cleaning | hygiene | pharmacy | general"
     }
   ]
 }
 
 REGLAS CRÍTICAS:
 1. "items": Registra cada producto o plato individual que posea un precio legible. Limpia el nombre de códigos irrelevantes o símbolos extraños.
-2. "price": Precio unitario en formato número flotante/decimal sin símbolos ni letras (Ejemplo: 4.50, 15.00, 180.25).
-3. "quantity": En menús, listas de precios o carteleras coloca 1.0 por defecto. En facturas donde se compró más de 1 unidad, coloca la cantidad indicada.
-4. "total": En facturas es el total general del documento. En menús o listas donde no hay un total global de compra, calcula la suma de los ítems o 0.00.
-5. "currency": Si la mayoría de precios usan $, ref o dólares -> "USD". Si usan Bs, bolívares -> "VES".
-6. REGLA ESTRICTA DE SEGURIDAD: NO intentes calificar el producto, NO agregues estrellas, NO inventes valoraciones de calidad. Las calificaciones son exclusivas del usuario.
-7. Devuelve SOLO el objeto JSON puro sin bloques markdown (\`\`\`json) ni explicaciones adicionales.
+2. "category_hint": Elige de la lista la categoría/icono que mejor corresponda al producto o plato:
+   - "restaurant": Comida rápida, platos preparados, pizzas, hamburguesas, sushi, combos, arepas, empanadas, etc.
+   - "bakery": Panes, dulces, galletas, ponqués, tortas, bollería.
+   - "coffee": Café, té, refrescos, maltas, cervezas, licores, jugos, bebidas.
+   - "meat": Carnes rojas, pollo, pescado, mariscos, embutidos.
+   - "dairy": Quesos, leche, huevos, mantequilla, yogurt.
+   - "produce": Frutas, verduras, hortalizas, legumbres frescas.
+   - "grain": Harina, arroz, pastas, cereales, granos secos.
+   - "canned": Enlatados, salsas, aceites, condimentos.
+   - "snack": Chocolates, papitas, golosinas, helados.
+   - "cleaning": Detergentes, cloro, desinfectantes, artículos del hogar.
+   - "hygiene": Champú, jabón, pasta dental, desodorante, aseo personal.
+   - "pharmacy": Medicinas, pastillas, jarabes, salud.
+   - "general": Otros artículos.
+3. "price": Precio unitario en formato número flotante/decimal sin símbolos ni letras (Ejemplo: 4.50, 15.00, 180.25).
+4. "quantity": En menús, listas de precios o carteleras coloca 1.0 por defecto. En facturas donde se compró más de 1 unidad, coloca la cantidad indicada.
+5. "total": En facturas es el total general del documento. En menús o listas donde no hay un total global de compra, calcula la suma de los ítems o 0.00.
+6. "currency": Si la mayoría de precios usan $, ref o dólares -> "USD". Si usan Bs, bolívares -> "VES".
+7. REGLA ESTRICTA DE SEGURIDAD: NO intentes calificar el producto, NO agregues estrellas, NO inventes valoraciones de calidad. Las calificaciones son exclusivas del usuario.
+8. Devuelve SOLO el objeto JSON puro sin bloques markdown (\`\`\`json) ni explicaciones adicionales.
 `;
 
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${this.defaultModel}:generateContent?key=${apiKey}`;
@@ -240,12 +306,15 @@ REGLAS CRÍTICAS:
       store = await window.db.findStoreByName(storeName);
       if (!store) {
         isNewStore = true;
+        const guessedStoreIcon = this.guessStoreIcon(storeName, docType);
         const newStoreId = await window.db.saveStore({
           workspace_id: activeWs,
           name: storeName,
           maps_url: `https://maps.google.com/?q=${encodeURIComponent(storeName)}`,
           lat: null,
           lng: null,
+          image_type: 'icon',
+          image_data: guessedStoreIcon,
           description: `Registrada automáticamente mediante escaneo inteligente (${docType.toLowerCase()}).`
         });
         store = await window.db.getById('stores', newStoreId);
@@ -284,8 +353,8 @@ REGLAS CRÍTICAS:
           rating: existingProduct.rating
         });
       } else {
-        // Asignar icono temático estándar automático de AppIcons
-        const guessedIcon = this.guessProductIcon(cleanName);
+        // Asignar icono temático estándar automático de AppIcons más correspondiente
+        const guessedIcon = this.guessProductIcon(cleanName, item.category_hint);
 
         const newProduct = {
           workspace_id: activeWs,
@@ -347,13 +416,26 @@ REGLAS CRÍTICAS:
         original_size_bytes: compressedPhotoData ? compressedPhotoData.originalSizeBytes : 0
       });
 
+      // Deducir categoría contable más adecuada
+      let expenseCategory = 'Alimentos / Mercado';
+      const storeLower = (store.name || '').toLowerCase();
+      if (/(farmacia|farma|botica|drogueria|salud|medic|farmatodo|locatel)/.test(storeLower)) {
+        expenseCategory = 'Salud / Farmacia';
+      } else if (/(restaurant|cafe|cafeteria|pizzeria|burger|bar|tasca|comida rapida|heladeria|arepera)/.test(storeLower) || docType === 'MENU_LISTA') {
+        expenseCategory = 'Ocio / Salidas';
+      } else if (/(ferreteria|hogar|muebles|bazar|limpieza)/.test(storeLower)) {
+        expenseCategory = 'Hogar';
+      } else if (/(transporte|gasolina|taller|repuestos|taxi|metro)/.test(storeLower)) {
+        expenseCategory = 'Transporte';
+      }
+
       // Crear Gasto Contable Automático
       const expenseId = await window.db.saveExpense({
         workspace_id: activeWs,
         invoice_id: invoiceRecord.id,
         date: date,
         concept: `Compra en ${store.name}`,
-        category: 'Alimentos / Mercado',
+        category: expenseCategory,
         amount_usd: totalUsd,
         amount_ves: totalVes,
         original_currency: currency,
