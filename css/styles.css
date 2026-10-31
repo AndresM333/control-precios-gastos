@@ -51,64 +51,159 @@ body {
   position: sticky;
   top: 0;
   z-index: 40;
-  background-color: rgba(11, 15, 25, 0.92);
-  backdrop-filter: blur(12px);
+  background-color: rgba(11, 15, 25, 0.96);
+  backdrop-filter: blur(14px);
   border-bottom: 1px solid var(--border-color);
-  padding: 10px 16px;
+  padding: 8px 12px;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 8px;
+}
+
+@media (min-width: 768px) {
+  .app-header {
+    padding: 10px 20px;
+    flex-wrap: nowrap;
+    gap: 16px;
+  }
 }
 
 .brand-wrapper {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
+  flex-shrink: 0;
+  order: 1;
 }
 
 .brand-logo {
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  flex-shrink: 0;
 }
 
 .brand-title {
-  font-size: 1.05rem;
+  font-size: 0.95rem;
   font-weight: 700;
   letter-spacing: -0.02em;
   color: var(--text-main);
+  white-space: nowrap;
+  line-height: 1.2;
 }
 
 .brand-subtitle {
-  font-size: 0.7rem;
+  font-size: 0.65rem;
   color: var(--text-muted);
+  white-space: nowrap;
+  line-height: 1.2;
+}
+
+@media (max-width: 640px) {
+  .brand-subtitle {
+    display: none;
+  }
+}
+
+@media (min-width: 768px) {
+  .brand-wrapper {
+    order: unset;
+  }
+  .brand-logo {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+  }
+  .brand-title {
+    font-size: 1.05rem;
+  }
 }
 
 .header-actions {
   display: flex;
   align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  order: 2;
+}
+
+@media (min-width: 768px) {
+  .header-actions {
+    gap: 8px;
+    order: unset;
+  }
+}
+
+/* Workspace Selector */
+.workspace-selector-wrapper {
+  position: relative;
+  width: 100%;
+  order: 3;
+}
+
+.workspace-btn-main {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 8px;
+  padding: 6px 12px;
+  border-radius: 10px;
+  background-color: rgba(30, 41, 59, 0.85);
+  border: 1px solid rgba(51, 65, 85, 0.8);
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #f1f5f9;
+  transition: all 0.15s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.workspace-btn-main:hover {
+  background-color: rgba(51, 65, 85, 0.95);
+  border-color: rgba(71, 85, 105, 1);
+}
+
+@media (min-width: 768px) {
+  .workspace-selector-wrapper {
+    width: auto;
+    order: unset;
+  }
+  .workspace-btn-main {
+    width: auto;
+    justify-content: flex-start;
+    padding: 6px 14px;
+    border-radius: 12px;
+  }
 }
 
 /* BCV Badge Pill */
 .bcv-pill {
   display: flex;
   align-items: center;
-  gap: 6px;
-  background: rgba(59, 130, 246, 0.12);
-  border: 1px solid rgba(59, 130, 246, 0.3);
-  padding: 4px 10px;
+  gap: 5px;
+  background: rgba(59, 130, 246, 0.14);
+  border: 1px solid rgba(59, 130, 246, 0.35);
+  padding: 4px 8px;
   border-radius: 20px;
-  font-size: 0.78rem;
+  font-size: 0.75rem;
   font-weight: 600;
   color: #60a5fa;
   cursor: pointer;
+  white-space: nowrap;
   transition: all 0.2s;
 }
 
 .bcv-pill:hover {
-  background: rgba(59, 130, 246, 0.22);
+  background: rgba(59, 130, 246, 0.25);
+}
+
+@media (min-width: 768px) {
+  .bcv-pill {
+    padding: 4px 10px;
+    font-size: 0.78rem;
+  }
 }
 
 .drive-pill {
