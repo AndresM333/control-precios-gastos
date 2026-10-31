@@ -13,9 +13,66 @@ class AIScannerService {
   }
 
   /**
-   * Analiza una imagen de factura o tabla de precios usando Gemini Flash
+   * Deduce el icono temático de producto más apropiado según el nombre
+   * @param {string} name 
+   * @returns {string} ID del icono en AppIcons.products
+   */
+  guessProductIcon(name) {
+    if (!name || typeof name !== 'string') return 'general';
+    const n = name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+    // Panadería / Repostería / Masas / Desayunos
+    if (/(pan|panaderia|baguette|canilla|campesino|croissant|donut|dona|galleta|pastel|torta|hojaldre|empanada|tequeno|pastelito|ponque|bizcocho|waffle|brownie|muffin|sandwich|sanduche|bagel|panqueque)/.test(n)) {
+      return 'bakery';
+    }
+    // Bebidas / Café / Licores / Refrescos
+    if (/(cafe|espresso|capuchino|cappuccino|latte|moka|te|infusion|bebida|refresco|malta|jugo|chicha|agua|soda|cerveza|vino|licor|ron|vodka|whisky|coctel|smoothie|batido|merengada|energizante|monster|redbull|gatorade|coca|pepsi|chinotto|frescolita)/.test(n)) {
+      return 'coffee';
+    }
+    // Carnes / Pollo / Pescado / Hamburguesas
+    if (/(carne|molida|mechada|solomo|bistec|lomito|pollo|pechuga|muslo|ala|alas|milanesa|pescado|atun|salmon|sardina|camaron|marisco|cerdo|cochino|chuleta|jamon|salchicha|tocineta|mortadela|chorizo|costilla|hamburguesa|burger|nugget|albondiga|parrilla)/.test(n)) {
+      return 'meat';
+    }
+    // Lácteos / Huevos / Quesos
+    if (/(queso|leche|suero|mantequilla|margarina|yogurt|yogur|crema|nata|cuajada|huevo|huevos|parmesano|gouda|mozzarella|mozarella|ricotta|cheddar)/.test(n)) {
+      return 'dairy';
+    }
+    // Frutas / Verduras / Ensaladas
+    if (/(tomate|cebolla|papa|papas|platano|cambur|banana|fruta|verdura|hortaliza|aguacate|lechuga|zanahoria|limon|naranja|manzana|fresa|pina|ajo|cilantro|perejil|pimenton|melon|patilla|sandia|pepino|calabacin|repollo|yuca|ocumo|auyama|guayaba|mango|ensalada)/.test(n)) {
+      return 'produce';
+    }
+    // Granos / Harinas / Cereales / Pastas
+    if (/(arroz|harina|pan harina|pasta|espagueti|fideos|avena|cereal|cornflakes|caraota|caraotas|frijol|lenteja|garbanzo|trigo|maiz|maizina|fororo|granos)/.test(n)) {
+      return 'grain';
+    }
+    // Enlatados / Salsas / Condimentos / Despensa
+    if (/(salsa|mayonesa|ketchup|mostaza|enlatado|lata|guisantes|vinagre|aceite|aderezo|caldo|cubito|mermelada|miel|nutella|atun en lata)/.test(n)) {
+      return 'canned';
+    }
+    // Snacks / Golosinas / Chocolates / Helados
+    if (/(snack|chocolate|caramelo|papitas|doritos|cheetos|lays|platanitos|frutos secos|mani|cotufas|gomitas|chicle|bombon|pirulin|galak|toronto|cocosette|susy|barquilla|helado)/.test(n)) {
+      return 'snack';
+    }
+    // Limpieza / Hogar / Detergentes
+    if (/(cloro|detergente|jabon en polvo|desinfectante|esponja|lavaplatos|suavizante|escoba|coleto|toallin|papel higienico|papel sanitario|ajax|ariel|ace|limpiador|ambientador)/.test(n)) {
+      return 'cleaning';
+    }
+    // Higiene Personal / Aseo
+    if (/(champu|shampoo|acondicionador|jabon|jaboncillo|pasta dental|crema dental|cepillo|desodorante|toalla|toallas sanitarias|afeitadora|gillette|talco|crema de cuerpo|protector solar|enjuague bucal)/.test(n)) {
+      return 'hygiene';
+    }
+    // Farmacia / Medicinas / Cuidado
+    if (/(pastilla|jarabe|antibiotico|ibuprofeno|acetaminofen|paracetamol|aspirina|medicina|alcohol|algodon|gasa|curita|ampolla|gotas|vitamina|capsula|analgesico|antihistaminico|pedialyte)/.test(n)) {
+      return 'pharmacy';
+    }
+
+    return 'general';
+  }
+
+  /**
+   * Analiza una imagen (factura, menú de restaurante, catálogo, lista de compras o tabla de precios) usando Gemini Flash
    * @param {string} base64DataUrl - Imagen en formato dataURL
-   * @param {string} mode - 'FACTURA' o 'TABLA_PRECIOS'
+   * @param {string} mode - 'FACTURA', 'MENU_LISTA' o 'TABLA_PRECIOS'
    */
   async analyzeImage(base64DataUrl, mode = 'FACTURA') {
     const apiKey = await this.getApiKey();
@@ -35,20 +92,30 @@ class AIScannerService {
     const mimeType = matches[1];
     const base64Data = matches[2];
 
-    const promptText = `
-Eres un extractor de datos de alta precisión para facturas, tickets de compra y listas de precios de Venezuela.
-Analiza cuidadosamente esta imagen.
+    let contextDesc = 'facturas de compra, tickets de caja o recibos comerciales';
+    if (mode === 'MENU_LISTA') {
+      contextDesc = 'menús de restaurantes, cafeterías, panaderías, cartas de platos/bebidas, listas de compras o catálogos de productos';
+    } else if (mode === 'TABLA_PRECIOS') {
+      contextDesc = 'pizarras de precios, carteleras de abastos, etiquetas de estanterías o tablas de productos';
+    }
 
-Extrae EXCLUSIVAMENTE los siguientes campos en formato JSON estricto:
+    const promptText = `
+Eres un extractor de datos de alta precisión para ${contextDesc} de Venezuela y Latinoamérica.
+Analiza cuidadosamente esta imagen. La imagen PUEDE CONTENER MULTIPLES PRODUCTOS (como un menú completo con varios platos y bebidas, una lista de compras, una cartelera de precios con varios renglones, o una factura con muchos artículos).
+
+OBJETIVO PRINCIPAL:
+Extrae TODOS Y CADA UNO de los productos, artículos o platos identificables con su precio correspondiente. NO resumas, NO omitas productos; si detectas 3, 10, 25 o más productos, debes extraerlos todos individualmente en el array "items".
+
+Devuelve EXCLUSIVAMENTE los siguientes campos en formato JSON estricto:
 {
-  "store_name": "Nombre de la tienda, comercio o supermercado (Ej: Central Madeirense, Farmatodo, Bodegón X). Si no se distingue con claridad, usa 'Tienda Desconocida'",
-  "date": "Fecha de la compra en formato YYYY-MM-DD (si no está visible, usa la fecha actual)",
-  "currency": "USD o VES (Moneda principal en la que están expresados los precios individuales)",
+  "store_name": "Nombre de la tienda, restaurante, panadería o comercio (Ej: Central Madeirense, Burger Place, Farmatodo, Bodegón Express). Si no se distingue con claridad, deduce del encabezado o logo, o usa 'Comercio Detectado'",
+  "date": "Fecha en formato YYYY-MM-DD (si no está visible, usa la fecha actual)",
+  "currency": "USD o VES (Indica 'USD' si los precios están en dólares, $, ref, divisas; o 'VES' si están en Bs., bolívares)",
   "document_type": "${mode}",
   "total": 0.00,
   "items": [
     {
-      "name": "Nombre descriptivo y limpio del producto (Ej: Harina PAN 1kg, Arroz Mary 1kg)",
+      "name": "Nombre descriptivo y limpio del producto o plato (Ej: Hamburguesa Especial, Pizza Mediana, Harina PAN 1kg, Refresco 1.5L, Café con Leche)",
       "price": 0.00,
       "quantity": 1.0,
       "total": 0.00
@@ -57,11 +124,13 @@ Extrae EXCLUSIVAMENTE los siguientes campos en formato JSON estricto:
 }
 
 REGLAS CRÍTICAS:
-1. "price" debe ser el precio unitario del producto como número flotante (sin símbolos de $ ni Bs).
-2. Si los precios están en Bolívares, pon "currency": "VES". Si están en Dólares, pon "currency": "USD".
-3. NO incluyas productos sin nombre o sin precio legible.
-4. REGLA ESTRICTA DE SEGURIDAD: NO intentes calificar el producto, NO agregues estrellas, NO inventes valoraciones de calidad. Las valoraciones de calidad son manuales del usuario.
-5. Devuelve SOLO el objeto JSON puro sin bloques markdown ni explicaciones adicionales.
+1. "items": Registra cada producto o plato individual que posea un precio legible. Limpia el nombre de códigos irrelevantes o símbolos extraños.
+2. "price": Precio unitario en formato número flotante/decimal sin símbolos ni letras (Ejemplo: 4.50, 15.00, 180.25).
+3. "quantity": En menús, listas de precios o carteleras coloca 1.0 por defecto. En facturas donde se compró más de 1 unidad, coloca la cantidad indicada.
+4. "total": En facturas es el total general del documento. En menús o listas donde no hay un total global de compra, calcula la suma de los ítems o 0.00.
+5. "currency": Si la mayoría de precios usan $, ref o dólares -> "USD". Si usan Bs, bolívares -> "VES".
+6. REGLA ESTRICTA DE SEGURIDAD: NO intentes calificar el producto, NO agregues estrellas, NO inventes valoraciones de calidad. Las calificaciones son exclusivas del usuario.
+7. Devuelve SOLO el objeto JSON puro sin bloques markdown (\`\`\`json) ni explicaciones adicionales.
 `;
 
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${this.defaultModel}:generateContent?key=${apiKey}`;
@@ -115,48 +184,81 @@ REGLAS CRÍTICAS:
     try {
       parsedResult = JSON.parse(rawJson);
     } catch (e) {
-      // Intenta limpiar bloques markdown si los trajo
       const cleaned = rawJson.replace(/```json/g, '').replace(/```/g, '').trim();
       parsedResult = JSON.parse(cleaned);
+    }
+
+    if (!parsedResult.items || !Array.isArray(parsedResult.items)) {
+      parsedResult.items = [];
     }
 
     return parsedResult;
   }
 
   /**
-   * Guarda automáticamente los datos extraídos en la base de datos local
-   * cumpliendo todas las reglas de negocio
+   * Guarda automáticamente los datos extraídos (múltiples productos) en la base de datos local
+   * cumpliendo todas las reglas de negocio, asignación de iconos y registro contable opcional
+   * @param {Object} extraction - Datos analizados por la IA
+   * @param {Object|null} options - Opciones personalizadas (tienda, ítems seleccionados, moneda, gasto)
    */
-  async processAndCommitExtraction(extraction, compressedPhotoData = null) {
-    const currentBcvRate = window.bcvService.rate;
-    const storeName = (extraction.store_name || 'Tienda Desconocida').trim();
-    const date = extraction.date || new Date().toISOString().split('T')[0];
-    const currency = (extraction.currency || 'USD').toUpperCase() === 'VES' ? 'VES' : 'USD';
-    const items = extraction.items || [];
-    const docType = extraction.document_type || 'FACTURA';
+  async processAndCommitExtraction(extraction, options = {}) {
+    let compressedPhotoData = null;
+    let selectedStoreId = null;
+    let customStoreName = null;
+    let selectedItems = null;
+    let selectedCurrency = null;
+    let shouldRecordExpense = null;
 
-    // 1. Verificar o Crear Tienda
-    let store = await window.db.findStoreByName(storeName);
-    let isNewStore = false;
-
-    if (!store) {
-      isNewStore = true;
-      const newStoreId = await window.db.saveStore({
-        name: storeName,
-        maps_url: `https://maps.google.com/?q=${encodeURIComponent(storeName)}`,
-        lat: null,
-        lng: null,
-        description: 'Registrada automáticamente mediante escaneo de factura.'
-      });
-      store = await window.db.getById('stores', newStoreId);
+    if (options && options.dataUrl) {
+      // Retrocompatibilidad si se envió directamente el objeto de foto comprimida
+      compressedPhotoData = options;
+    } else if (typeof options === 'object' && options !== null) {
+      compressedPhotoData = options.compressedPhoto || null;
+      selectedStoreId = options.storeId || null;
+      customStoreName = options.storeName || null;
+      selectedItems = options.items || null;
+      selectedCurrency = options.currency || null;
+      shouldRecordExpense = options.recordExpense !== undefined ? options.recordExpense : null;
     }
 
-    // 2. Procesar Productos
+    const activeWs = window.authGroups ? window.authGroups.getActiveWorkspaceId() : 'personal';
+    const currentBcvRate = window.bcvService ? window.bcvService.rate : 1.0;
+    const date = extraction.date || new Date().toISOString().split('T')[0];
+    const docType = extraction.document_type || 'FACTURA';
+    const currency = (selectedCurrency || extraction.currency || 'USD').toUpperCase() === 'VES' ? 'VES' : 'USD';
+
+    // 1. Resolver Tienda de Destino
+    let store = null;
+    let isNewStore = false;
+
+    if (selectedStoreId && selectedStoreId !== 'NEW_DETECTED' && selectedStoreId !== 'CUSTOM_NEW') {
+      store = await window.db.getById('stores', selectedStoreId);
+    }
+
+    if (!store) {
+      const storeName = (customStoreName || extraction.store_name || 'Comercio Detectado').trim();
+      store = await window.db.findStoreByName(storeName);
+      if (!store) {
+        isNewStore = true;
+        const newStoreId = await window.db.saveStore({
+          workspace_id: activeWs,
+          name: storeName,
+          maps_url: `https://maps.google.com/?q=${encodeURIComponent(storeName)}`,
+          lat: null,
+          lng: null,
+          description: `Registrada automáticamente mediante escaneo inteligente (${docType.toLowerCase()}).`
+        });
+        store = await window.db.getById('stores', newStoreId);
+      }
+    }
+
+    // 2. Procesar Productos Seleccionados
+    const itemsToProcess = selectedItems || extraction.items || [];
     let newProductsCount = 0;
     let updatedProductsCount = 0;
     const processedItems = [];
 
-    for (const item of items) {
+    for (const item of itemsToProcess) {
       if (!item.name || item.price === undefined || isNaN(parseFloat(item.price))) continue;
 
       const cleanName = item.name.trim();
@@ -168,7 +270,7 @@ REGLAS CRÍTICAS:
       const existingProduct = await window.db.findProductByStoreAndName(store.id, cleanName);
 
       if (existingProduct) {
-        // Actualizar precio actual, preservar valoración de 1 a 5 estrellas intacta
+        // Actualizar precio actual, preservar valoración personal de 1 a 5 estrellas intacta
         existingProduct.current_price = unitPrice;
         existingProduct.original_currency = currency;
         existingProduct.updated_at = new Date().toISOString();
@@ -182,13 +284,18 @@ REGLAS CRÍTICAS:
           rating: existingProduct.rating
         });
       } else {
-        // Crear nuevo producto (con rating null - regla estricta: IA no toca valoración)
+        // Asignar icono temático estándar automático de AppIcons
+        const guessedIcon = this.guessProductIcon(cleanName);
+
         const newProduct = {
+          workspace_id: activeWs,
           store_id: store.id,
           name: cleanName,
           current_price: unitPrice,
           original_currency: currency,
-          rating: null, // Dejado en blanco para valoración manual personal del usuario
+          image_type: 'icon',
+          image_data: guessedIcon,
+          rating: null, // Dejado en blanco para valoración manual del usuario
           description: `Registrado automáticamente desde ${docType.toLowerCase()}.`
         };
 
@@ -198,19 +305,27 @@ REGLAS CRÍTICAS:
           ...item,
           productId: savedProd.id,
           status: 'nuevo',
-          rating: null
+          rating: savedProd.rating || null
         });
       }
     }
 
-    // 3. Si es Factura: Guardar Factura con Foto Comprimida y Registrar Gasto Contable
+    // 3. Registrar Gasto y Factura si corresponde
     let invoiceRecord = null;
     let expenseRecord = null;
 
-    if (docType === 'FACTURA' && (extraction.total > 0 || processedItems.length > 0)) {
-      let totalAmount = parseFloat(extraction.total);
-      if (isNaN(totalAmount) || totalAmount <= 0) {
-        totalAmount = processedItems.reduce((acc, curr) => acc + (parseFloat(curr.total) || (parseFloat(curr.price) * (parseFloat(curr.quantity) || 1))), 0);
+    // Si no se especificó explícitamente, por defecto sólo se registra gasto si es FACTURA
+    const recordExpenseFinal = shouldRecordExpense !== null ? Boolean(shouldRecordExpense) : (docType === 'FACTURA');
+
+    if (recordExpenseFinal && processedItems.length > 0) {
+      let totalAmount = processedItems.reduce((acc, curr) => {
+        const p = parseFloat(curr.price) || 0;
+        const q = parseFloat(curr.quantity) || 1;
+        return acc + (parseFloat(curr.total) || (p * q));
+      }, 0);
+
+      if (totalAmount <= 0 && extraction.total > 0) {
+        totalAmount = parseFloat(extraction.total);
       }
 
       const totalUsd = currency === 'USD' ? totalAmount : window.bcvService.vesToUsd(totalAmount, currentBcvRate);
@@ -218,6 +333,7 @@ REGLAS CRÍTICAS:
 
       // Guardar Factura con foto ultra-comprimida WebP
       invoiceRecord = await window.db.saveInvoice({
+        workspace_id: activeWs,
         store_id: store.id,
         store_name: store.name,
         date: date,
@@ -233,6 +349,7 @@ REGLAS CRÍTICAS:
 
       // Crear Gasto Contable Automático
       const expenseId = await window.db.saveExpense({
+        workspace_id: activeWs,
         invoice_id: invoiceRecord.id,
         date: date,
         concept: `Compra en ${store.name}`,
@@ -241,8 +358,8 @@ REGLAS CRÍTICAS:
         amount_ves: totalVes,
         original_currency: currency,
         bcv_rate: currentBcvRate,
-        source: 'FACTURA',
-        note: `Factura con ${processedItems.length} productos procesada con IA.`
+        source: docType,
+        note: `${docType === 'FACTURA' ? 'Factura' : 'Registro múltiple'} con ${processedItems.length} productos procesados con IA.`
       });
 
       expenseRecord = await window.db.getById('expenses', expenseId);

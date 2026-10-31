@@ -1294,22 +1294,36 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   // ----------------------------------------------------
-  // 3. ESCANEO CON IA & COMPRESIÓN EXTREMA
+  // 3. ESCANEO CON IA & COMPRESIÓN EXTREMA (REGISTRO MÚLTIPLE)
   // ----------------------------------------------------
   const scanModeInvoiceBtn = document.getElementById('scanModeInvoiceBtn');
+  const scanModeMenuBtn = document.getElementById('scanModeMenuBtn');
   const scanModeTableBtn = document.getElementById('scanModeTableBtn');
 
-  scanModeInvoiceBtn.addEventListener('click', () => {
-    activeScanMode = 'FACTURA';
-    scanModeInvoiceBtn.className = 'p-3 rounded-xl border border-blue-500 bg-blue-500/10 text-blue-400 font-semibold text-sm flex items-center justify-center gap-2';
-    scanModeTableBtn.className = 'p-3 rounded-xl border border-slate-700 bg-slate-800 text-slate-400 font-semibold text-sm flex items-center justify-center gap-2';
-  });
+  function setScanMode(mode) {
+    activeScanMode = mode;
+    const processBtn = document.getElementById('btnProcessAI');
+    const inactiveCls = 'p-2.5 sm:p-3 rounded-xl border border-slate-700 bg-slate-800 text-slate-400 hover:text-slate-200 font-semibold text-xs sm:text-sm flex items-center justify-center gap-2 transition';
+    const activeCls = 'p-2.5 sm:p-3 rounded-xl border border-blue-500 bg-blue-500/10 text-blue-400 font-semibold text-xs sm:text-sm flex items-center justify-center gap-2 transition';
 
-  scanModeTableBtn.addEventListener('click', () => {
-    activeScanMode = 'TABLA_PRECIOS';
-    scanModeTableBtn.className = 'p-3 rounded-xl border border-blue-500 bg-blue-500/10 text-blue-400 font-semibold text-sm flex items-center justify-center gap-2';
-    scanModeInvoiceBtn.className = 'p-3 rounded-xl border border-slate-700 bg-slate-800 text-slate-400 font-semibold text-sm flex items-center justify-center gap-2';
-  });
+    if (scanModeInvoiceBtn) scanModeInvoiceBtn.className = (mode === 'FACTURA' ? activeCls : inactiveCls);
+    if (scanModeMenuBtn) scanModeMenuBtn.className = (mode === 'MENU_LISTA' ? activeCls : inactiveCls);
+    if (scanModeTableBtn) scanModeTableBtn.className = (mode === 'TABLA_PRECIOS' ? activeCls : inactiveCls);
+
+    if (processBtn) {
+      if (mode === 'FACTURA') {
+        processBtn.innerHTML = '✨ Analizar Factura con Gemini Flash';
+      } else if (mode === 'MENU_LISTA') {
+        processBtn.innerHTML = '✨ Escanear Menú / Lista con Gemini Flash';
+      } else {
+        processBtn.innerHTML = '✨ Analizar Tablita de Precios con Gemini Flash';
+      }
+    }
+  }
+
+  if (scanModeInvoiceBtn) scanModeInvoiceBtn.addEventListener('click', () => setScanMode('FACTURA'));
+  if (scanModeMenuBtn) scanModeMenuBtn.addEventListener('click', () => setScanMode('MENU_LISTA'));
+  if (scanModeTableBtn) scanModeTableBtn.addEventListener('click', () => setScanMode('TABLA_PRECIOS'));
 
   document.getElementById('btnTriggerCamera').addEventListener('click', () => {
     document.getElementById('cameraFileInput').click();
@@ -1356,6 +1370,270 @@ document.addEventListener('DOMContentLoaded', async () => {
     handleImageFile(e.target.files[0]);
   });
 
+  // Estado reactivo para los productos extraídos y seleccionados
+  let scannedItems = [];
+
+  function updateScanTotals() {
+    const currency = document.getElementById('scanCurrencySelector').value;
+    const currSymbol = currency === 'VES' ? 'Bs.' : '$';
+
+    // Actualizar símbolo de moneda en todas las filas visibles
+    document.querySelectorAll('.scan-curr-symbol').forEach(el => {
+      el.textContent = currSymbol;
+    });
+
+    let selectedCount = 0;
+    let selectedSum = 0;
+
+    scannedItems.forEach(item => {
+      if (item.selected) {
+        selectedCount++;
+        const p = parseFloat(item.price) || 0;
+        const q = parseFloat(item.quantity) || 1;
+        selectedSum += (p * q);
+      }
+    });
+
+    const totalCount = scannedItems.length;
+    const scanSelectedCountEl = document.getElementById('scanSelectedCount');
+    const scanTotalCountEl = document.getElementById('scanTotalCount');
+    const scanSelectedTotalEl = document.getElementById('scanSelectedTotal');
+    const scanBadgeCountEl = document.getElementById('scanBadgeCount');
+    const btnConfirmScanEl = document.getElementById('btnConfirmScan');
+    const scanSelectAllChk = document.getElementById('scanSelectAllChk');
+
+    if (scanSelectedCountEl) scanSelectedCountEl.textContent = selectedCount;
+    if (scanTotalCountEl) scanTotalCountEl.textContent = totalCount;
+    if (scanBadgeCountEl) scanBadgeCountEl.textContent = `${totalCount} detectados`;
+    if (scanSelectedTotalEl) scanSelectedTotalEl.textContent = `${currSymbol} ${selectedSum.toFixed(2)}`;
+
+    if (scanSelectAllChk) {
+      scanSelectAllChk.checked = (totalCount > 0 && selectedCount === totalCount);
+      scanSelectAllChk.indeterminate = (selectedCount > 0 && selectedCount < totalCount);
+    }
+
+    if (btnConfirmScanEl) {
+      if (selectedCount === 0) {
+        btnConfirmScanEl.disabled = true;
+        btnConfirmScanEl.innerHTML = '⚠️ Selecciona al menos 1 producto';
+      } else {
+        btnConfirmScanEl.disabled = false;
+        btnConfirmScanEl.innerHTML = `💾 Registrar ${selectedCount} Producto${selectedCount === 1 ? '' : 's'} Seleccionado${selectedCount === 1 ? '' : 's'}`;
+      }
+    }
+  }
+
+  async function refreshItemsStoreStatus() {
+    const storeSelector = document.getElementById('scanStoreSelector');
+    if (!storeSelector) return;
+    const selectedStoreId = storeSelector.value;
+    let storeProducts = [];
+
+    if (selectedStoreId && selectedStoreId !== 'NEW_DETECTED' && selectedStoreId !== 'CUSTOM_NEW') {
+      storeProducts = await window.db.getProductsByStore(selectedStoreId);
+    }
+
+    const storeProductsMap = new Set(storeProducts.map(p => p.name.trim().toLowerCase()));
+
+    scannedItems.forEach((item, index) => {
+      const clean = (item.name || '').trim().toLowerCase();
+      item.isExisting = clean ? storeProductsMap.has(clean) : false;
+      const statusBadge = document.getElementById(`scan-status-badge-${index}`);
+      if (statusBadge) {
+        if (item.isExisting) {
+          statusBadge.className = 'px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 whitespace-nowrap';
+          statusBadge.textContent = 'Actualizará precio';
+        } else {
+          statusBadge.className = 'px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 whitespace-nowrap';
+          statusBadge.textContent = 'Nuevo Producto';
+        }
+      }
+    });
+  }
+
+  function renderScannedItemsList() {
+    const container = document.getElementById('extractedItemsList');
+    if (!container) return;
+
+    if (scannedItems.length === 0) {
+      container.innerHTML = `
+        <div class="p-6 text-center text-xs text-slate-500">
+          No hay productos en la lista. Puedes añadir uno manualmente con el botón "+ Añadir producto".
+        </div>
+      `;
+      updateScanTotals();
+      return;
+    }
+
+    const currency = document.getElementById('scanCurrencySelector').value;
+    const currSymbol = currency === 'VES' ? 'Bs.' : '$';
+
+    container.innerHTML = scannedItems.map((item, index) => {
+      const iconKey = item.icon || window.aiScanner.guessProductIcon(item.name);
+      const iconDef = (window.AppIcons && window.AppIcons.products && window.AppIcons.products[iconKey]) || {
+        color: '#94a3b8',
+        bg: 'rgba(148, 163, 184, 0.15)',
+        name: 'General',
+        svg: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg>`
+      };
+
+      const statusBadgeHtml = item.isExisting
+        ? `<span id="scan-status-badge-${index}" class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 whitespace-nowrap">Actualizará precio</span>`
+        : `<span id="scan-status-badge-${index}" class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 whitespace-nowrap">Nuevo Producto</span>`;
+
+      return `
+        <div class="p-2.5 sm:p-3 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 hover:bg-slate-900/60 transition" data-row-index="${index}">
+          <div class="flex items-center gap-2.5 flex-1 min-w-0">
+            <input type="checkbox" class="scan-item-chk rounded text-blue-600 focus:ring-blue-500 w-4 h-4 flex-shrink-0 cursor-pointer" data-index="${index}" ${item.selected ? 'checked' : ''}>
+            <div id="scan-icon-box-${index}" class="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style="background: ${iconDef.bg}; color: ${iconDef.color};" title="Categoría: ${iconDef.name}">
+              <div class="w-5 h-5">${iconDef.svg}</div>
+            </div>
+            <div class="flex-1 min-w-0">
+              <input type="text" class="scan-item-name form-input w-full text-xs py-1.5 px-2 font-medium" data-index="${index}" value="${escapeHtml(item.name)}" placeholder="Nombre del producto o plato">
+            </div>
+          </div>
+          <div class="flex items-center justify-between sm:justify-end gap-2 pl-6 sm:pl-0 flex-shrink-0">
+            <div class="flex items-center gap-1.5">
+              <span class="scan-curr-symbol text-xs font-semibold text-slate-400">${currSymbol}</span>
+              <input type="number" step="0.01" min="0" class="scan-item-price form-input w-24 text-xs py-1.5 px-2 text-right font-bold text-slate-100" data-index="${index}" value="${(parseFloat(item.price) || 0).toFixed(2)}">
+            </div>
+            <div class="flex items-center gap-1.5">
+              ${statusBadgeHtml}
+              <button type="button" class="scan-item-delete text-slate-500 hover:text-red-400 p-1.5 transition rounded-lg hover:bg-slate-800" data-index="${index}" title="Quitar de la lista">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    // Listeners de checkboxes individuales
+    container.querySelectorAll('.scan-item-chk').forEach(chk => {
+      chk.addEventListener('change', (e) => {
+        const idx = parseInt(e.target.dataset.index, 10);
+        if (scannedItems[idx]) {
+          scannedItems[idx].selected = e.target.checked;
+          updateScanTotals();
+        }
+      });
+    });
+
+    // Listeners de edición de nombre
+    container.querySelectorAll('.scan-item-name').forEach(inp => {
+      inp.addEventListener('input', (e) => {
+        const idx = parseInt(e.target.dataset.index, 10);
+        if (scannedItems[idx]) {
+          scannedItems[idx].name = e.target.value;
+          // Actualizar icono automáticamente según nuevo nombre
+          const newIcon = window.aiScanner.guessProductIcon(e.target.value);
+          if (newIcon !== scannedItems[idx].icon) {
+            scannedItems[idx].icon = newIcon;
+            const iconDef = (window.AppIcons && window.AppIcons.products && window.AppIcons.products[newIcon]) || {
+              color: '#94a3b8',
+              bg: 'rgba(148, 163, 184, 0.15)',
+              name: 'General',
+              svg: ''
+            };
+            const iconBox = document.getElementById(`scan-icon-box-${idx}`);
+            if (iconBox) {
+              iconBox.style.background = iconDef.bg;
+              iconBox.style.color = iconDef.color;
+              iconBox.title = `Categoría: ${iconDef.name}`;
+              iconBox.innerHTML = `<div class="w-5 h-5">${iconDef.svg}</div>`;
+            }
+          }
+        }
+      });
+      inp.addEventListener('blur', () => {
+        refreshItemsStoreStatus();
+      });
+    });
+
+    // Listeners de edición de precio
+    container.querySelectorAll('.scan-item-price').forEach(inp => {
+      inp.addEventListener('input', (e) => {
+        const idx = parseInt(e.target.dataset.index, 10);
+        if (scannedItems[idx]) {
+          scannedItems[idx].price = parseFloat(e.target.value) || 0;
+          updateScanTotals();
+        }
+      });
+    });
+
+    // Listeners para eliminar producto
+    container.querySelectorAll('.scan-item-delete').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const btnTarget = e.target.closest('.scan-item-delete');
+        const idx = parseInt(btnTarget.dataset.index, 10);
+        scannedItems.splice(idx, 1);
+        renderScannedItemsList();
+      });
+    });
+
+    updateScanTotals();
+  }
+
+  // Checkbox de Seleccionar Todos
+  const scanSelectAllChk = document.getElementById('scanSelectAllChk');
+  if (scanSelectAllChk) {
+    scanSelectAllChk.addEventListener('change', (e) => {
+      const isChecked = e.target.checked;
+      scannedItems.forEach(item => {
+        item.selected = isChecked;
+      });
+      document.querySelectorAll('.scan-item-chk').forEach(chk => {
+        chk.checked = isChecked;
+      });
+      updateScanTotals();
+    });
+  }
+
+  // Botón Añadir Producto Manual a la lista escaneada
+  const btnScanAddNewRow = document.getElementById('btnScanAddNewRow');
+  if (btnScanAddNewRow) {
+    btnScanAddNewRow.addEventListener('click', () => {
+      scannedItems.push({
+        name: 'Producto ' + (scannedItems.length + 1),
+        price: 0.0,
+        quantity: 1.0,
+        selected: true,
+        icon: 'general',
+        isExisting: false
+      });
+      renderScannedItemsList();
+      const nameInputs = document.querySelectorAll('.scan-item-name');
+      if (nameInputs.length > 0) {
+        const lastInput = nameInputs[nameInputs.length - 1];
+        lastInput.focus();
+        lastInput.select();
+      }
+    });
+  }
+
+  // Cambio de selector de tienda
+  const scanStoreSelector = document.getElementById('scanStoreSelector');
+  const scanNewStoreInput = document.getElementById('scanNewStoreInput');
+  if (scanStoreSelector) {
+    scanStoreSelector.addEventListener('change', () => {
+      if (scanStoreSelector.value === 'CUSTOM_NEW') {
+        scanNewStoreInput.classList.remove('hidden');
+        scanNewStoreInput.focus();
+      } else {
+        scanNewStoreInput.classList.add('hidden');
+      }
+      refreshItemsStoreStatus();
+    });
+  }
+
+  // Cambio de selector de moneda
+  const scanCurrencySelector = document.getElementById('scanCurrencySelector');
+  if (scanCurrencySelector) {
+    scanCurrencySelector.addEventListener('change', () => {
+      updateScanTotals();
+    });
+  }
+
   // Procesar con IA
   document.getElementById('btnProcessAI').addEventListener('click', async () => {
     if (!activeCompressedPhoto) {
@@ -1378,68 +1656,162 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const processBtn = document.getElementById('btnProcessAI');
     processBtn.disabled = true;
-    processBtn.innerHTML = '⏳ Analizando con Gemini Flash...';
+    processBtn.innerHTML = '⏳ Extrayendo productos con Gemini Flash...';
 
     try {
       const result = await window.aiScanner.analyzeImage(activeCompressedPhoto.dataUrl, activeScanMode);
       activeExtractionData = result;
 
-      // Mostrar resultados para confirmación
-      document.getElementById('extractedStoreName').textContent = result.store_name || 'Tienda Desconocida';
-      const currSymbol = result.currency === 'VES' ? 'Bs.' : '$';
-      document.getElementById('extractedTotalAmount').textContent = `${currSymbol} ${(parseFloat(result.total) || 0).toFixed(2)}`;
+      // 1. Cargar y configurar Tiendas de Destino
+      const stores = await window.db.getStores();
+      const detectedStoreName = (result.store_name || '').trim() || 'Comercio Detectado';
+      const matchedStore = stores.find(s => s.name.trim().toLowerCase() === detectedStoreName.toLowerCase());
 
-      const tbody = document.getElementById('extractedItemsTableBody');
-      tbody.innerHTML = (result.items || []).map(item => `
-        <tr class="hover:bg-slate-800/50">
-          <td class="p-2.5 font-medium text-slate-200">${escapeHtml(item.name)}</td>
-          <td class="p-2.5 text-center text-slate-400">${item.quantity || 1}</td>
-          <td class="p-2.5 text-right font-semibold text-slate-100">${currSymbol} ${(parseFloat(item.price) || 0).toFixed(2)}</td>
-          <td class="p-2.5 text-right font-bold text-emerald-400">${currSymbol} ${(parseFloat(item.total) || ((item.price || 0) * (item.quantity || 1))).toFixed(2)}</td>
-        </tr>
-      `).join('');
+      const storeSelector = document.getElementById('scanStoreSelector');
+      storeSelector.innerHTML = '';
+
+      if (matchedStore) {
+        const optMatch = document.createElement('option');
+        optMatch.value = matchedStore.id;
+        optMatch.textContent = `🏪 ${matchedStore.name} (Detectada en catálogo)`;
+        storeSelector.appendChild(optMatch);
+      } else {
+        const optNew = document.createElement('option');
+        optNew.value = 'NEW_DETECTED';
+        optNew.textContent = `✨ Crear nueva: "${detectedStoreName}"`;
+        storeSelector.appendChild(optNew);
+      }
+
+      // Otras tiendas existentes
+      stores.filter(s => !matchedStore || s.id !== matchedStore.id).forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s.id;
+        opt.textContent = `🏪 ${s.name}`;
+        storeSelector.appendChild(opt);
+      });
+
+      // Opción de crear otra tienda personalizada
+      const optCustom = document.createElement('option');
+      optCustom.value = 'CUSTOM_NEW';
+      optCustom.textContent = '+ Crear otra tienda con otro nombre...';
+      storeSelector.appendChild(optCustom);
+
+      document.getElementById('scanNewStoreInput').classList.add('hidden');
+      document.getElementById('scanNewStoreInput').value = '';
+
+      // 2. Moneda detectada
+      const currSelector = document.getElementById('scanCurrencySelector');
+      currSelector.value = (result.currency || 'USD').toUpperCase() === 'VES' ? 'VES' : 'USD';
+
+      // 3. Toggle de registro de gasto contable
+      const expenseToggle = document.getElementById('scanRecordExpenseToggle');
+      if (expenseToggle) {
+        // En facturas de compra viene marcado por defecto; en menús/listas viene desmarcado
+        expenseToggle.checked = (activeScanMode === 'FACTURA');
+      }
+
+      // 4. Mapear ítems detectados
+      const rawItems = Array.isArray(result.items) ? result.items : [];
+      scannedItems = rawItems.map(item => {
+        const cleanName = (item.name || '').trim();
+        return {
+          name: cleanName,
+          price: parseFloat(item.price) || 0,
+          quantity: parseFloat(item.quantity) || 1,
+          selected: true,
+          icon: window.aiScanner.guessProductIcon(cleanName),
+          isExisting: false
+        };
+      }).filter(item => item.name.length > 0);
+
+      // Renderizar tabla editable
+      renderScannedItemsList();
+      await refreshItemsStoreStatus();
 
       document.getElementById('scanResultBox').classList.remove('hidden');
-      showToast('Extracción completada con éxito. Revisa y confirma.', 'success');
+      showToast(`¡Se detectaron ${scannedItems.length} productos! Revisa y confirma el registro múltiple.`, 'success');
     } catch (err) {
       console.error(err);
       showToast('Error al analizar con IA: ' + err.message, 'error');
     } finally {
       processBtn.disabled = false;
-      processBtn.innerHTML = '✨ Analizar Factura con Gemini Flash';
+      setScanMode(activeScanMode);
     }
   });
 
-  // Confirmar y Guardar en BD
+  // Confirmar y Guardar Registro Múltiple en BD
   document.getElementById('btnConfirmScan').addEventListener('click', async () => {
     if (!activeExtractionData) return;
 
+    const selectedProducts = scannedItems.filter(item => item.selected && item.name.trim().length > 0);
+    if (selectedProducts.length === 0) {
+      showToast('Selecciona al menos un producto válido para registrar', 'error');
+      return;
+    }
+
+    const storeSelector = document.getElementById('scanStoreSelector');
+    const currencySelector = document.getElementById('scanCurrencySelector');
+    const expenseToggle = document.getElementById('scanRecordExpenseToggle');
+    const newStoreInput = document.getElementById('scanNewStoreInput');
+
+    let chosenStoreId = storeSelector.value;
+    let chosenStoreName = null;
+
+    if (chosenStoreId === 'CUSTOM_NEW') {
+      chosenStoreName = newStoreInput.value.trim();
+      if (!chosenStoreName) {
+        showToast('Escribe el nombre de la nueva tienda', 'error');
+        newStoreInput.focus();
+        return;
+      }
+      chosenStoreId = null;
+    } else if (chosenStoreId === 'NEW_DETECTED') {
+      chosenStoreName = (activeExtractionData.store_name || '').trim() || 'Comercio Detectado';
+      chosenStoreId = null;
+    }
+
+    const confirmBtn = document.getElementById('btnConfirmScan');
+    confirmBtn.disabled = true;
+    confirmBtn.innerHTML = '⏳ Guardando productos...';
+
     try {
-      const commitRes = await window.aiScanner.processAndCommitExtraction(activeExtractionData, activeCompressedPhoto);
+      const commitRes = await window.aiScanner.processAndCommitExtraction(activeExtractionData, {
+        compressedPhoto: activeCompressedPhoto,
+        storeId: chosenStoreId,
+        storeName: chosenStoreName,
+        currency: currencySelector.value,
+        recordExpense: expenseToggle ? expenseToggle.checked : false,
+        items: selectedProducts
+      });
 
       showToast(
-        `¡Guardado! ${commitRes.newProductsCount} productos nuevos, ${commitRes.updatedProductsCount} actualizados.`,
+        `¡Éxito! ${commitRes.totalItemsProcessed} productos guardados en ${commitRes.store.name} (${commitRes.newProductsCount} nuevos, ${commitRes.updatedProductsCount} actualizados)`,
         'success'
       );
 
-      // Limpiar estado
+      // Limpiar estado del escáner
       activeExtractionData = null;
       activeCompressedPhoto = null;
+      scannedItems = [];
       document.getElementById('scanPreviewCard').classList.add('hidden');
       document.getElementById('scanResultBox').classList.add('hidden');
       document.getElementById('cameraFileInput').value = '';
       document.getElementById('galleryFileInput').value = '';
 
-      // Redirigir a productos o contabilidad
+      // Redirigir a vista de productos
       switchView('products');
     } catch (err) {
       console.error(err);
       showToast('Error al registrar en la base de datos: ' + err.message, 'error');
+    } finally {
+      confirmBtn.disabled = false;
+      updateScanTotals();
     }
   });
 
   document.getElementById('btnDiscardScan').addEventListener('click', () => {
     activeExtractionData = null;
+    scannedItems = [];
     document.getElementById('scanResultBox').classList.add('hidden');
     showToast('Escaneo descartado', 'info');
   });
@@ -2375,7 +2747,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // REGISTRO DE SERVICE WORKER (PWA)
   // ----------------------------------------------------
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js?v=10').then((reg) => {
+    navigator.serviceWorker.register('./sw.js?v=11').then((reg) => {
       console.log('Service Worker registrado con éxito:', reg.scope);
       reg.update();
     }).catch((err) => {

@@ -12,7 +12,7 @@
   <link rel="manifest" href="./manifest.json">
   <link rel="icon" type="image/svg+xml" href="./icons/icon.svg">
   <link rel="apple-touch-icon" href="./icons/icon.svg">
-  <link rel="stylesheet" href="./css/styles.css?v=10">
+  <link rel="stylesheet" href="./css/styles.css?v=11">
   <!-- Tailwind Utilities (CDN for instant responsive styling) -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -193,13 +193,16 @@
         </div>
       </div>
 
-      <!-- Document Mode Selector -->
-      <div class="grid grid-cols-2 gap-3 max-w-md mx-auto mb-6">
-        <button id="scanModeInvoiceBtn" class="p-3 rounded-xl border border-blue-500 bg-blue-500/10 text-blue-400 font-semibold text-sm flex items-center justify-center gap-2">
-          <span>🧾</span> Factura Completa
+      <!-- Document Mode Selector (Factura, Menú/Lista, Tablita) -->
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 max-w-2xl mx-auto mb-6">
+        <button type="button" id="scanModeInvoiceBtn" class="p-2.5 sm:p-3 rounded-xl border border-blue-500 bg-blue-500/10 text-blue-400 font-semibold text-xs sm:text-sm flex items-center justify-center gap-2 transition">
+          <span>🧾</span> Factura de Compra
         </button>
-        <button id="scanModeTableBtn" class="p-3 rounded-xl border border-slate-700 bg-slate-800 text-slate-400 font-semibold text-sm flex items-center justify-center gap-2">
-          <span>📋</span> Tablita de Precios
+        <button type="button" id="scanModeMenuBtn" class="p-2.5 sm:p-3 rounded-xl border border-slate-700 bg-slate-800 text-slate-400 hover:text-slate-200 font-semibold text-xs sm:text-sm flex items-center justify-center gap-2 transition">
+          <span>📋</span> Menú o Lista
+        </button>
+        <button type="button" id="scanModeTableBtn" class="p-2.5 sm:p-3 rounded-xl border border-slate-700 bg-slate-800 text-slate-400 hover:text-slate-200 font-semibold text-xs sm:text-sm flex items-center justify-center gap-2 transition">
+          <span>📊</span> Tablita / Cartelera
         </button>
       </div>
 
@@ -256,45 +259,84 @@
           </div>
         </div>
 
-        <!-- AI Extraction Results Confirmation Box -->
-        <div id="scanResultBox" class="hidden bg-slate-900 border border-blue-500/30 rounded-2xl p-5">
-          <div class="flex items-center justify-between pb-3 border-b border-slate-800 mb-4">
+        <!-- AI Extraction Results Confirmation Box (Registro Múltiple de Productos) -->
+        <div id="scanResultBox" class="hidden bg-slate-900 border border-blue-500/30 rounded-2xl p-4 sm:p-6 space-y-4">
+          <!-- Header: Detected Info & Count -->
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
             <div>
-              <span class="text-xs font-bold uppercase text-blue-400">Resultados Extraídos por IA</span>
-              <h3 id="extractedStoreName" class="text-lg font-extrabold text-white">Tienda Detectada</h3>
+              <div class="flex items-center gap-2">
+                <span class="text-xs font-bold uppercase tracking-wider text-blue-400">Escaneo Múltiple con IA</span>
+                <span id="scanBadgeCount" class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-blue-500/20 text-blue-400 border border-blue-500/30">0 detectados</span>
+              </div>
+              <h3 class="text-base sm:text-lg font-extrabold text-white mt-1">Registro Múltiple de Productos</h3>
             </div>
-            <div class="text-right">
-              <span class="text-xs text-slate-400 block">Total Factura</span>
-              <span id="extractedTotalAmount" class="text-lg font-bold text-emerald-400">$ 0.00</span>
+            <div class="text-left sm:text-right">
+              <span class="text-xs text-slate-400 block">Suma de Seleccionados:</span>
+              <span id="scanSelectedTotal" class="text-lg sm:text-xl font-black text-emerald-400">$ 0.00</span>
             </div>
           </div>
 
-          <!-- Items Table -->
-          <div class="max-h-60 overflow-y-auto mb-4 border border-slate-800 rounded-xl">
-            <table class="w-full text-left text-xs">
-              <thead class="bg-slate-800/80 text-slate-400 sticky top-0">
-                <tr>
-                  <th class="p-2.5">Producto</th>
-                  <th class="p-2.5 text-center">Cant.</th>
-                  <th class="p-2.5 text-right">Precio Unit.</th>
-                  <th class="p-2.5 text-right">Total</th>
-                </tr>
-              </thead>
-              <tbody id="extractedItemsTableBody" class="divide-y divide-slate-800">
-                <!-- Rendered dynamically -->
-              </tbody>
-            </table>
+          <!-- Store Destination & Currency Controls -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3 bg-slate-800/40 p-3.5 rounded-xl border border-slate-800">
+            <div>
+              <label for="scanStoreSelector" class="block text-xs font-bold text-slate-300 mb-1">
+                🏪 Tienda o Establecimiento de Destino:
+              </label>
+              <select id="scanStoreSelector" class="form-select w-full text-xs">
+                <!-- Dynamically populated with stores + option to create new -->
+              </select>
+              <input type="text" id="scanNewStoreInput" class="form-input w-full text-xs mt-2 hidden" placeholder="Escribe el nombre de la nueva tienda">
+            </div>
+
+            <div class="space-y-2">
+              <div>
+                <label for="scanCurrencySelector" class="block text-xs font-bold text-slate-300 mb-1">
+                  💵 Moneda de los Precios:
+                </label>
+                <select id="scanCurrencySelector" class="form-select w-full text-xs">
+                  <option value="USD">USD ($ - Dólares)</option>
+                  <option value="VES">VES (Bs - Bolívares)</option>
+                </select>
+              </div>
+              <label class="flex items-center gap-2 cursor-pointer bg-slate-800 hover:bg-slate-700/60 p-2 rounded-lg border border-slate-700 text-xs text-slate-300 select-none">
+                <input type="checkbox" id="scanRecordExpenseToggle" class="rounded text-blue-600 focus:ring-blue-500 w-4 h-4">
+                <span>Registrar compra como Gasto en Contabilidad</span>
+              </label>
+            </div>
           </div>
 
-          <p class="text-xs text-amber-400/90 mb-4 flex items-center gap-1.5">
-            <span>ℹ️</span> 
-            <span>Las valoraciones de calidad (1-5 ⭐) permanecen intactas en productos existentes o en blanco para que las califiques manualmente.</span>
-          </p>
+          <!-- Product Table Selection Header -->
+          <div class="flex items-center justify-between pt-1">
+            <label class="flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-300 select-none">
+              <input type="checkbox" id="scanSelectAllChk" checked class="rounded text-blue-600 focus:ring-blue-500 w-4 h-4">
+              <span>Seleccionar todos (<span id="scanSelectedCount">0</span> de <span id="scanTotalCount">0</span> seleccionados)</span>
+            </label>
+            <button type="button" id="btnScanAddNewRow" class="btn btn-secondary btn-sm text-xs py-1 px-2.5">
+              + Añadir producto
+            </button>
+          </div>
 
-          <div class="flex gap-3 justify-end">
-            <button id="btnDiscardScan" class="btn btn-secondary btn-sm">Descartar</button>
-            <button id="btnConfirmScan" class="btn btn-success btn-sm">
-              💾 Confirmar y Guardar en BD
+          <!-- Items Table / List -->
+          <div class="max-h-80 overflow-y-auto border border-slate-800 rounded-xl bg-slate-950/60">
+            <div id="extractedItemsList" class="divide-y divide-slate-800/80">
+              <!-- Rendered dynamically with checkboxes, icons, editable names & prices -->
+            </div>
+          </div>
+
+          <div class="bg-blue-950/30 border border-blue-500/20 rounded-xl p-3 text-xs text-slate-300 flex items-start gap-2">
+            <span class="text-blue-400 mt-0.5">ℹ️</span>
+            <div>
+              <strong class="text-blue-300">Registro seguro y limpio:</strong> Puedes editar los nombres y precios antes de guardar o desmarcar los que no desees registrar. Cada producto nuevo tendrá asignado su icono temático automáticamente y respetará tus valoraciones personales con estrellas (⭐).
+            </div>
+          </div>
+
+          <!-- Bottom Actions -->
+          <div class="flex flex-col-reverse sm:flex-row gap-2.5 sm:justify-end pt-2">
+            <button type="button" id="btnDiscardScan" class="btn btn-secondary btn-sm w-full sm:w-auto">
+              Descartar Escaneo
+            </button>
+            <button type="button" id="btnConfirmScan" class="btn btn-success btn-sm w-full sm:w-auto font-bold shadow-lg shadow-emerald-500/20">
+              💾 Registrar Productos Seleccionados
             </button>
           </div>
         </div>
@@ -1278,16 +1320,16 @@
   <div id="toastContainer" class="toast-container"></div>
 
   <!-- Core Scripts -->
-  <script src="./js/db.js?v=10"></script>
-  <script src="./js/icons-library.js?v=10"></script>
-  <script src="./js/bcv.js?v=10"></script>
-  <script src="./js/image-compressor.js?v=10"></script>
-  <script src="./js/ai-scanner.js?v=10"></script>
-  <script src="./js/charts.js?v=10"></script>
-  <script src="./js/grocery-planner.js?v=10"></script>
-  <script src="./js/accounting.js?v=10"></script>
-  <script src="./js/backup-drive.js?v=10"></script>
-  <script src="./js/auth-groups.js?v=10"></script>
-  <script src="./js/app.js?v=10"></script>
+  <script src="./js/db.js?v=11"></script>
+  <script src="./js/icons-library.js?v=11"></script>
+  <script src="./js/bcv.js?v=11"></script>
+  <script src="./js/image-compressor.js?v=11"></script>
+  <script src="./js/ai-scanner.js?v=11"></script>
+  <script src="./js/charts.js?v=11"></script>
+  <script src="./js/grocery-planner.js?v=11"></script>
+  <script src="./js/accounting.js?v=11"></script>
+  <script src="./js/backup-drive.js?v=11"></script>
+  <script src="./js/auth-groups.js?v=11"></script>
+  <script src="./js/app.js?v=11"></script>
 </body>
 </html>
