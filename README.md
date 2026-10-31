@@ -1,5 +1,24 @@
 # Control de Precios y Gastos (PWA)
 
+<div align="center">
+
+## 🚀 ¡Pruébala en vivo con un solo clic!
+
+[![Probar App en Vivo](https://img.shields.io/badge/▶%20PROBAR%20APP%20EN%20VIVO%20(1--CLICK)-2563EB?style=for-the-badge&logo=googlechrome&logoColor=white)](https://andresm333.github.io/control-precios-gastos/)
+[![GitHub Pages](https://img.shields.io/badge/GitHub%20Pages-Online-10B981?style=for-the-badge&logo=github&logoColor=white)](https://andresm333.github.io/control-precios-gastos/)
+
+### 👉 [Abrir Aplicación en Vivo en el Navegador](https://andresm333.github.io/control-precios-gastos/) 👈
+
+*No requiere instalar nada. Funciona directo en tu teléfono o computadora.*
+
+| 📸 **Acceso Directo Escáner** | 🛒 **Acceso Directo Mercado** | 💵 **Acceso Directo Gastos** |
+| :---: | :---: | :---: |
+| [▶ Probar Escáner de Facturas](https://andresm333.github.io/control-precios-gastos/?action=scan) | [▶ Probar Programar Mercado](https://andresm333.github.io/control-precios-gastos/?action=planner) | [▶ Probar Cargar Gasto](https://andresm333.github.io/control-precios-gastos/?action=expense) |
+
+</div>
+
+---
+
 Aplicación Web Progresiva (PWA) instalable para **teléfono (Android / iOS)** y **computadora (Windows / Mac)**, diseñada para registrar compras y facturas mediante IA, monitorear gastos diarios, comparar tiendas inteligentemente y analizar la evolución de precios con la tasa oficial del Banco de Venezuela (BCV).
 
 ---
