@@ -410,6 +410,18 @@ class AppDB {
     return this.put('settings', { key, value, updated_at: new Date().toISOString() });
   }
 
+  // Limpia completamente la base de datos para una instalación limpia (0 tiendas, 0 productos, 0 gastos)
+  async clearAllPersonalData() {
+    await this.clear('stores');
+    await this.clear('products');
+    await this.clear('price_history');
+    await this.clear('expenses');
+    await this.clear('invoices');
+    await this.setSetting('app_clean_install', true);
+    console.log('Base de datos reseteada a instalación limpia (0 datos preestablecidos).');
+    return true;
+  }
+
   // Seed Initial Demo Data (so app is never empty on first load)
   async seedInitialDataIfEmpty(currentBcvRate = 45.0) {
     const stores = await this.getStores();

@@ -11,8 +11,25 @@ document.addEventListener('DOMContentLoaded', async () => {
   // 2. Verificar retorno de redirección OAuth de Google (accounts.google.com)
   await checkGoogleOAuthCallback();
 
-  // Sembrar datos de demostración si la base de datos está vacía
-  await window.db.seedInitialDataIfEmpty(window.bcvService.rate);
+  // 3. Manejo de Modo de Inicio (Instalación Limpia vs Demo)
+  const urlParamsInit = new URLSearchParams(window.location.search);
+  const isCleanReq = urlParamsInit.get('mode') === 'clean' || urlParamsInit.get('clean') === 'true' || urlParamsInit.get('clean') === '1';
+  const isDemoReq = urlParamsInit.get('mode') === 'demo' || urlParamsInit.get('demo') === 'true';
+  const isCleanSaved = await window.db.getSetting('app_clean_install', false);
+
+  if (isCleanReq) {
+    await window.db.clearAllPersonalData();
+    window.history.replaceState(null, '', window.location.pathname);
+    showToast('✨ Instalación limpia activada: Espacio en blanco listo para usar', 'success');
+  } else if (isDemoReq) {
+    await window.db.setSetting('app_clean_install', false);
+    await window.db.seedInitialDataIfEmpty(window.bcvService.rate);
+    window.history.replaceState(null, '', window.location.pathname);
+    showToast('🧪 Modo Demostración activado con datos de muestra', 'info');
+  } else if (!isCleanSaved) {
+    // Si la base de datos está vacía y no se había marcado instalación limpia, sembrar datos iniciales
+    await window.db.seedInitialDataIfEmpty(window.bcvService.rate);
+  }
 
   // Inicializar Gráfica Global
   const chartContainer = document.getElementById('productChartContainer');
@@ -1981,6 +1998,31 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
+  // Resetear e iniciar instalación limpia (0 tiendas / 0 productos)
+  const btnResetClean = document.getElementById('btnResetCleanInstall');
+  if (btnResetClean) {
+    btnResetClean.addEventListener('click', async () => {
+      const ok = confirm('¿Deseas vaciar todas las tiendas y productos para dejar la aplicación 100% limpia y sin datos de prueba?');
+      if (!ok) return;
+      await window.db.clearAllPersonalData();
+      await renderStores();
+      await renderProducts();
+      showToast('✨ Base de datos 100% limpia. Lista para registrar tus compras.', 'success');
+    });
+  }
+
+  // Cargar datos de demostración
+  const btnLoadDemo = document.getElementById('btnLoadDemoData');
+  if (btnLoadDemo) {
+    btnLoadDemo.addEventListener('click', async () => {
+      await window.db.setSetting('app_clean_install', false);
+      await window.db.seedInitialDataIfEmpty(window.bcvService.rate);
+      await renderStores();
+      await renderProducts();
+      showToast('🧪 Datos de demostración cargados en la aplicación.', 'info');
+    });
+  }
+
   // ----------------------------------------------------
   // GEOFENCING Y PERMISOS DE UBICACIÓN EN TIEMPO REAL
   // ----------------------------------------------------
@@ -2245,7 +2287,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // REGISTRO DE SERVICE WORKER (PWA)
   // ----------------------------------------------------
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js?v=8').then((reg) => {
+    navigator.serviceWorker.register('./sw.js?v=9').then((reg) => {
       console.log('Service Worker registrado con éxito:', reg.scope);
       reg.update();
     }).catch((err) => {

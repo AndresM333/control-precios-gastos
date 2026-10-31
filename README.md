@@ -2,14 +2,16 @@
 
 <div align="center">
 
-## 🚀 ¡Pruébala en vivo con un solo clic!
+## 🚀 ¡Pruébala en vivo o Instálala con un solo clic!
 
-[![Probar App en Vivo](https://img.shields.io/badge/▶%20PROBAR%20APP%20EN%20VIVO%20(1--CLICK)-2563EB?style=for-the-badge&logo=googlechrome&logoColor=white)](https://andresm333.github.io/control-precios-gastos/)
-[![GitHub Pages](https://img.shields.io/badge/GitHub%20Pages-Online-10B981?style=for-the-badge&logo=github&logoColor=white)](https://andresm333.github.io/control-precios-gastos/)
+| 🌟 **Instalación Limpia Oficial** *(Recomendada para uso personal/familiar)* | 🧪 **Modo Demostración** *(Para explorar y probar)* |
+| :---: | :---: |
+| [![Instalación Limpia](https://img.shields.io/badge/✨%20INSTALACIÓN%20LIMPIA%20(SIN%20DATOS)-10B981?style=for-the-badge&logo=sparkles&logoColor=white)](https://andresm333.github.io/control-precios-gastos/?mode=clean) | [![Modo Demo](https://img.shields.io/badge/🧪%20PROBAR%20CON%20DATOS%20DEMO-6366F1?style=for-the-badge&logo=flask&logoColor=white)](https://andresm333.github.io/control-precios-gastos/?mode=demo) |
+| 👉 **[Abrir App Limpia para Instalar](https://andresm333.github.io/control-precios-gastos/?mode=clean)** 👈<br>*Inicia 100% vacía (0 tiendas y 0 productos), lista para tus compras reales.* | 👉 **[Abrir con Tiendas y Productos Demo](https://andresm333.github.io/control-precios-gastos/?mode=demo)** 👈<br>*Carga tiendas y productos de ejemplo para ver cómo funciona.* |
 
-### 👉 [Abrir Aplicación en Vivo en el Navegador](https://andresm333.github.io/control-precios-gastos/) 👈
+[![GitHub Pages](https://img.shields.io/badge/GitHub%20Pages-Online-2563EB?style=for-the-badge&logo=github&logoColor=white)](https://andresm333.github.io/control-precios-gastos/)
 
-*No requiere instalar nada. Funciona directo en tu teléfono o computadora.*
+*No requiere instalar archivos ejecutables ni APKs. Funciona directo en tu teléfono o computadora como PWA.*
 
 | 📸 **Acceso Directo Escáner** | 🛒 **Acceso Directo Mercado** | 💵 **Acceso Directo Gastos** |
 | :---: | :---: | :---: |
