@@ -1,6 +1,6 @@
 // IndexedDB Engine for "Control de Precios y Gastos"
 const DB_NAME = 'ControlPreciosGastosDB';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 class AppDB {
   constructor() {
@@ -54,6 +54,12 @@ class AppDB {
         // Settings (Configuraciones generales)
         if (!db.objectStoreNames.contains('settings')) {
           db.createObjectStore('settings', { keyPath: 'key' });
+        }
+
+        // Groups (Grupos compartidos / Familias)
+        if (!db.objectStoreNames.contains('groups')) {
+          const grpOS = db.createObjectStore('groups', { keyPath: 'id' });
+          grpOS.createIndex('owner_email', 'owner_email', { unique: false });
         }
       };
 
@@ -138,18 +144,28 @@ class AppDB {
   // --- Specific Store Operations ---
 
   // Stores
-  async getStores() {
-    return this.getAll('stores');
+  async getStores(workspaceId = null) {
+    const all = await this.getAll('stores');
+    if (workspaceId === 'ALL') return all;
+    const targetWs = workspaceId || (window.authGroups ? window.authGroups.getActiveWorkspaceId() : 'personal');
+    return all.filter(s => (s.workspace_id || 'personal') === targetWs);
   }
 
-  async findStoreByName(name) {
-    const stores = await this.getStores();
+  async findStoreByName(name, workspaceId = null) {
+    const stores = await this.getStores(workspaceId);
     const clean = name.trim().toLowerCase();
     return stores.find(s => s.name.trim().toLowerCase() === clean);
   }
 
+  async findStoreByNameInWorkspace(name, workspaceId = 'personal') {
+    return this.findStoreByName(name, workspaceId);
+  }
+
   async saveStore(storeData) {
     const now = new Date().toISOString();
+    if (!storeData.workspace_id) {
+      storeData.workspace_id = window.authGroups ? window.authGroups.getActiveWorkspaceId() : 'personal';
+    }
     if (storeData.id) {
       storeData.updated_at = now;
       await this.put('stores', storeData);
@@ -171,8 +187,11 @@ class AppDB {
   }
 
   // Products
-  async getProducts() {
-    return this.getAll('products');
+  async getProducts(workspaceId = null) {
+    const all = await this.getAll('products');
+    if (workspaceId === 'ALL') return all;
+    const targetWs = workspaceId || (window.authGroups ? window.authGroups.getActiveWorkspaceId() : 'personal');
+    return all.filter(p => (p.workspace_id || 'personal') === targetWs);
   }
 
   async getProductsByStore(storeId) {
@@ -194,6 +213,9 @@ class AppDB {
 
   async saveProduct(productData, priceHistorySource = 'MANUAL', bcvRate = null) {
     const now = new Date().toISOString();
+    if (!productData.workspace_id) {
+      productData.workspace_id = window.authGroups ? window.authGroups.getActiveWorkspaceId() : 'personal';
+    }
     let productId = productData.id;
     let isNew = !productId;
 
@@ -221,6 +243,31 @@ class AppDB {
     }
 
     return productData;
+  }
+
+  // --- Groups (Grupos Compartidos / Familias) ---
+  async getGroups() {
+    return this.getAll('groups');
+  }
+
+  async getGroupById(id) {
+    return this.getById('groups', id);
+  }
+
+  async saveGroup(groupData) {
+    const now = new Date().toISOString();
+    groupData.updated_at = now;
+    if (!groupData.created_at) groupData.created_at = now;
+    await this.put('groups', groupData);
+    return groupData.id;
+  }
+
+  async deleteGroup(id) {
+    const groupStores = await this.getStores(id);
+    for (const s of groupStores) {
+      await this.deleteStore(s.id);
+    }
+    return this.delete('groups', id);
   }
 
   async deleteProduct(productId) {

@@ -100,6 +100,21 @@ Si usas extensiones de navegador como **Shortcut Manager**:
   - Opción de **Guardar tiendas con número identificador** (ej: `Automercados Plaza's (1)`) para compartir listas de precios con familiares o amigos sin peligro de sobreescribir sus datos propios.
 - **Importador Inteligente**: Previsualiza el contenido del respaldo y te permite decidir si renombrar duplicados con números, actualizar solo precios o ignorar repetidos.
 
+### 8. 👥 Login con Google, Grupos Compartidos y Copia a Espacio Personal
+- **Acceso Exclusivo con Google**: Inicia sesión con tu cuenta de Gmail.
+- **Separación Total de Bibliotecas**:
+  - **👤 Mi Espacio Personal**: Tu biblioteca privada de tiendas, productos y contabilidad. Nadie más tiene acceso.
+  - **👥 Grupos Compartidos (Familia / Equipo)**: Espacios colaborativos donde varios miembros ven y actualizan los mismos precios en tiempo real.
+  - Selector rápido en la barra superior para alternar entre tu espacio personal y tus grupos en 1 clic.
+- **Invitaciones por Correo Electrónico**:
+  - El Administrador del grupo agrega a las personas usando **únicamente su correo de Gmail**.
+  - **Seguridad Garantizada**: El invitado solo podrá unirse y ver los precios si inicia sesión con esa cuenta de Google específica.
+- **📥 Motor de Copia al Espacio Personal**:
+  - Botón individual en cada tienda y producto: **"📥 A Personal"**.
+  - Botón en el banner del grupo: **"📥 Copiar biblioteca del grupo a mi espacio personal"**.
+  - Al copiar, se actualizan los precios más recientes sin sobreescribir tus calificaciones personales de calidad (1 a 5 ⭐), manteniendo tus datos privados intactos.
+- **Reglas de Seguridad en la Nube**: El repositorio incluye el archivo `firestore.rules` con las reglas de seguridad listas para desplegar en Firebase.
+
 ---
 
 ## 🔑 Cómo Obtener tu Clave Gratuita de Gemini Flash

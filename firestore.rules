@@ -1,0 +1,37 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Regla de Perfiles de Usuario
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Reglas para Grupos Compartidos (Familias / Equipos)
+    match /groups/{groupId} {
+      // 1. Lectura del grupo: Solo si el usuario está autenticado en Google Y su correo está en members
+      allow read: if request.auth != null && 
+                     request.auth.token.email in resource.data.members;
+
+      // 2. Creación de un grupo nuevo: Cualquier usuario autenticado
+      allow create: if request.auth != null && 
+                       request.resource.data.owner_email == request.auth.token.email &&
+                       request.auth.token.email in request.resource.data.members;
+
+      // 3. Edición / Invitar miembros: SOLO el Admin/Dueño original del grupo puede modificar la lista
+      allow update: if request.auth != null && 
+                       request.auth.token.email == resource.data.owner_email;
+
+      // 4. Eliminar grupo: Solo el Admin
+      allow delete: if request.auth != null && 
+                       request.auth.token.email == resource.data.owner_email;
+
+      // Subcolecciones dentro del grupo (Tiendas, Productos, Historial de Precios)
+      match /{document=**} {
+        // Cualquier miembro autorizado por correo en el grupo padre puede leer y registrar productos/precios
+        allow read, write: if request.auth != null && 
+                              request.auth.token.email in get(/databases/$(database)/documents/groups/$(groupId)).data.members;
+      }
+    }
+  }
+}

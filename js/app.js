@@ -6,6 +6,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   await window.db.ready;
   await window.bcvService.init();
   await window.backupDrive.init();
+  await window.authGroups.init();
 
   // Sembrar datos de demostración si la base de datos está vacía
   await window.db.seedInitialDataIfEmpty(window.bcvService.rate);
@@ -56,6 +57,289 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Event Listeners de Navegación
   document.querySelectorAll('[data-view]').forEach(el => {
     el.addEventListener('click', () => switchView(el.dataset.view));
+  });
+
+  // ----------------------------------------------------
+  // GESTIÓN DE AUTENTICACIÓN GOOGLE Y ESPACIOS DE TRABAJO (GRUPOS)
+  // ----------------------------------------------------
+  function updateGoogleAuthUI() {
+    const user = window.authGroups.getCurrentUser();
+    const btnText = document.getElementById('googleAuthText');
+    const loggedOutView = document.getElementById('googleLoginLoggedOutView');
+    const loggedInView = document.getElementById('googleLoginLoggedInView');
+
+    if (user) {
+      if (btnText) btnText.textContent = user.displayName || user.email.split('@')[0];
+      if (loggedOutView) loggedOutView.classList.add('hidden');
+      if (loggedInView) {
+        loggedInView.classList.remove('hidden');
+        document.getElementById('userAvatarImg').src = user.photoURL;
+        document.getElementById('userDisplayName').textContent = user.displayName;
+        document.getElementById('userEmailText').textContent = user.email;
+        document.getElementById('userGroupsCount').textContent = `${window.authGroups.groups.length} grupo(s) vinculado(s)`;
+      }
+    } else {
+      if (btnText) btnText.textContent = 'Acceder';
+      if (loggedOutView) loggedOutView.classList.remove('hidden');
+      if (loggedInView) loggedInView.classList.add('hidden');
+    }
+  }
+
+  function updateWorkspaceUI() {
+    const activeWs = window.authGroups.getActiveWorkspace();
+    const isGroup = activeWs.type === 'GROUP';
+
+    const wsNameEl = document.getElementById('workspaceName');
+    const wsIconEl = document.getElementById('workspaceIcon');
+    const banner = document.getElementById('groupActiveBanner');
+    const btnManageModal = document.getElementById('btnOpenManageGroupModal');
+
+    if (wsNameEl) wsNameEl.textContent = activeWs.name;
+    if (wsIconEl) wsIconEl.textContent = isGroup ? '👥' : '👤';
+
+    // Banner de grupo
+    if (banner) {
+      if (isGroup) {
+        banner.classList.remove('hidden');
+        document.getElementById('groupBannerName').textContent = activeWs.name;
+        document.getElementById('groupBannerRole').textContent = activeWs.isOwner ? '👑 Administrador' : 'Miembro';
+      } else {
+        banner.classList.add('hidden');
+      }
+    }
+
+    // Botón de administrar grupo en el dropdown
+    if (btnManageModal) {
+      btnManageModal.classList.toggle('hidden', !isGroup);
+    }
+
+    // Renderizar lista en el dropdown
+    const optionsContainer = document.getElementById('workspaceOptionsList');
+    if (optionsContainer) {
+      const groups = window.authGroups.groups;
+      optionsContainer.innerHTML = `
+        <button class="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center justify-between transition ${!isGroup ? 'bg-blue-600 text-white shadow' : 'text-slate-300 hover:bg-slate-800'}" id="optSelectPersonal">
+          <span class="flex items-center gap-2"><span>👤</span> Mi Espacio Personal</span>
+          ${!isGroup ? '<span>✓</span>' : ''}
+        </button>
+      ` + groups.map(g => {
+        const isCurrent = isGroup && activeWs.id === g.id;
+        return `
+          <button class="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center justify-between transition ${isCurrent ? 'bg-blue-600 text-white shadow' : 'text-slate-300 hover:bg-slate-800'} opt-select-group" data-group-id="${g.id}">
+            <span class="flex items-center gap-2 truncate"><span>👥</span> ${escapeHtml(g.name)}</span>
+            ${isCurrent ? '<span>✓</span>' : ''}
+          </button>
+        `;
+      }).join('');
+
+      document.getElementById('optSelectPersonal').addEventListener('click', async () => {
+        await window.authGroups.switchToPersonal();
+        document.getElementById('workspaceDropdown').classList.add('hidden');
+        showToast('Cambiado a tu Espacio Personal', 'info');
+      });
+
+      document.querySelectorAll('.opt-select-group').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const gId = btn.dataset.groupId;
+          await window.authGroups.switchToGroup(gId);
+          document.getElementById('workspaceDropdown').classList.add('hidden');
+          showToast(`Cambiado al grupo ${window.authGroups.getActiveWorkspace().name}`, 'info');
+        });
+      });
+    }
+  }
+
+  // Toggle dropdown del selector de espacio
+  const wsBtn = document.getElementById('workspaceBtn');
+  const wsDropdown = document.getElementById('workspaceDropdown');
+  if (wsBtn && wsDropdown) {
+    wsBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      wsDropdown.classList.toggle('hidden');
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!wsDropdown.contains(e.target) && e.target !== wsBtn) {
+        wsDropdown.classList.add('hidden');
+      }
+    });
+  }
+
+  // Auth Button
+  const googleAuthBtn = document.getElementById('googleAuthBtn');
+  if (googleAuthBtn) {
+    googleAuthBtn.addEventListener('click', () => {
+      openModal('modalGoogleLogin');
+    });
+  }
+
+  // Formulario de Inicio de Sesión
+  document.getElementById('formGoogleLogin').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = document.getElementById('inputGoogleEmail').value;
+    const name = document.getElementById('inputGoogleName').value;
+
+    try {
+      const user = await window.authGroups.signInWithGoogle(email, name);
+      showToast(`¡Sesión iniciada como ${user.displayName}!`, 'success');
+      closeModal('modalGoogleLogin');
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  });
+
+  // Cerrar sesión
+  document.getElementById('btnSignOutGoogle').addEventListener('click', async () => {
+    await window.authGroups.signOut();
+    showToast('Sesión de Google cerrada', 'info');
+    closeModal('modalGoogleLogin');
+  });
+
+  // Crear Grupo Modal
+  document.getElementById('btnOpenCreateGroupModal').addEventListener('click', () => {
+    wsDropdown.classList.add('hidden');
+    if (!window.authGroups.isLoggedIn()) {
+      showToast('Debes iniciar sesión con Google para crear un grupo', 'error');
+      openModal('modalGoogleLogin');
+      return;
+    }
+    document.getElementById('formCreateGroup').reset();
+    openModal('modalCreateGroup');
+  });
+
+  document.getElementById('formCreateGroup').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const groupName = document.getElementById('inputGroupName').value;
+    try {
+      const newGroup = await window.authGroups.createGroup(groupName);
+      showToast(`¡Grupo "${newGroup.name}" creado con éxito!`, 'success');
+      closeModal('modalCreateGroup');
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  });
+
+  // Administrar Grupo Modal
+  function openGroupManagement() {
+    const activeWs = window.authGroups.getActiveWorkspace();
+    if (activeWs.type !== 'GROUP') return;
+
+    document.getElementById('manageGroupName').textContent = activeWs.name;
+    document.getElementById('manageGroupOwner').textContent = `Admin: ${activeWs.owner_email}`;
+
+    const isOwner = window.authGroups.currentUser && activeWs.owner_email.toLowerCase() === window.authGroups.currentUser.email.toLowerCase();
+
+    // Mostrar u ocultar sección de invitar miembros según rol
+    document.getElementById('inviteMemberSection').style.display = isOwner ? 'block' : 'none';
+    document.getElementById('deleteGroupSection').classList.toggle('hidden', !isOwner);
+
+    // Listar miembros
+    const membersList = document.getElementById('groupMembersList');
+    membersList.innerHTML = (activeWs.members || []).map(m => {
+      const isAdmin = m.toLowerCase() === activeWs.owner_email.toLowerCase();
+      const canRemove = isOwner && !isAdmin;
+      return `
+        <div class="flex items-center justify-between p-2 rounded-lg bg-slate-800/60 border border-slate-700/60 text-xs">
+          <div class="flex items-center gap-2">
+            <span>👤</span>
+            <span class="font-medium text-slate-200">${escapeHtml(m)}</span>
+            <span class="px-1.5 py-0.5 rounded text-[10px] font-bold ${isAdmin ? 'bg-amber-500/20 text-amber-300' : 'bg-slate-700 text-slate-300'}">
+              ${isAdmin ? '👑 Admin' : 'Miembro'}
+            </span>
+          </div>
+          ${canRemove ? `
+            <button class="btn btn-outline-danger btn-sm text-[10px] py-0.5 px-2 btn-remove-member" data-email="${escapeHtml(m)}">
+              Expulsar
+            </button>
+          ` : ''}
+        </div>
+      `;
+    }).join('');
+
+    // Listener para remover miembros
+    document.querySelectorAll('.btn-remove-member').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const emailToRemove = btn.dataset.email;
+        if (confirm(`¿Remover a ${emailToRemove} de este grupo? Ya no podrá acceder a las tiendas ni precios.`)) {
+          try {
+            await window.authGroups.removeMember(activeWs.id, emailToRemove);
+            showToast(`${emailToRemove} ha sido removido del grupo`, 'info');
+            openGroupManagement();
+          } catch (err) {
+            showToast(err.message, 'error');
+          }
+        }
+      });
+    });
+
+    openModal('modalManageGroup');
+  }
+
+  document.getElementById('btnOpenManageGroupModal').addEventListener('click', () => {
+    wsDropdown.classList.add('hidden');
+    openGroupManagement();
+  });
+  document.getElementById('btnBannerManageGroup').addEventListener('click', openGroupManagement);
+
+  // Formulario para invitar miembro por correo
+  document.getElementById('formInviteMember').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const activeWs = window.authGroups.getActiveWorkspace();
+    const emailToInvite = document.getElementById('inputInviteMemberEmail').value;
+
+    try {
+      await window.authGroups.inviteMember(activeWs.id, emailToInvite);
+      showToast(`¡Invitación registrada! ${emailToInvite} podrá unirse al iniciar sesión con Google.`, 'success');
+      document.getElementById('inputInviteMemberEmail').value = '';
+      openGroupManagement();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  });
+
+  // Eliminar grupo
+  document.getElementById('btnDeleteCurrentGroup').addEventListener('click', async () => {
+    const activeWs = window.authGroups.getActiveWorkspace();
+    if (confirm(`¿Estás seguro de eliminar el grupo "${activeWs.name}" y todos sus datos compartidos?`)) {
+      await window.db.deleteGroup(activeWs.id);
+      await window.authGroups.switchToPersonal();
+      closeModal('modalManageGroup');
+      showToast('Grupo eliminado correctamente', 'info');
+    }
+  });
+
+  // Suscribirse a cambios en Auth y Workspaces
+  window.authGroups.subscribe(() => {
+    updateWorkspaceUI();
+    updateGoogleAuthUI();
+    if (currentActiveView === 'stores') renderStores();
+    if (currentActiveView === 'products') renderProducts();
+    if (currentActiveView === 'planner') loadPlannerProductList();
+  });
+  updateWorkspaceUI();
+  updateGoogleAuthUI();
+
+  // Modal Copiar Todo del Grupo al Espacio Personal
+  document.getElementById('btnBannerCopyAll').addEventListener('click', () => {
+    const activeWs = window.authGroups.getActiveWorkspace();
+    document.getElementById('copyGroupSourceTitle').textContent = `"${activeWs.name}"`;
+    openModal('modalCopyGroup');
+  });
+
+  document.getElementById('btnConfirmCopyAllGroup').addEventListener('click', async () => {
+    const updatePrices = document.getElementById('chkCopyUpdatePrices').checked;
+    showToast('Clonando biblioteca a tu espacio personal...', 'info');
+
+    try {
+      const res = await window.authGroups.copyAllActiveGroupToPersonal({
+        updatePriceIfExisting: updatePrices
+      });
+
+      showToast(`¡Copia lista! ${res.createdProducts} productos nuevos y ${res.updatedProducts} actualizados en tu espacio personal.`, 'success');
+      closeModal('modalCopyGroup');
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
   });
 
   // ----------------------------------------------------
@@ -164,6 +448,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const searchTerm = (document.getElementById('storeSearchInput').value || '').toLowerCase().trim();
     const stores = await window.db.getStores();
     const products = await window.db.getProducts();
+    const isGroup = window.authGroups.getActiveWorkspace().type === 'GROUP';
 
     const filtered = stores.filter(s => {
       return s.name.toLowerCase().includes(searchTerm) || (s.description || '').toLowerCase().includes(searchTerm);
@@ -174,7 +459,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         <div class="col-span-full text-center py-12 text-slate-500">
           <p class="text-3xl mb-2">🏪</p>
           <p class="font-semibold text-slate-300">No se encontraron tiendas</p>
-          <p class="text-xs text-slate-500 mt-1">Registra una con el botón "+ Nueva Tienda" o escanea una factura.</p>
+          <p class="text-xs text-slate-500 mt-1">${isGroup ? 'Este grupo aún no tiene tiendas. ¡Agrega una con "+ Nueva Tienda" o escanea una factura!' : 'Registra una con el botón "+ Nueva Tienda" o escanea una factura.'}</p>
         </div>
       `;
       return;
@@ -195,10 +480,17 @@ document.addEventListener('DOMContentLoaded', async () => {
           </div>
           
           <div class="card-footer">
-            <a href="${mapsLink}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm text-blue-400">
-              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-              Google Maps
-            </a>
+            <div class="flex items-center gap-1.5 flex-wrap">
+              <a href="${mapsLink}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm text-blue-400">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                Maps
+              </a>
+              ${isGroup ? `
+                <button class="btn btn-primary btn-sm btn-copy-store-personal" data-id="${store.id}" title="Copiar tienda y sus productos a mi espacio personal">
+                  📥 A Personal
+                </button>
+              ` : ''}
+            </div>
             <div class="flex items-center gap-1.5">
               <button class="btn btn-secondary btn-sm btn-edit-store" data-id="${store.id}" title="Editar tienda">
                 ✏️
@@ -211,6 +503,24 @@ document.addEventListener('DOMContentLoaded', async () => {
         </div>
       `;
     }).join('');
+
+    // Attach listeners
+    document.querySelectorAll('.btn-copy-store-personal').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const storeId = parseInt(btn.dataset.id);
+        btn.disabled = true;
+        btn.textContent = 'Copiando...';
+        try {
+          const res = await window.authGroups.copyStoreToPersonal(storeId);
+          showToast(`¡Tienda "${res.storeName}" copiada a tu espacio personal! (${res.createdCount} productos nuevos, ${res.updatedCount} actualizados)`, 'success');
+        } catch (err) {
+          showToast(err.message, 'error');
+        } finally {
+          btn.disabled = false;
+          btn.textContent = '📥 A Personal';
+        }
+      });
+    });
 
     // Attach listeners
     document.querySelectorAll('.btn-edit-store').forEach(btn => {
@@ -286,6 +596,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const products = await window.db.getProducts();
     const stores = await window.db.getStores();
     const storesMap = new Map(stores.map(s => [s.id, s]));
+    const isGroup = window.authGroups.getActiveWorkspace().type === 'GROUP';
 
     // Populate select filter
     const storeSelect = document.getElementById('productStoreFilter');
@@ -306,7 +617,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         <div class="col-span-full text-center py-12 text-slate-500">
           <p class="text-3xl mb-2">🏷️</p>
           <p class="font-semibold text-slate-300">No se encontraron productos</p>
-          <p class="text-xs text-slate-500 mt-1">Registra productos nuevos o escanea una factura.</p>
+          <p class="text-xs text-slate-500 mt-1">${isGroup ? 'Este grupo aún no tiene productos. Agrega uno o escanea una factura.' : 'Registra productos nuevos o escanea una factura.'}</p>
         </div>
       `;
       return;
@@ -358,9 +669,16 @@ document.addEventListener('DOMContentLoaded', async () => {
           </div>
 
           <div class="card-footer mt-3">
-            <button class="btn btn-secondary btn-sm btn-view-chart" data-id="${prod.id}" title="Ver historial de precios y gráfica porcentual">
-              📈 Gráfica & %
-            </button>
+            <div class="flex items-center gap-1.5 flex-wrap">
+              <button class="btn btn-secondary btn-sm btn-view-chart" data-id="${prod.id}" title="Ver historial de precios y gráfica porcentual">
+                📈 Gráfica & %
+              </button>
+              ${isGroup ? `
+                <button class="btn btn-primary btn-sm btn-copy-prod-personal" data-id="${prod.id}" title="Copiar producto a mi espacio personal">
+                  📥 A Personal
+                </button>
+              ` : ''}
+            </div>
             <div class="flex items-center gap-1.5">
               <button class="btn btn-secondary btn-sm btn-edit-product" data-id="${prod.id}">✏️</button>
               <button class="btn btn-outline-danger btn-sm btn-delete-product" data-id="${prod.id}">🗑️</button>
@@ -369,6 +687,28 @@ document.addEventListener('DOMContentLoaded', async () => {
         </div>
       `;
     }).join('');
+
+    // Listener para copiar producto a personal
+    document.querySelectorAll('.btn-copy-prod-personal').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const prodId = parseInt(btn.dataset.id);
+        const prod = await window.db.getById('products', prodId);
+        if (prod) {
+          btn.disabled = true;
+          try {
+            const res = await window.authGroups.copyProductToPersonal(prod);
+            const msg = res.action === 'created'
+              ? `"${prod.name}" copiado a tu espacio personal.`
+              : `Precio de "${prod.name}" actualizado en tu espacio personal.`;
+            showToast(msg, 'success');
+          } catch (err) {
+            showToast(err.message, 'error');
+          } finally {
+            btn.disabled = false;
+          }
+        }
+      });
+    });
 
     // Attach click listener on stars to update rating directly
     document.querySelectorAll('.card-stars .star').forEach(star => {
