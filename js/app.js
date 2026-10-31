@@ -2063,7 +2063,14 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
 
-    const redirectUri = window.location.origin + window.location.pathname;
+    // Redirección oficial limpia (normalizada tanto para GitHub Pages como para localhost)
+    let redirectUri = window.location.origin + window.location.pathname;
+    if (redirectUri.endsWith('index.html')) {
+      redirectUri = redirectUri.slice(0, -'index.html'.length);
+    }
+    if (!redirectUri.endsWith('/')) {
+      redirectUri += '/';
+    }
     const state = 'google_oauth_' + Math.random().toString(36).substring(2, 12);
     try {
       sessionStorage.setItem('oauth_state', state);
