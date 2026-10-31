@@ -29,6 +29,8 @@
       }
     }
   </script>
+  <!-- Google Identity Services (GIS) Oficial -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body class="bg-slate-950 text-slate-100 antialiased selection:bg-blue-500 selection:text-white">
 
@@ -298,81 +300,105 @@
       <div class="section-header">
         <div>
           <h2 class="section-title">Programar Mercado</h2>
-          <p class="section-desc">Selecciona los productos que necesitas y la app optimizará tu compra por precio, cercanía o calidad.</p>
+          <p class="section-desc">Elige productos con el botón +, ajusta cantidades en tu canasta con + y -, y optimiza tu compra por precio, cercanía o calidad.</p>
         </div>
       </div>
 
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <!-- Left: Product Selector -->
-        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4">
-          <h3 class="text-sm font-bold uppercase tracking-wider text-slate-400 mb-3">1. Selecciona tus productos</h3>
-          
-          <input type="text" id="plannerSearchInput" class="form-input w-full text-xs mb-3" placeholder="Filtrar productos disponibles...">
-          
-          <div id="plannerChecklist" class="max-h-80 overflow-y-auto space-y-1.5 pr-1 mb-4">
-            <!-- List of products with checkboxes -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+        <!-- Col 1: Catálogo Disponible con botón + (4 cols) -->
+        <div class="lg:col-span-4 bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col h-full">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+              <span>🏷️</span> 1. Catálogo Disponible
+            </h3>
+            <span id="plannerCatalogTotal" class="text-[11px] font-semibold text-slate-400">0 productos</span>
           </div>
 
-          <div class="pt-2 border-t border-slate-800 flex items-center justify-between">
-            <span id="plannerSelectedCount" class="text-xs font-semibold text-slate-400">0 seleccionados</span>
-            <button id="btnExecutePlanner" class="btn btn-primary btn-sm">
-              🔍 Optimizar Compras
+          <input type="text" id="plannerSearchInput" class="form-input w-full text-xs mb-3" placeholder="Buscar en catálogo...">
+
+          <div id="plannerCatalogList" class="flex-1 max-h-[460px] overflow-y-auto space-y-1.5 pr-1">
+            <!-- Products with + button rendered here -->
+          </div>
+        </div>
+
+        <!-- Col 2: Mi Canasta Elegida con - y + (4 cols) -->
+        <div class="lg:col-span-4 bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col h-full">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-blue-400 flex items-center gap-1.5">
+              <span>🛒</span> 2. Canasta Elegida
+            </h3>
+            <button id="btnClearPlannerCart" class="text-[11px] text-slate-400 hover:text-red-400 transition hidden">
+              Vaciar
+            </button>
+          </div>
+
+          <div id="plannerCartList" class="flex-1 max-h-[400px] overflow-y-auto space-y-2 pr-1 mb-3">
+            <!-- Chosen items with - / + controls rendered here -->
+          </div>
+
+          <div class="pt-3 border-t border-slate-800 space-y-2">
+            <div class="flex items-center justify-between text-xs">
+              <span class="text-slate-400">Total en Canasta:</span>
+              <span id="plannerCartSummary" class="font-bold text-slate-200">0 unidades (0 productos)</span>
+            </div>
+            <button id="btnExecutePlanner" class="btn btn-primary w-full py-2.5 font-bold shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2">
+              <span>🔍</span> Optimizar Compras
             </button>
           </div>
         </div>
 
-        <!-- Right: Optimization Results -->
-        <div class="lg:col-span-2 space-y-4">
+        <!-- Col 3: Resultados de Optimización (4 cols) -->
+        <div class="lg:col-span-4 space-y-4">
           <!-- Top 3 Featured Criteria Cards -->
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-3" id="plannerFeaturedCards">
+          <div class="space-y-3" id="plannerFeaturedCards">
             <!-- Más Barata -->
-            <div id="cardBestCheapest" class="bg-slate-900 border border-emerald-500/30 rounded-2xl p-4 flex flex-col justify-between">
+            <div id="cardBestCheapest" class="bg-slate-900 border border-emerald-500/30 rounded-2xl p-3.5 flex flex-col justify-between">
               <div>
                 <div class="flex items-center gap-1.5 text-xs font-bold uppercase text-emerald-400 mb-1">
                   <span>💰</span> La Más Barata
                 </div>
                 <h4 class="font-extrabold text-slate-100 text-sm store-name">--</h4>
-                <p class="text-xs text-slate-400 mt-1 store-summary">Calculando canasta...</p>
+                <p class="text-xs text-slate-400 mt-0.5 store-summary">Calculando canasta...</p>
               </div>
-              <div class="mt-3 pt-2 border-t border-slate-800 text-right">
-                <span class="text-lg font-black text-emerald-400 store-price">$ 0.00</span>
+              <div class="mt-2.5 pt-2 border-t border-slate-800 text-right">
+                <span class="text-base font-black text-emerald-400 store-price">$ 0.00</span>
               </div>
             </div>
 
             <!-- Más Cercana -->
-            <div id="cardBestClosest" class="bg-slate-900 border border-blue-500/30 rounded-2xl p-4 flex flex-col justify-between">
+            <div id="cardBestClosest" class="bg-slate-900 border border-blue-500/30 rounded-2xl p-3.5 flex flex-col justify-between">
               <div>
                 <div class="flex items-center gap-1.5 text-xs font-bold uppercase text-blue-400 mb-1">
                   <span>📍</span> La Más Cercana
                 </div>
                 <h4 class="font-extrabold text-slate-100 text-sm store-name">--</h4>
-                <p class="text-xs text-slate-400 mt-1 store-summary">Ubicación GPS...</p>
+                <p class="text-xs text-slate-400 mt-0.5 store-summary">Ubicación GPS...</p>
               </div>
-              <div class="mt-3 pt-2 border-t border-slate-800 text-right">
-                <span class="text-sm font-bold text-blue-400 store-distance">-- km</span>
+              <div class="mt-2.5 pt-2 border-t border-slate-800 text-right">
+                <span class="text-xs font-bold text-blue-400 store-distance">-- km</span>
               </div>
             </div>
 
             <!-- Mejor Valorada -->
-            <div id="cardBestRated" class="bg-slate-900 border border-amber-500/30 rounded-2xl p-4 flex flex-col justify-between">
+            <div id="cardBestRated" class="bg-slate-900 border border-amber-500/30 rounded-2xl p-3.5 flex flex-col justify-between">
               <div>
                 <div class="flex items-center gap-1.5 text-xs font-bold uppercase text-amber-400 mb-1">
                   <span>⭐</span> Mejor Valorada
                 </div>
                 <h4 class="font-extrabold text-slate-100 text-sm store-name">--</h4>
-                <p class="text-xs text-slate-400 mt-1 store-summary">Calidad de productos...</p>
+                <p class="text-xs text-slate-400 mt-0.5 store-summary">Calidad de productos...</p>
               </div>
-              <div class="mt-3 pt-2 border-t border-slate-800 text-right">
-                <span class="text-sm font-bold text-amber-400 store-rating">⭐ --</span>
+              <div class="mt-2.5 pt-2 border-t border-slate-800 text-right">
+                <span class="text-xs font-bold text-amber-400 store-rating">⭐ --</span>
               </div>
             </div>
           </div>
 
           <!-- All Stores Comparison Details -->
           <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4">
-            <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Comparativa Completa de Tiendas</h4>
-            <div id="plannerResultsList" class="space-y-3">
-              <p class="text-xs text-slate-500 py-6 text-center">Selecciona productos a la izquierda y pulsa "Optimizar Compras" para ver el análisis.</p>
+            <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2.5">Comparativa de Tiendas</h4>
+            <div id="plannerResultsList" class="space-y-2.5">
+              <p class="text-xs text-slate-500 py-4 text-center">Agrega productos a tu canasta con + y presiona "Optimizar Compras".</p>
             </div>
           </div>
         </div>
@@ -579,19 +605,67 @@
 
   <!-- MODAL: NUEVA / EDITAR TIENDA -->
   <div id="modalStore" class="modal-overlay">
-    <div class="modal-content">
+    <div class="modal-content max-w-lg">
       <div class="modal-header">
         <h3 id="modalStoreTitle" class="modal-title">Nueva Tienda</h3>
         <button class="modal-close" data-modal="modalStore">&times;</button>
       </div>
-      <form id="formStore" class="modal-body">
+      <form id="formStore" class="modal-body space-y-3">
         <input type="hidden" id="inputStoreId">
+        
+        <!-- Media Selector Obligatorio (Icono SVG o Foto) -->
+        <div class="form-group">
+          <label class="form-label flex items-center justify-between">
+            <span>Identificador Visual (Foto / Ícono) *</span>
+            <span class="text-[10px] text-amber-400 font-bold uppercase tracking-wider">Obligatorio</span>
+          </label>
+          <input type="hidden" id="inputStoreImageType" value="icon">
+          <input type="hidden" id="inputStoreImageData" value="supermarket">
+
+          <!-- Selector de Modo -->
+          <div class="grid grid-cols-2 gap-2 mb-2">
+            <button type="button" id="tabStoreIcon" class="btn btn-primary btn-sm text-xs py-1.5 flex items-center justify-center gap-1.5">
+              <span>🎨</span> Ícono SVG Estándar
+            </button>
+            <button type="button" id="tabStorePhoto" class="btn btn-secondary btn-sm text-xs py-1.5 flex items-center justify-center gap-1.5">
+              <span>📷</span> Subir Foto / Imagen
+            </button>
+          </div>
+
+          <!-- Preview -->
+          <div class="flex items-center gap-3 p-2.5 bg-slate-900/90 rounded-xl border border-slate-800">
+            <div id="storeMediaPreview" class="w-12 h-12 rounded-xl flex items-center justify-center p-2.5 flex-shrink-0 shadow"></div>
+            <div>
+              <span id="storeMediaPreviewTitle" class="text-xs font-bold text-slate-200 block">Supermercado</span>
+              <span class="text-[11px] text-slate-400">Identificador visible en tarjetas y listados.</span>
+            </div>
+          </div>
+
+          <!-- Galería de Íconos Estándar -->
+          <div id="storeIconPickerSection" class="mt-2 space-y-1">
+            <div class="text-[11px] text-slate-400 font-medium">Toca un ícono estándar:</div>
+            <div id="storeIconGrid" class="grid grid-cols-4 gap-2 max-h-36 overflow-y-auto p-1.5 bg-slate-900/50 rounded-xl border border-slate-800">
+              <!-- Rendered dynamically -->
+            </div>
+          </div>
+
+          <!-- Subir Foto / Imagen -->
+          <div id="storePhotoUploadSection" class="mt-2 space-y-1.5 hidden">
+            <label class="block p-3 rounded-xl border-2 border-dashed border-slate-700 hover:border-blue-500/50 text-center cursor-pointer transition bg-slate-900/40">
+              <input type="file" id="inputStorePhotoFile" accept="image/*" class="hidden">
+              <span class="text-xl block mb-0.5">📸</span>
+              <span class="text-xs font-semibold text-slate-200 block">Seleccionar Foto del Comercio</span>
+              <span class="text-[10px] text-slate-400 block mt-0.5">Se optimiza en WebP ultraligero</span>
+            </label>
+          </div>
+        </div>
+
         <div class="form-group">
           <label class="form-label">Nombre de la Tienda *</label>
-          <input type="text" id="inputStoreName" class="form-input" required placeholder="Ej: Automercados Plaza's, Bodegón Express">
+          <input type="text" id="inputStoreName" class="form-input" required placeholder="Ej: Automercados Plaza's, Farmatodo">
         </div>
         <div class="form-group">
-          <label class="form-label">Ubicación con Google Maps (Enlace o Nombre)</label>
+          <label class="form-label">Ubicación con Google Maps (Enlace o Dirección)</label>
           <input type="text" id="inputStoreMapsUrl" class="form-input" placeholder="Ej: https://maps.google.com/?q=... o Las Mercedes, Caracas">
         </div>
         <div class="grid grid-cols-2 gap-3">
@@ -608,7 +682,7 @@
           <label class="form-label">Descripción Opcional</label>
           <textarea id="inputStoreDesc" class="form-textarea" placeholder="Ej: Sucursal principal, abre los domingos..."></textarea>
         </div>
-        <div class="modal-footer">
+        <div class="modal-footer pt-2">
           <button type="button" class="btn btn-secondary" data-modal="modalStore">Cancelar</button>
           <button type="submit" class="btn btn-primary">Guardar Tienda</button>
         </div>
@@ -618,13 +692,61 @@
 
   <!-- MODAL: NUEVO / EDITAR PRODUCTO -->
   <div id="modalProduct" class="modal-overlay">
-    <div class="modal-content">
+    <div class="modal-content max-w-lg">
       <div class="modal-header">
         <h3 id="modalProductTitle" class="modal-title">Nuevo Producto</h3>
         <button class="modal-close" data-modal="modalProduct">&times;</button>
       </div>
-      <form id="formProduct" class="modal-body">
+      <form id="formProduct" class="modal-body space-y-3">
         <input type="hidden" id="inputProductId">
+
+        <!-- Media Selector Obligatorio (Icono SVG o Foto) -->
+        <div class="form-group">
+          <label class="form-label flex items-center justify-between">
+            <span>Identificador Visual (Foto / Ícono) *</span>
+            <span class="text-[10px] text-amber-400 font-bold uppercase tracking-wider">Obligatorio</span>
+          </label>
+          <input type="hidden" id="inputProductImageType" value="icon">
+          <input type="hidden" id="inputProductImageData" value="grain">
+
+          <!-- Selector de Modo -->
+          <div class="grid grid-cols-2 gap-2 mb-2">
+            <button type="button" id="tabProductIcon" class="btn btn-primary btn-sm text-xs py-1.5 flex items-center justify-center gap-1.5">
+              <span>🎨</span> Ícono SVG Estándar
+            </button>
+            <button type="button" id="tabProductPhoto" class="btn btn-secondary btn-sm text-xs py-1.5 flex items-center justify-center gap-1.5">
+              <span>📷</span> Subir Foto / Imagen
+            </button>
+          </div>
+
+          <!-- Preview -->
+          <div class="flex items-center gap-3 p-2.5 bg-slate-900/90 rounded-xl border border-slate-800">
+            <div id="productMediaPreview" class="w-12 h-12 rounded-xl flex items-center justify-center p-2.5 flex-shrink-0 shadow"></div>
+            <div>
+              <span id="productMediaPreviewTitle" class="text-xs font-bold text-slate-200 block">Granos / Harinas / Cereales</span>
+              <span class="text-[11px] text-slate-400">Icono o foto obligatoria para identificar el producto.</span>
+            </div>
+          </div>
+
+          <!-- Galería de Íconos Estándar -->
+          <div id="productIconPickerSection" class="mt-2 space-y-1">
+            <div class="text-[11px] text-slate-400 font-medium">Toca un ícono estándar:</div>
+            <div id="productIconGrid" class="grid grid-cols-4 sm:grid-cols-6 gap-2 max-h-36 overflow-y-auto p-1.5 bg-slate-900/50 rounded-xl border border-slate-800">
+              <!-- Rendered dynamically -->
+            </div>
+          </div>
+
+          <!-- Subir Foto / Imagen -->
+          <div id="productPhotoUploadSection" class="mt-2 space-y-1.5 hidden">
+            <label class="block p-3 rounded-xl border-2 border-dashed border-slate-700 hover:border-blue-500/50 text-center cursor-pointer transition bg-slate-900/40">
+              <input type="file" id="inputProductPhotoFile" accept="image/*" class="hidden">
+              <span class="text-xl block mb-0.5">📸</span>
+              <span class="text-xs font-semibold text-slate-200 block">Seleccionar Foto del Producto</span>
+              <span class="text-[10px] text-slate-400 block mt-0.5">Se optimiza en WebP ultraligero</span>
+            </label>
+          </div>
+        </div>
+
         <div class="form-group">
           <label class="form-label">Tienda donde se vende *</label>
           <select id="inputProductStoreId" class="form-select" required>
@@ -661,13 +783,13 @@
             <input type="hidden" id="inputProductRating" value="">
             <button type="button" id="btnClearProductRating" class="text-xs text-slate-400 hover:text-slate-200">Limpiar</button>
           </div>
-          <span class="text-[11px] text-slate-500">Exclusivo y personal. La IA nunca modifica esta calificación.</span>
+          <span class="text-[11px] text-slate-400">Compartida automáticamente con productos de idéntico nombre e imagen.</span>
         </div>
         <div class="form-group">
           <label class="form-label">Descripción Opcional</label>
           <textarea id="inputProductDesc" class="form-textarea" placeholder="Marca, presentación, notas..."></textarea>
         </div>
-        <div class="modal-footer">
+        <div class="modal-footer pt-2">
           <button type="button" class="btn btn-secondary" data-modal="modalProduct">Cancelar</button>
           <button type="submit" class="btn btn-primary">Guardar Producto</button>
         </div>
@@ -846,7 +968,103 @@
     </div>
   </div>
 
-  <!-- MODAL: LOGIN EXCLUSIVO CON GOOGLE -->
+  <!-- MODAL: PRODUCTOS DE LA TIENDA (CLICK EN TIENDA) -->
+  <div id="modalStoreProducts" class="modal-overlay">
+    <div class="modal-content max-w-2xl">
+      <div class="modal-header items-center">
+        <div class="flex items-center gap-3">
+          <div id="storeModalIcon" class="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 shadow"></div>
+          <div>
+            <h3 id="storeModalName" class="modal-title">Nombre de Tienda</h3>
+            <p id="storeModalDesc" class="text-xs text-slate-400 mt-0.5">Descripción de la tienda</p>
+          </div>
+        </div>
+        <button class="modal-close" data-modal="modalStoreProducts">&times;</button>
+      </div>
+
+      <div class="modal-body space-y-3.5">
+        <!-- Sub-header bar -->
+        <div class="flex items-center justify-between gap-2 flex-wrap pb-2 border-b border-slate-800">
+          <div class="flex items-center gap-2">
+            <span id="storeModalProductsCount" class="card-badge bg-blue-500/20 text-blue-400 font-bold">0 productos</span>
+            <a id="storeModalMapsLink" href="#" target="_blank" rel="noopener noreferrer" class="text-xs text-blue-400 hover:underline flex items-center gap-1 font-semibold">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+              <span>Ver en Maps</span>
+            </a>
+          </div>
+          <button id="btnStoreModalAddProduct" class="btn btn-primary btn-sm flex items-center gap-1 text-xs">
+            <span>➕</span> Agregar Producto a esta Tienda
+          </button>
+        </div>
+
+        <!-- Filter within store products -->
+        <input type="text" id="storeModalFilterInput" class="form-input w-full text-xs" placeholder="Buscar productos en esta tienda...">
+
+        <!-- List of products in this store -->
+        <div id="storeModalProductsList" class="space-y-2 max-h-[50vh] overflow-y-auto pr-1">
+          <!-- Rendered dynamically -->
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-modal="modalStoreProducts">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: AVISO DE UBICACIÓN DESACTIVADA -->
+  <div id="modalLocationDenied" class="modal-overlay">
+    <div class="modal-content max-w-md">
+      <div class="modal-header border-b border-amber-500/30">
+        <div class="flex items-center gap-2 text-amber-400">
+          <span class="text-2xl">📍⚠️</span>
+          <div>
+            <h3 class="modal-title text-amber-300">Permiso de Ubicación Desactivado</h3>
+            <p class="text-[11px] text-amber-400/80">Aviso sobre funciones limitadas</p>
+          </div>
+        </div>
+        <button class="modal-close" data-modal="modalLocationDenied">&times;</button>
+      </div>
+
+      <div class="modal-body space-y-3.5 text-xs text-slate-300">
+        <p class="leading-relaxed">
+          Has denegado o bloqueado el acceso a tu <strong class="text-white">Ubicación en Tiempo Real</strong> en tu navegador o dispositivo.
+        </p>
+
+        <div class="p-3.5 bg-amber-500/10 border border-amber-500/25 rounded-xl space-y-2.5">
+          <p class="font-bold text-amber-300 text-xs uppercase tracking-wide">
+            Funciones que pierdes al desactivar la ubicación:
+          </p>
+          <ul class="space-y-2 text-slate-300 list-disc list-inside">
+            <li>
+              <strong class="text-slate-100">Cálculo de Distancia Real (km):</strong> No podremos calcular la distancia exacta entre tu posición y cada tienda o supermercado.
+            </li>
+            <li>
+              <strong class="text-slate-100">Optimizador "La Más Cercana":</strong> Al programar tu mercado la app no podrá determinar cuál es la tienda más próxima a ti.
+            </li>
+            <li>
+              <strong class="text-slate-100">Detección automática de GPS:</strong> Al registrar una nueva tienda mientras estás en ella, las coordenadas no se completarán automáticamente.
+            </li>
+          </ul>
+        </div>
+
+        <p class="text-[11px] text-slate-400 leading-normal">
+          💡 <em>Puedes volver a activar los permisos tocando el icono de candado o configuración de sitio 🔒 junto a la URL en tu navegador y permitiendo la "Ubicación".</em>
+        </p>
+      </div>
+
+      <div class="modal-footer flex flex-col sm:flex-row gap-2">
+        <button type="button" class="btn btn-secondary w-full sm:w-auto" data-modal="modalLocationDenied">
+          Entendido, continuar sin ubicación
+        </button>
+        <button type="button" id="btnRetryLocationPerm" class="btn btn-primary w-full sm:w-auto">
+          🔄 Reintentar Permiso
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: LOGIN EXCLUSIVO CON GOOGLE OFICIAL -->
   <div id="modalGoogleLogin" class="modal-overlay">
     <div class="modal-content max-w-sm">
       <div class="modal-header">
@@ -860,27 +1078,53 @@
             <svg class="w-8 h-8" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/></svg>
           </div>
           <div>
-            <h4 class="font-bold text-slate-100 text-sm">Iniciar Sesión con Google</h4>
-            <p class="text-xs text-slate-400 mt-1">Conecta tu correo para unirte a grupos familiares y compartir precios.</p>
+            <h4 class="font-bold text-slate-100 text-sm">Iniciar Sesión Oficial con Google</h4>
+            <p class="text-xs text-slate-400 mt-1">Conéctate para compartir tiendas y productos en grupos familiares.</p>
           </div>
-          <form id="formGoogleLogin" class="space-y-3 text-left">
+
+          <!-- Botón Oficial de Google Identity Services -->
+          <div class="my-3 flex flex-col items-center justify-center min-h-[44px]">
+            <div id="googleGisButtonContainer" class="flex justify-center"></div>
+          </div>
+
+          <div class="p-2.5 bg-blue-500/10 border border-blue-500/25 rounded-xl text-left text-[11px] text-slate-300 space-y-1">
+            <span class="font-bold text-blue-300 block">🔒 Seguridad Oficial de Google:</span>
+            <span>La verificación de contraseña y 2FA se realiza de forma directa y oficial en la ventana emergente de Google (GIS / OAuth 2.0). Tus credenciales nunca pasan por servidores de terceros.</span>
+          </div>
+
+          <!-- Formulario Directo (Modo Local / Personal) -->
+          <form id="formGoogleLogin" class="space-y-2.5 text-left pt-2 border-t border-slate-800">
+            <div class="text-[11px] font-bold uppercase text-slate-400">O ingresar correo manualmente:</div>
             <div class="form-group">
-              <label class="form-label">Tu Correo de Google (Gmail):</label>
-              <input type="email" id="inputGoogleEmail" class="form-input" required placeholder="tu_correo@gmail.com">
+              <input type="email" id="inputGoogleEmail" class="form-input text-xs" required placeholder="tu_correo@gmail.com">
             </div>
             <div class="form-group">
-              <label class="form-label">Tu Nombre o Apodo:</label>
-              <input type="text" id="inputGoogleName" class="form-input" placeholder="Ej: Andrés">
+              <input type="text" id="inputGoogleName" class="form-input text-xs" placeholder="Tu Nombre o Apodo (Opcional)">
             </div>
-            <button type="submit" class="btn btn-primary w-full py-2.5 font-bold shadow-lg shadow-blue-500/25">
-              Continuar con Google
+            <button type="submit" class="btn btn-secondary w-full text-xs py-2 font-bold">
+              Continuar con este Correo
             </button>
           </form>
+
+          <!-- Configurar Google OAuth Client ID -->
+          <details class="text-left text-xs bg-slate-900/60 p-2.5 rounded-xl border border-slate-800">
+            <summary class="cursor-pointer font-semibold text-slate-400 hover:text-white flex items-center justify-between text-[11px]">
+              <span>⚙️ Configurar Google Client ID Oficial</span>
+              <span class="text-blue-400">Abrir</span>
+            </summary>
+            <div class="mt-2.5 space-y-2 text-[11px] text-slate-400">
+              <p>Para mostrar la ventana oficial de Google en este dominio, ingresa tu Client ID de Google Cloud:</p>
+              <input type="text" id="inputGoogleClientId" class="form-input text-xs" placeholder="xxxx.apps.googleusercontent.com">
+              <button type="button" id="btnSaveGoogleClientId" class="btn btn-secondary btn-sm w-full text-xs">
+                💾 Guardar Client ID
+              </button>
+            </div>
+          </details>
         </div>
 
         <!-- Vista Cuando SÍ está logueado -->
         <div id="googleLoginLoggedInView" class="hidden space-y-4 text-center">
-          <img id="userAvatarImg" src="" alt="Avatar" class="w-16 h-16 rounded-full mx-auto border-2 border-blue-500 shadow-lg">
+          <img id="userAvatarImg" src="" alt="Avatar" class="w-16 h-16 rounded-full mx-auto border-2 border-blue-500 shadow-lg object-cover">
           <div>
             <h4 id="userDisplayName" class="font-bold text-slate-100 text-base">Usuario</h4>
             <p id="userEmailText" class="text-xs text-slate-400">correo@gmail.com</p>
@@ -1000,6 +1244,7 @@
 
   <!-- Core Scripts -->
   <script src="./js/db.js"></script>
+  <script src="./js/icons-library.js"></script>
   <script src="./js/bcv.js"></script>
   <script src="./js/image-compressor.js"></script>
   <script src="./js/ai-scanner.js"></script>

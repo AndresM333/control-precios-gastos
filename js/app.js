@@ -15,6 +15,16 @@ document.addEventListener('DOMContentLoaded', async () => {
   const chartContainer = document.getElementById('productChartContainer');
   window.activePriceChart = new ProductPriceChart(chartContainer);
 
+  // Inicializar Controles de Medios Obligatorios (Íconos SVG y Fotos)
+  initStoreMediaControls();
+  initProductMediaControls();
+
+  // Solicitar permiso de ubicación en tiempo real al iniciar la app
+  initLocationPermissionCheck();
+
+  // Inicializar Google Identity Services Oficial
+  initGoogleOfficialGis();
+
   // Variables de Estado en Memoria
   let currentActiveView = 'stores';
   let activeCompressedPhoto = null;
@@ -441,6 +451,390 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // ----------------------------------------------------
+  // GESTIÓN DE MEDIOS (FOTOS E ICONOS SVG OBLIGATORIOS)
+  // ----------------------------------------------------
+  function initStoreMediaControls() {
+    const grid = document.getElementById('storeIconGrid');
+    if (!grid || !window.AppIcons) return;
+
+    grid.innerHTML = Object.values(window.AppIcons.stores).map(icon => `
+      <button type="button" class="btn-store-icon-choice p-2 rounded-xl flex flex-col items-center justify-center gap-1 border border-slate-700/60 hover:border-blue-500 hover:bg-slate-800 transition" data-id="${icon.id}" title="${icon.name}">
+        <div class="w-6 h-6 flex items-center justify-center pointer-events-none" style="color: ${icon.color};">
+          ${icon.svg}
+        </div>
+        <span class="text-[9px] text-slate-300 truncate max-w-[65px] pointer-events-none">${icon.name.split('/')[0]}</span>
+      </button>
+    `).join('');
+
+    updateStoreMediaPreview();
+
+    grid.addEventListener('click', (e) => {
+      const btn = e.target.closest('.btn-store-icon-choice');
+      if (!btn) return;
+      const iconId = btn.dataset.id;
+      document.getElementById('inputStoreImageType').value = 'icon';
+      document.getElementById('inputStoreImageData').value = iconId;
+      updateStoreMediaPreview();
+    });
+
+    const tabIcon = document.getElementById('tabStoreIcon');
+    const tabPhoto = document.getElementById('tabStorePhoto');
+    const secIcon = document.getElementById('storeIconPickerSection');
+    const secPhoto = document.getElementById('storePhotoUploadSection');
+
+    if (tabIcon && tabPhoto) {
+      tabIcon.addEventListener('click', () => {
+        tabIcon.className = 'btn btn-primary btn-sm text-xs py-1.5 flex items-center justify-center gap-1.5';
+        tabPhoto.className = 'btn btn-secondary btn-sm text-xs py-1.5 flex items-center justify-center gap-1.5';
+        secIcon.classList.remove('hidden');
+        secPhoto.classList.add('hidden');
+        if (document.getElementById('inputStoreImageType').value === 'photo') {
+          document.getElementById('inputStoreImageType').value = 'icon';
+          document.getElementById('inputStoreImageData').value = 'supermarket';
+          updateStoreMediaPreview();
+        }
+      });
+
+      tabPhoto.addEventListener('click', () => {
+        tabPhoto.className = 'btn btn-primary btn-sm text-xs py-1.5 flex items-center justify-center gap-1.5';
+        tabIcon.className = 'btn btn-secondary btn-sm text-xs py-1.5 flex items-center justify-center gap-1.5';
+        secPhoto.classList.remove('hidden');
+        secIcon.classList.add('hidden');
+      });
+    }
+
+    const photoInput = document.getElementById('inputStorePhotoFile');
+    if (photoInput) {
+      photoInput.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        try {
+          showToast('Optimizando foto en WebP...', 'info');
+          const compressed = await window.imageCompressor.compressImage(file, { maxWidth: 360, quality: 0.75 });
+          document.getElementById('inputStoreImageType').value = 'photo';
+          document.getElementById('inputStoreImageData').value = compressed.dataUrl;
+          updateStoreMediaPreview();
+          showToast('Foto asignada a la tienda', 'success');
+        } catch (err) {
+          showToast('Error al procesar foto: ' + err.message, 'error');
+        }
+      });
+    }
+  }
+
+  function updateStoreMediaPreview() {
+    const type = document.getElementById('inputStoreImageType').value || 'icon';
+    const data = document.getElementById('inputStoreImageData').value || 'supermarket';
+    const previewEl = document.getElementById('storeMediaPreview');
+    const labelEl = document.getElementById('storeMediaPreviewTitle');
+    if (!previewEl || !window.AppIcons) return;
+
+    if (type === 'photo' && data.startsWith('data:image')) {
+      previewEl.innerHTML = `<img src="${data}" alt="Foto" class="w-full h-full object-cover rounded-xl">`;
+      previewEl.style.backgroundColor = '#0f172a';
+      if (labelEl) labelEl.textContent = 'Foto Personalizada';
+    } else {
+      const def = window.AppIcons.stores[data] || window.AppIcons.stores['supermarket'];
+      previewEl.innerHTML = def.svg;
+      previewEl.style.backgroundColor = def.bg;
+      previewEl.style.color = def.color;
+      if (labelEl) labelEl.textContent = def.name;
+    }
+
+    document.querySelectorAll('.btn-store-icon-choice').forEach(b => {
+      const isSel = type === 'icon' && b.dataset.id === data;
+      b.classList.toggle('ring-2', isSel);
+      b.classList.toggle('ring-blue-500', isSel);
+      b.classList.toggle('bg-blue-500/10', isSel);
+    });
+  }
+
+  function setStoreMedia(type = 'icon', data = 'supermarket') {
+    document.getElementById('inputStoreImageType').value = type || 'icon';
+    document.getElementById('inputStoreImageData').value = data || 'supermarket';
+    const tabIcon = document.getElementById('tabStoreIcon');
+    const tabPhoto = document.getElementById('tabStorePhoto');
+    const secIcon = document.getElementById('storeIconPickerSection');
+    const secPhoto = document.getElementById('storePhotoUploadSection');
+
+    if (type === 'photo') {
+      if (tabPhoto) tabPhoto.className = 'btn btn-primary btn-sm text-xs py-1.5 flex items-center justify-center gap-1.5';
+      if (tabIcon) tabIcon.className = 'btn btn-secondary btn-sm text-xs py-1.5 flex items-center justify-center gap-1.5';
+      if (secPhoto) secPhoto.classList.remove('hidden');
+      if (secIcon) secIcon.classList.add('hidden');
+    } else {
+      if (tabIcon) tabIcon.className = 'btn btn-primary btn-sm text-xs py-1.5 flex items-center justify-center gap-1.5';
+      if (tabPhoto) tabPhoto.className = 'btn btn-secondary btn-sm text-xs py-1.5 flex items-center justify-center gap-1.5';
+      if (secIcon) secIcon.classList.remove('hidden');
+      if (secPhoto) secPhoto.classList.add('hidden');
+    }
+    updateStoreMediaPreview();
+  }
+
+  function initProductMediaControls() {
+    const grid = document.getElementById('productIconGrid');
+    if (!grid || !window.AppIcons) return;
+
+    grid.innerHTML = Object.values(window.AppIcons.products).map(icon => `
+      <button type="button" class="btn-product-icon-choice p-1.5 rounded-xl flex flex-col items-center justify-center gap-1 border border-slate-700/60 hover:border-blue-500 hover:bg-slate-800 transition" data-id="${icon.id}" title="${icon.name}">
+        <div class="w-5 h-5 flex items-center justify-center pointer-events-none" style="color: ${icon.color};">
+          ${icon.svg}
+        </div>
+        <span class="text-[8px] text-slate-300 truncate max-w-[55px] pointer-events-none">${icon.name.split('/')[0]}</span>
+      </button>
+    `).join('');
+
+    updateProductMediaPreview();
+
+    grid.addEventListener('click', (e) => {
+      const btn = e.target.closest('.btn-product-icon-choice');
+      if (!btn) return;
+      const iconId = btn.dataset.id;
+      document.getElementById('inputProductImageType').value = 'icon';
+      document.getElementById('inputProductImageData').value = iconId;
+      updateProductMediaPreview();
+    });
+
+    const tabIcon = document.getElementById('tabProductIcon');
+    const tabPhoto = document.getElementById('tabProductPhoto');
+    const secIcon = document.getElementById('productIconPickerSection');
+    const secPhoto = document.getElementById('productPhotoUploadSection');
+
+    if (tabIcon && tabPhoto) {
+      tabIcon.addEventListener('click', () => {
+        tabIcon.className = 'btn btn-primary btn-sm text-xs py-1.5 flex items-center justify-center gap-1.5';
+        tabPhoto.className = 'btn btn-secondary btn-sm text-xs py-1.5 flex items-center justify-center gap-1.5';
+        secIcon.classList.remove('hidden');
+        secPhoto.classList.add('hidden');
+        if (document.getElementById('inputProductImageType').value === 'photo') {
+          document.getElementById('inputProductImageType').value = 'icon';
+          document.getElementById('inputProductImageData').value = 'grain';
+          updateProductMediaPreview();
+        }
+      });
+
+      tabPhoto.addEventListener('click', () => {
+        tabPhoto.className = 'btn btn-primary btn-sm text-xs py-1.5 flex items-center justify-center gap-1.5';
+        tabIcon.className = 'btn btn-secondary btn-sm text-xs py-1.5 flex items-center justify-center gap-1.5';
+        secPhoto.classList.remove('hidden');
+        secIcon.classList.add('hidden');
+      });
+    }
+
+    const photoInput = document.getElementById('inputProductPhotoFile');
+    if (photoInput) {
+      photoInput.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        try {
+          showToast('Optimizando foto en WebP...', 'info');
+          const compressed = await window.imageCompressor.compressImage(file, { maxWidth: 360, quality: 0.75 });
+          document.getElementById('inputProductImageType').value = 'photo';
+          document.getElementById('inputProductImageData').value = compressed.dataUrl;
+          updateProductMediaPreview();
+          showToast('Foto asignada al producto', 'success');
+        } catch (err) {
+          showToast('Error al procesar foto: ' + err.message, 'error');
+        }
+      });
+    }
+  }
+
+  function updateProductMediaPreview() {
+    const type = document.getElementById('inputProductImageType').value || 'icon';
+    const data = document.getElementById('inputProductImageData').value || 'grain';
+    const previewEl = document.getElementById('productMediaPreview');
+    const labelEl = document.getElementById('productMediaPreviewTitle');
+    if (!previewEl || !window.AppIcons) return;
+
+    if (type === 'photo' && data.startsWith('data:image')) {
+      previewEl.innerHTML = `<img src="${data}" alt="Foto" class="w-full h-full object-cover rounded-xl">`;
+      previewEl.style.backgroundColor = '#0f172a';
+      if (labelEl) labelEl.textContent = 'Foto Personalizada';
+    } else {
+      const def = window.AppIcons.products[data] || window.AppIcons.products['grain'];
+      previewEl.innerHTML = def.svg;
+      previewEl.style.backgroundColor = def.bg;
+      previewEl.style.color = def.color;
+      if (labelEl) labelEl.textContent = def.name;
+    }
+
+    document.querySelectorAll('.btn-product-icon-choice').forEach(b => {
+      const isSel = type === 'icon' && b.dataset.id === data;
+      b.classList.toggle('ring-2', isSel);
+      b.classList.toggle('ring-blue-500', isSel);
+      b.classList.toggle('bg-blue-500/10', isSel);
+    });
+  }
+
+  function setProductMedia(type = 'icon', data = 'grain') {
+    document.getElementById('inputProductImageType').value = type || 'icon';
+    document.getElementById('inputProductImageData').value = data || 'grain';
+    const tabIcon = document.getElementById('tabProductIcon');
+    const tabPhoto = document.getElementById('tabProductPhoto');
+    const secIcon = document.getElementById('productIconPickerSection');
+    const secPhoto = document.getElementById('productPhotoUploadSection');
+
+    if (type === 'photo') {
+      if (tabPhoto) tabPhoto.className = 'btn btn-primary btn-sm text-xs py-1.5 flex items-center justify-center gap-1.5';
+      if (tabIcon) tabIcon.className = 'btn btn-secondary btn-sm text-xs py-1.5 flex items-center justify-center gap-1.5';
+      if (secPhoto) secPhoto.classList.remove('hidden');
+      if (secIcon) secIcon.classList.add('hidden');
+    } else {
+      if (tabIcon) tabIcon.className = 'btn btn-primary btn-sm text-xs py-1.5 flex items-center justify-center gap-1.5';
+      if (tabPhoto) tabPhoto.className = 'btn btn-secondary btn-sm text-xs py-1.5 flex items-center justify-center gap-1.5';
+      if (secIcon) secIcon.classList.remove('hidden');
+      if (secPhoto) secPhoto.classList.add('hidden');
+    }
+    updateProductMediaPreview();
+  }
+
+  // ----------------------------------------------------
+  // MODAL: PRODUCTOS DE LA TIENDA (CLICK EN TIENDA)
+  // ----------------------------------------------------
+  let currentModalStoreId = null;
+
+  async function openStoreProductsModal(storeId) {
+    currentModalStoreId = storeId;
+    const store = await window.db.getById('stores', storeId);
+    if (!store) return;
+
+    const iconContainer = document.getElementById('storeModalIcon');
+    if (window.AppIcons) {
+      iconContainer.innerHTML = window.AppIcons.renderStoreMedia(store, 'w-12 h-12');
+    }
+
+    document.getElementById('storeModalName').textContent = store.name;
+    document.getElementById('storeModalDesc').textContent = store.description || 'Comercio registrado';
+    
+    const mapsLink = store.maps_url || (store.lat && store.lng ? `https://maps.google.com/?q=${store.lat},${store.lng}` : `https://maps.google.com/?q=${encodeURIComponent(store.name)}`);
+    document.getElementById('storeModalMapsLink').href = mapsLink;
+
+    const filterInput = document.getElementById('storeModalFilterInput');
+    filterInput.value = '';
+
+    await renderStoreModalProductsList();
+    openModal('modalStoreProducts');
+  }
+
+  async function renderStoreModalProductsList() {
+    if (!currentModalStoreId) return;
+    const container = document.getElementById('storeModalProductsList');
+    const countBadge = document.getElementById('storeModalProductsCount');
+    const filterTerm = (document.getElementById('storeModalFilterInput').value || '').toLowerCase().trim();
+
+    const allProducts = await window.db.getProducts();
+    const storeProducts = allProducts.filter(p => p.store_id === currentModalStoreId);
+    const currentRate = window.bcvService.rate;
+
+    countBadge.textContent = `${storeProducts.length} producto${storeProducts.length === 1 ? '' : 's'} vinculados`;
+
+    const filtered = storeProducts.filter(p => {
+      return p.name.toLowerCase().includes(filterTerm) || (p.description || '').toLowerCase().includes(filterTerm);
+    });
+
+    if (filtered.length === 0) {
+      container.innerHTML = `
+        <div class="text-center py-8 text-slate-500">
+          <p class="text-2xl mb-1">🏷️</p>
+          <p class="font-semibold text-slate-300 text-xs">No hay productos en esta tienda</p>
+          <p class="text-[11px] text-slate-500 mt-1">Toca "+ Agregar Producto a esta Tienda" para añadir uno.</p>
+        </div>
+      `;
+      return;
+    }
+
+    container.innerHTML = filtered.map(p => {
+      let priceUsd = p.current_price;
+      let priceVes = p.current_price;
+      if (p.original_currency === 'VES') {
+        priceUsd = currentRate > 0 ? p.current_price / currentRate : 0;
+      } else {
+        priceVes = p.current_price * currentRate;
+      }
+
+      const mediaHtml = window.AppIcons ? window.AppIcons.renderProductMedia(p, 'w-10 h-10') : '🏷️';
+
+      const starsHtml = [1, 2, 3, 4, 5].map(starNum => {
+        const isFilled = p.rating && p.rating >= starNum;
+        return `<span class="star ${isFilled ? 'filled' : ''}" data-prod-id="${p.id}" data-rating="${starNum}" title="Calificar con ${starNum} estrellas">★</span>`;
+      }).join('');
+
+      return `
+        <div class="p-3 bg-slate-900/80 rounded-xl border border-slate-800 flex items-center justify-between gap-3 hover:border-slate-700 transition">
+          <div class="flex items-center gap-3 min-w-0">
+            ${mediaHtml}
+            <div class="truncate">
+              <h4 class="font-bold text-slate-100 text-xs truncate">${escapeHtml(p.name)}</h4>
+              <div class="flex items-center gap-2 mt-0.5">
+                <span class="text-xs font-black text-slate-200">$ ${priceUsd.toFixed(2)}</span>
+                <span class="text-[10px] text-emerald-400 font-semibold">Bs. ${priceVes.toFixed(2)}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-2 flex-shrink-0">
+            <div class="star-rating store-modal-stars scale-90">
+              ${starsHtml}
+            </div>
+            <button class="btn btn-secondary btn-sm text-[11px] py-1 px-2 btn-store-modal-chart" data-id="${p.id}" title="Ver evolución de precio">
+              📈
+            </button>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    // Attach listeners in modal
+    container.querySelectorAll('.store-modal-stars .star').forEach(star => {
+      star.addEventListener('click', async () => {
+        const prodId = parseInt(star.dataset.prodId);
+        const rating = parseInt(star.dataset.rating);
+        const prod = await window.db.getById('products', prodId);
+        if (prod) {
+          const res = await window.db.updateProductRatingShared(prodId, rating);
+          if (res.count > 1) {
+            showToast(`⭐ Calificación (${rating}★) compartida con ${res.count} tiendas para "${prod.name}"`, 'success');
+          } else {
+            showToast(`⭐ Calificación (${rating}★) guardada`, 'success');
+          }
+          await renderStoreModalProductsList();
+          renderProducts();
+        }
+      });
+    });
+
+    container.querySelectorAll('.btn-store-modal-chart').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const prodId = parseInt(btn.dataset.id);
+        const prod = await window.db.getById('products', prodId);
+        if (prod) {
+          const store = await window.db.getById('stores', prod.store_id);
+          const history = await window.db.getPriceHistory(prodId);
+          document.getElementById('modalChartProductName').textContent = prod.name;
+          document.getElementById('modalChartStoreName').textContent = `Comercio: ${store ? store.name : 'Tienda'}`;
+          window.activePriceChart.setData(prod, history);
+          openModal('modalPriceChart');
+        }
+      });
+    });
+  }
+
+  document.getElementById('storeModalFilterInput').addEventListener('input', renderStoreModalProductsList);
+
+  document.getElementById('btnStoreModalAddProduct').addEventListener('click', async () => {
+    if (!currentModalStoreId) return;
+    await populateStoreSelect('inputProductStoreId', currentModalStoreId);
+    document.getElementById('modalProductTitle').textContent = 'Nuevo Producto';
+    document.getElementById('formProduct').reset();
+    document.getElementById('inputProductId').value = '';
+    setProductMedia('icon', 'grain');
+    setModalRatingStars(0);
+    closeModal('modalStoreProducts');
+    openModal('modalProduct');
+  });
+
+  // ----------------------------------------------------
   // 1. TIENDAS (STORES)
   // ----------------------------------------------------
   async function renderStores() {
@@ -468,34 +862,43 @@ document.addEventListener('DOMContentLoaded', async () => {
     storesGrid.innerHTML = filtered.map(store => {
       const storeProducts = products.filter(p => p.store_id === store.id);
       const mapsLink = store.maps_url || (store.lat && store.lng ? `https://maps.google.com/?q=${store.lat},${store.lng}` : `https://maps.google.com/?q=${encodeURIComponent(store.name)}`);
+      const mediaHtml = window.AppIcons ? window.AppIcons.renderStoreMedia(store) : '🏪';
 
       return `
-        <div class="app-card">
+        <div class="app-card cursor-pointer hover:border-blue-500/60 transition group store-card" data-store-id="${store.id}">
           <div>
-            <div class="card-header">
-              <h3 class="card-title">${escapeHtml(store.name)}</h3>
-              <span class="card-badge">${storeProducts.length} productos</span>
+            <div class="card-header items-center gap-3">
+              <div class="flex items-center gap-3 min-w-0">
+                ${mediaHtml}
+                <div class="min-w-0">
+                  <h3 class="card-title text-base group-hover:text-blue-400 transition truncate">${escapeHtml(store.name)}</h3>
+                  <span class="card-badge mt-1">${storeProducts.length} productos</span>
+                </div>
+              </div>
             </div>
-            <p class="card-desc">${escapeHtml(store.description || 'Sin descripción')}</p>
+            <p class="card-desc mt-2">${escapeHtml(store.description || 'Sin descripción adicional')}</p>
+            <div class="text-[11px] text-blue-400 font-semibold mt-2.5 flex items-center gap-1 opacity-90 group-hover:opacity-100">
+              <span>👉 Toca para ver sus ${storeProducts.length} productos</span>
+            </div>
           </div>
           
-          <div class="card-footer">
+          <div class="card-footer mt-3" onclick="event.stopPropagation();">
             <div class="flex items-center gap-1.5 flex-wrap">
-              <a href="${mapsLink}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm text-blue-400">
+              <a href="${mapsLink}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm text-blue-400" onclick="event.stopPropagation();">
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                 Maps
               </a>
               ${isGroup ? `
-                <button class="btn btn-primary btn-sm btn-copy-store-personal" data-id="${store.id}" title="Copiar tienda y sus productos a mi espacio personal">
+                <button class="btn btn-primary btn-sm btn-copy-store-personal" data-id="${store.id}" title="Copiar tienda y sus productos a mi espacio personal" onclick="event.stopPropagation();">
                   📥 A Personal
                 </button>
               ` : ''}
             </div>
-            <div class="flex items-center gap-1.5">
-              <button class="btn btn-secondary btn-sm btn-edit-store" data-id="${store.id}" title="Editar tienda">
+            <div class="flex items-center gap-1.5" onclick="event.stopPropagation();">
+              <button class="btn btn-secondary btn-sm btn-edit-store" data-id="${store.id}" title="Editar tienda" onclick="event.stopPropagation();">
                 ✏️
               </button>
-              <button class="btn btn-outline-danger btn-sm btn-delete-store" data-id="${store.id}" title="Eliminar tienda">
+              <button class="btn btn-outline-danger btn-sm btn-delete-store" data-id="${store.id}" title="Eliminar tienda" onclick="event.stopPropagation();">
                 🗑️
               </button>
             </div>
@@ -504,9 +907,21 @@ document.addEventListener('DOMContentLoaded', async () => {
       `;
     }).join('');
 
+    // Click en la tarjeta de tienda abre el modal de productos
+    document.querySelectorAll('.store-card').forEach(card => {
+      card.addEventListener('click', (e) => {
+        if (e.target.closest('button') || e.target.closest('a') || e.target.closest('.card-footer')) {
+          return;
+        }
+        const storeId = parseInt(card.dataset.storeId);
+        openStoreProductsModal(storeId);
+      });
+    });
+
     // Attach listeners
     document.querySelectorAll('.btn-copy-store-personal').forEach(btn => {
-      btn.addEventListener('click', async () => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
         const storeId = parseInt(btn.dataset.id);
         btn.disabled = true;
         btn.textContent = 'Copiando...';
@@ -522,9 +937,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       });
     });
 
-    // Attach listeners
     document.querySelectorAll('.btn-edit-store').forEach(btn => {
-      btn.addEventListener('click', async () => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
         const store = await window.db.getById('stores', parseInt(btn.dataset.id));
         if (store) {
           document.getElementById('modalStoreTitle').textContent = 'Editar Tienda';
@@ -534,13 +949,15 @@ document.addEventListener('DOMContentLoaded', async () => {
           document.getElementById('inputStoreLat').value = store.lat || '';
           document.getElementById('inputStoreLng').value = store.lng || '';
           document.getElementById('inputStoreDesc').value = store.description || '';
+          setStoreMedia(store.image_type || 'icon', store.image_data || 'supermarket');
           openModal('modalStore');
         }
       });
     });
 
     document.querySelectorAll('.btn-delete-store').forEach(btn => {
-      btn.addEventListener('click', async () => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
         if (confirm('¿Eliminar esta tienda y todos sus productos registrados?')) {
           await window.db.deleteStore(parseInt(btn.dataset.id));
           showToast('Tienda eliminada', 'info');
@@ -556,6 +973,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('modalStoreTitle').textContent = 'Nueva Tienda';
     document.getElementById('formStore').reset();
     document.getElementById('inputStoreId').value = '';
+    setStoreMedia('icon', 'supermarket');
     openModal('modalStore');
   });
 
@@ -567,6 +985,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     const lat = parseFloat(document.getElementById('inputStoreLat').value) || null;
     const lng = parseFloat(document.getElementById('inputStoreLng').value) || null;
     const desc = document.getElementById('inputStoreDesc').value.trim();
+    const imageType = document.getElementById('inputStoreImageType').value || 'icon';
+    const imageData = document.getElementById('inputStoreImageData').value || 'supermarket';
 
     if (!mapsUrl) {
       mapsUrl = `https://maps.google.com/?q=${encodeURIComponent(name)}`;
@@ -578,7 +998,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       maps_url: mapsUrl,
       lat,
       lng,
-      description: desc
+      description: desc,
+      image_type: imageType,
+      image_data: imageData
     });
 
     showToast('Tienda guardada con éxito', 'success');
@@ -636,7 +1058,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         priceVes = prod.current_price * currentRate;
       }
 
-      // Estrellas de valoración personal (1 a 5)
+      const mediaHtml = window.AppIcons ? window.AppIcons.renderProductMedia(prod) : '🏷️';
+
+      // Estrellas de valoración personal compartida (1 a 5)
       const starsHtml = [1, 2, 3, 4, 5].map(starNum => {
         const isFilled = prod.rating && prod.rating >= starNum;
         return `<span class="star ${isFilled ? 'filled' : ''}" data-prod-id="${prod.id}" data-rating="${starNum}" title="Calificar con ${starNum} estrellas">★</span>`;
@@ -645,13 +1069,16 @@ document.addEventListener('DOMContentLoaded', async () => {
       return `
         <div class="app-card">
           <div>
-            <div class="card-header">
-              <div>
-                <span class="text-[11px] font-semibold text-blue-400 block">${escapeHtml(store.name)}</span>
-                <h3 class="card-title text-base mt-0.5">${escapeHtml(prod.name)}</h3>
+            <div class="card-header items-center gap-3">
+              <div class="flex items-center gap-3 min-w-0">
+                ${mediaHtml}
+                <div class="min-w-0">
+                  <span class="text-[11px] font-semibold text-blue-400 block truncate">${escapeHtml(store.name)}</span>
+                  <h3 class="card-title text-base mt-0.5 truncate">${escapeHtml(prod.name)}</h3>
+                </div>
               </div>
               <!-- Dual Price Badge -->
-              <div class="text-right">
+              <div class="text-right flex-shrink-0">
                 <span class="text-base font-extrabold text-slate-100 block">$ ${priceUsd.toFixed(2)}</span>
                 <span class="text-[11px] font-semibold text-emerald-400">Bs. ${priceVes.toFixed(2)}</span>
               </div>
@@ -659,7 +1086,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             <p class="card-desc text-xs mt-2">${escapeHtml(prod.description || 'Sin notas adicionales')}</p>
 
-            <!-- Star Rating (Clickable on card) -->
+            <!-- Star Rating (Clickable on card - shared across same name + photo) -->
             <div class="flex items-center justify-between py-1.5 px-2 bg-slate-900/60 rounded-lg border border-slate-800/80 mt-2">
               <span class="text-[11px] text-slate-400 font-medium">Calidad:</span>
               <div class="star-rating card-stars">
@@ -710,17 +1137,20 @@ document.addEventListener('DOMContentLoaded', async () => {
       });
     });
 
-    // Attach click listener on stars to update rating directly
+    // Attach click listener on stars to update rating directly (SHARED rating sync)
     document.querySelectorAll('.card-stars .star').forEach(star => {
       star.addEventListener('click', async () => {
         const prodId = parseInt(star.dataset.prodId);
         const rating = parseInt(star.dataset.rating);
         const prod = await window.db.getById('products', prodId);
         if (prod) {
-          prod.rating = rating;
-          await window.db.put('products', prod);
-          showToast(`Valoración guardada: ${rating} ⭐ para ${prod.name}`, 'success');
-          renderProducts();
+          const res = await window.db.updateProductRatingShared(prodId, rating);
+          if (res.count > 1) {
+            showToast(`⭐ Calificación compartida (${rating}★) sincronizada en ${res.count} tiendas para "${prod.name}"`, 'success');
+          } else {
+            showToast(`⭐ Calificación guardada: ${rating}★ para "${prod.name}"`, 'success');
+          }
+          await renderProducts();
         }
       });
     });
@@ -755,6 +1185,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           document.getElementById('inputProductPrice').value = prod.current_price;
           document.getElementById('inputProductCurrency').value = prod.original_currency || 'USD';
           document.getElementById('inputProductDesc').value = prod.description || '';
+          setProductMedia(prod.image_type || 'icon', prod.image_data || 'grain');
           setModalRatingStars(prod.rating || 0);
           openModal('modalProduct');
         }
@@ -814,6 +1245,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('modalProductTitle').textContent = 'Nuevo Producto';
     document.getElementById('formProduct').reset();
     document.getElementById('inputProductId').value = '';
+    setProductMedia('icon', 'grain');
     setModalRatingStars(0);
     openModal('modalProduct');
   });
@@ -827,16 +1259,25 @@ document.addEventListener('DOMContentLoaded', async () => {
     const currency = document.getElementById('inputProductCurrency').value;
     const ratingVal = parseInt(document.getElementById('inputProductRating').value) || null;
     const desc = document.getElementById('inputProductDesc').value.trim();
+    const imageType = document.getElementById('inputProductImageType').value || 'icon';
+    const imageData = document.getElementById('inputProductImageData').value || 'grain';
 
-    await window.db.saveProduct({
+    const saved = await window.db.saveProduct({
       id: id ? parseInt(id) : undefined,
       store_id: storeId,
       name,
       current_price: price,
       original_currency: currency,
-      rating: ratingVal, // Conserva o actualiza la valoración manual
-      description: desc
+      rating: ratingVal,
+      description: desc,
+      image_type: imageType,
+      image_data: imageData
     }, 'MANUAL', window.bcvService.rate);
+
+    // Si se especificó calificación, sincronizarla automáticamente con productos idénticos
+    if (ratingVal && saved && saved.id) {
+      await window.db.updateProductRatingShared(saved.id, ratingVal);
+    }
 
     showToast('Producto guardado con éxito', 'success');
     closeModal('modalProduct');
@@ -995,53 +1436,196 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   // ----------------------------------------------------
-  // 4. PROGRAMAR MERCADO (GROCERY PLANNER)
+  // 4. PROGRAMAR MERCADO (CANASTA CON + Y -)
   // ----------------------------------------------------
+  const plannerCart = new Map(); // productName -> quantity
+
   async function loadPlannerProductList() {
-    const container = document.getElementById('plannerChecklist');
+    const catalogContainer = document.getElementById('plannerCatalogList');
+    if (!catalogContainer) return;
+
     const searchFilter = (document.getElementById('plannerSearchInput').value || '').toLowerCase().trim();
     const products = await window.db.getProducts();
 
-    // Obtener nombres únicos de productos ordenados alfabéticamente
-    const uniqueNames = Array.from(new Set(products.map(p => p.name.trim()))).sort();
+    // Group products by unique trimmed name to get a representative item
+    const productsByName = new Map();
+    products.forEach(p => {
+      const trimmed = p.name.trim();
+      if (!productsByName.has(trimmed)) {
+        productsByName.set(trimmed, p);
+      }
+    });
 
+    const uniqueNames = Array.from(productsByName.keys()).sort();
     const filtered = uniqueNames.filter(name => name.toLowerCase().includes(searchFilter));
 
-    container.innerHTML = filtered.map((name, idx) => `
-      <label class="flex items-center gap-2 p-2 rounded-lg hover:bg-slate-800 cursor-pointer text-xs transition">
-        <input type="checkbox" class="planner-item-chk rounded bg-slate-900 border-slate-700 text-blue-500" value="${escapeHtml(name)}">
-        <span class="text-slate-200">${escapeHtml(name)}</span>
-      </label>
-    `).join('');
+    const totalEl = document.getElementById('plannerCatalogTotal');
+    if (totalEl) totalEl.textContent = `${filtered.length} productos`;
 
-    // Listener para actualizar contador
-    document.querySelectorAll('.planner-item-chk').forEach(chk => {
-      chk.addEventListener('change', () => {
-        const selected = document.querySelectorAll('.planner-item-chk:checked').length;
-        document.getElementById('plannerSelectedCount').textContent = `${selected} seleccionados`;
+    if (filtered.length === 0) {
+      catalogContainer.innerHTML = `
+        <div class="text-center py-8 text-slate-500">
+          <p class="text-2xl mb-1">🔍</p>
+          <p class="text-xs">No se encontraron productos en el catálogo</p>
+        </div>
+      `;
+    } else {
+      catalogContainer.innerHTML = filtered.map(name => {
+        const prod = productsByName.get(name);
+        const mediaHtml = window.AppIcons ? window.AppIcons.renderProductMedia(prod, 'w-8 h-8') : '🏷️';
+        const inCartQty = plannerCart.get(name) || 0;
+
+        return `
+          <div class="flex items-center justify-between p-2 rounded-xl bg-slate-800/40 hover:bg-slate-800 border border-slate-800/60 transition gap-2">
+            <div class="flex items-center gap-2.5 min-w-0">
+              ${mediaHtml}
+              <div class="truncate">
+                <span class="text-xs font-semibold text-slate-200 block truncate">${escapeHtml(name)}</span>
+                <span class="text-[10px] text-slate-400 block">${inCartQty > 0 ? `<span class="text-emerald-400 font-bold">${inCartQty} en canasta</span>` : 'Disponible'}</span>
+              </div>
+            </div>
+            <button class="btn-planner-add-item w-8 h-8 rounded-full bg-emerald-500/20 hover:bg-emerald-500 text-emerald-400 hover:text-white font-bold flex items-center justify-center flex-shrink-0 transition shadow" data-name="${escapeHtml(name)}" title="Agregar 1 unidad a la canasta">
+              <svg class="w-4 h-4 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+            </button>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // Attach listeners on catalog add buttons
+    catalogContainer.querySelectorAll('.btn-planner-add-item').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const name = btn.dataset.name;
+        const current = plannerCart.get(name) || 0;
+        plannerCart.set(name, current + 1);
+        renderPlannerCart();
+        loadPlannerProductList(); // refresh counts
+        showToast(`+1 "${name}" en la canasta`, 'info');
+      });
+    });
+
+    renderPlannerCart();
+  }
+
+  async function renderPlannerCart() {
+    const cartContainer = document.getElementById('plannerCartList');
+    const summaryEl = document.getElementById('plannerCartSummary');
+    const clearBtn = document.getElementById('btnClearPlannerCart');
+    if (!cartContainer) return;
+
+    const products = await window.db.getProducts();
+    const productsByName = new Map();
+    products.forEach(p => {
+      const trimmed = p.name.trim();
+      if (!productsByName.has(trimmed)) productsByName.set(trimmed, p);
+    });
+
+    if (plannerCart.size === 0) {
+      cartContainer.innerHTML = `
+        <div class="text-center py-10 text-slate-500">
+          <p class="text-3xl mb-2">🛒</p>
+          <p class="font-semibold text-slate-300 text-xs">Tu canasta está vacía</p>
+          <p class="text-[11px] text-slate-500 mt-1 max-w-[220px] mx-auto">Toca el botón <span class="text-emerald-400 font-bold">+</span> en cualquier producto del catálogo para agregarlo.</p>
+        </div>
+      `;
+      if (summaryEl) summaryEl.textContent = '0 unidades (0 productos)';
+      if (clearBtn) clearBtn.classList.add('hidden');
+      return;
+    }
+
+    if (clearBtn) clearBtn.classList.remove('hidden');
+
+    let totalUnits = 0;
+    plannerCart.forEach(qty => totalUnits += qty);
+    if (summaryEl) {
+      summaryEl.textContent = `${totalUnits} unidad${totalUnits === 1 ? '' : 'es'} (${plannerCart.size} producto${plannerCart.size === 1 ? '' : 's'})`;
+    }
+
+    const cartEntries = Array.from(plannerCart.entries());
+    cartContainer.innerHTML = cartEntries.map(([name, qty]) => {
+      const prod = productsByName.get(name) || { name };
+      const mediaHtml = window.AppIcons ? window.AppIcons.renderProductMedia(prod, 'w-8 h-8') : '🛒';
+
+      return `
+        <div class="flex items-center justify-between p-2 rounded-xl bg-slate-800/80 border border-slate-700/70 gap-2">
+          <div class="flex items-center gap-2.5 min-w-0">
+            ${mediaHtml}
+            <span class="text-xs font-bold text-slate-100 truncate">${escapeHtml(name)}</span>
+          </div>
+
+          <div class="flex items-center gap-1.5 flex-shrink-0">
+            <!-- Botón - para restar 1 (si llega a 0 se elimina) -->
+            <button class="btn-cart-minus w-7 h-7 rounded-lg bg-slate-700 hover:bg-red-500/30 text-slate-200 hover:text-red-400 font-black flex items-center justify-center transition" data-name="${escapeHtml(name)}" title="Restar 1 unidad">
+              <svg class="w-3.5 h-3.5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M20 12H4"/></svg>
+            </button>
+
+            <!-- Contador de unidades -->
+            <span class="px-2 py-0.5 rounded-md bg-slate-900 border border-slate-700 text-xs font-black text-blue-400 min-w-[28px] text-center">
+              x${qty}
+            </span>
+
+            <!-- Botón + para sumar 1 -->
+            <button class="btn-cart-plus w-7 h-7 rounded-lg bg-slate-700 hover:bg-emerald-500/30 text-slate-200 hover:text-emerald-400 font-black flex items-center justify-center transition" data-name="${escapeHtml(name)}" title="Añadir 1 unidad más">
+              <svg class="w-3.5 h-3.5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+            </button>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    // Attach listeners on cart buttons
+    cartContainer.querySelectorAll('.btn-cart-plus').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const name = btn.dataset.name;
+        const current = plannerCart.get(name) || 0;
+        plannerCart.set(name, current + 1);
+        renderPlannerCart();
+        loadPlannerProductList();
+      });
+    });
+
+    cartContainer.querySelectorAll('.btn-cart-minus').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const name = btn.dataset.name;
+        const current = plannerCart.get(name) || 0;
+        if (current <= 1) {
+          plannerCart.delete(name);
+          showToast(`"${name}" quitado de la canasta`, 'info');
+        } else {
+          plannerCart.set(name, current - 1);
+        }
+        renderPlannerCart();
+        loadPlannerProductList();
       });
     });
   }
 
+  document.getElementById('btnClearPlannerCart').addEventListener('click', () => {
+    plannerCart.clear();
+    renderPlannerCart();
+    loadPlannerProductList();
+    showToast('Canasta vaciada', 'info');
+  });
+
   document.getElementById('plannerSearchInput').addEventListener('input', loadPlannerProductList);
 
   document.getElementById('btnExecutePlanner').addEventListener('click', async () => {
-    const selectedCheckboxes = document.querySelectorAll('.planner-item-chk:checked');
-    const selectedNames = Array.from(selectedCheckboxes).map(c => c.value);
-
-    if (selectedNames.length === 0) {
-      showToast('Selecciona al menos un producto de la lista', 'error');
+    if (plannerCart.size === 0) {
+      showToast('Añade al menos un producto a tu canasta usando el botón +', 'error');
       return;
     }
 
-    showToast('Optimizando compra...', 'info');
-    const plan = await window.groceryPlanner.planMarket(selectedNames);
+    const items = Array.from(plannerCart.entries()).map(([name, qty]) => ({ name, qty }));
+    const totalSelectedCount = items.length;
+
+    showToast('Optimizando compra con las cantidades elegidas...', 'info');
+    const plan = await window.groceryPlanner.planMarket(items);
 
     // 1. Tarjeta La Más Barata
     const cardCheapest = document.getElementById('cardBestCheapest');
     if (plan.bestCheapest) {
       cardCheapest.querySelector('.store-name').textContent = plan.bestCheapest.store.name;
-      cardCheapest.querySelector('.store-summary').textContent = `${plan.bestCheapest.available.length}/${selectedNames.length} productos disponibles`;
+      cardCheapest.querySelector('.store-summary').textContent = `${plan.bestCheapest.available.length}/${totalSelectedCount} productos disponibles`;
       cardCheapest.querySelector('.store-price').textContent = `$ ${plan.bestCheapest.totalCostUSD.toFixed(2)}`;
     } else {
       cardCheapest.querySelector('.store-name').textContent = 'No disponible';
@@ -1051,8 +1635,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     const cardClosest = document.getElementById('cardBestClosest');
     if (plan.bestClosest) {
       cardClosest.querySelector('.store-name').textContent = plan.bestClosest.store.name;
-      cardClosest.querySelector('.store-summary').textContent = `${plan.bestClosest.available.length}/${selectedNames.length} productos`;
+      cardClosest.querySelector('.store-summary').textContent = `${plan.bestClosest.available.length}/${totalSelectedCount} productos`;
       cardClosest.querySelector('.store-distance').textContent = plan.bestClosest.distanceKm ? `${plan.bestClosest.distanceKm.toFixed(1)} km` : 'Ver en mapa';
+    } else {
+      cardClosest.querySelector('.store-name').textContent = 'Ubicación requerida';
+      cardClosest.querySelector('.store-distance').textContent = '📍 Desactivada';
     }
 
     // 3. Tarjeta Mejor Valorada
@@ -1073,27 +1660,39 @@ document.addEventListener('DOMContentLoaded', async () => {
         <span class="text-[10px] bg-red-500/10 text-red-400 border border-red-500/20 px-1.5 py-0.5 rounded">Falta: ${escapeHtml(m)}</span>
       `).join(' ');
 
+      const availableItemsSummary = r.available.map(a => `
+        <span class="text-[10px] bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded border border-slate-700">
+          ${escapeHtml(a.product.name)} (x${a.qty || 1}): $${((a.product.current_price || 0) * (a.qty || 1)).toFixed(2)}
+        </span>
+      `).join(' ');
+
       return `
-        <div class="p-3 bg-slate-800/60 border border-slate-700/60 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-          <div>
-            <div class="flex items-center gap-2">
-              <span class="font-bold text-slate-100 text-sm">${escapeHtml(r.store.name)}</span>
-              <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${r.coveragePercent === 100 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'}">
-                ${r.available.length}/${selectedNames.length} encontrados (${r.coveragePercent}%)
-              </span>
+        <div class="p-3 bg-slate-800/60 border border-slate-700/60 rounded-xl flex flex-col gap-2 text-xs">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="font-bold text-slate-100 text-sm">${escapeHtml(r.store.name)}</span>
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${r.coveragePercent === 100 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'}">
+                  ${r.available.length}/${totalSelectedCount} encontrados (${r.coveragePercent}%)
+                </span>
+              </div>
             </div>
-            ${r.missing.length > 0 ? `<div class="flex flex-wrap gap-1 mt-1.5">${missingTags}</div>` : ''}
+
+            <div class="flex items-center gap-4 text-right">
+              <div>
+                <span class="text-sm font-extrabold text-emerald-400 block">$ ${r.totalCostUSD.toFixed(2)}</span>
+                <span class="text-[10px] text-slate-400">Bs. ${r.totalCostVES.toFixed(2)}</span>
+              </div>
+              <a href="${r.store.maps_url || '#'}" target="_blank" class="btn btn-secondary btn-sm">
+                📍 Ir
+              </a>
+            </div>
           </div>
 
-          <div class="flex items-center gap-4 text-right">
-            <div>
-              <span class="text-sm font-extrabold text-emerald-400 block">$ ${r.totalCostUSD.toFixed(2)}</span>
-              <span class="text-[10px] text-slate-400">Bs. ${r.totalCostVES.toFixed(2)}</span>
-            </div>
-            <a href="${r.store.maps_url || '#'}" target="_blank" class="btn btn-secondary btn-sm">
-              📍 Ir
-            </a>
+          <div class="flex flex-wrap gap-1 pt-1 border-t border-slate-800/60">
+            ${availableItemsSummary}
           </div>
+          ${r.missing.length > 0 ? `<div class="flex flex-wrap gap-1">${missingTags}</div>` : ''}
         </div>
       `;
     }).join('');
@@ -1393,6 +1992,151 @@ document.addEventListener('DOMContentLoaded', async () => {
       showToast('Fallo en la importación: ' + err.message, 'error');
     }
   });
+
+  // ----------------------------------------------------
+  // GEOFENCING Y PERMISOS DE UBICACIÓN EN TIEMPO REAL
+  // ----------------------------------------------------
+  function initLocationPermissionCheck() {
+    if (!navigator.geolocation) {
+      console.warn('Geolocalización no soportada por el navegador.');
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        window.userCurrentLocation = {
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude
+        };
+        console.log('📍 Permiso de ubicación en tiempo real concedido:', window.userCurrentLocation);
+      },
+      (err) => {
+        console.warn('Permiso de ubicación denegado o no disponible:', err.message);
+        // Si el usuario bloqueó el permiso (código 1 PERMISSION_DENIED)
+        if (err.code === 1 || err.code === err.PERMISSION_DENIED) {
+          const alreadyNotified = sessionStorage.getItem('location_denied_notified');
+          if (!alreadyNotified) {
+            sessionStorage.setItem('location_denied_notified', 'true');
+            setTimeout(() => {
+              openModal('modalLocationDenied');
+            }, 600);
+          }
+        }
+      },
+      { timeout: 8000, enableHighAccuracy: true, maximumAge: 60000 }
+    );
+  }
+
+  const btnRetryLoc = document.getElementById('btnRetryLocationPerm');
+  if (btnRetryLoc) {
+    btnRetryLoc.addEventListener('click', () => {
+      closeModal('modalLocationDenied');
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          window.userCurrentLocation = {
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude
+          };
+          showToast('¡Ubicación en tiempo real concedida!', 'success');
+        },
+        (err) => {
+          showToast('Sigue bloqueada. Actívala en el candado 🔒 de tu navegador.', 'error');
+        },
+        { enableHighAccuracy: true, timeout: 8000 }
+      );
+    });
+  }
+
+  // ----------------------------------------------------
+  // INICIO DE SESIÓN OFICIAL CON GOOGLE (GIS / OAUTH 2.0)
+  // ----------------------------------------------------
+  function decodeJwtResponse(token) {
+    try {
+      const base64Url = token.split('.')[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+        return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+      }).join(''));
+      return JSON.parse(jsonPayload);
+    } catch (e) {
+      console.error('Error decodificando token de Google:', e);
+      return null;
+    }
+  }
+
+  async function initGoogleOfficialGis() {
+    const savedClientId = await window.db.getSetting('google_client_id');
+    const inputClientEl = document.getElementById('inputGoogleClientId');
+    if (inputClientEl && savedClientId) {
+      inputClientEl.value = savedClientId;
+    }
+
+    const container = document.getElementById('googleGisButtonContainer');
+    if (!container) return;
+
+    if (window.google && window.google.accounts && window.google.accounts.id && savedClientId) {
+      try {
+        window.google.accounts.id.initialize({
+          client_id: savedClientId,
+          callback: async (response) => {
+            const payload = decodeJwtResponse(response.credential);
+            if (payload && payload.email) {
+              await window.authGroups.signInWithGoogle(payload.email, payload.name, payload.picture);
+              showToast(`¡Sesión oficial verificada con Google: ${payload.name}!`, 'success');
+              closeModal('modalGoogleLogin');
+            } else {
+              showToast('No se pudo verificar el token oficial de Google', 'error');
+            }
+          },
+          auto_select: false,
+          cancel_on_tap_outside: true
+        });
+
+        container.innerHTML = '';
+        window.google.accounts.id.renderButton(container, {
+          theme: 'outline',
+          size: 'large',
+          shape: 'pill',
+          text: 'continue_with',
+          width: 260
+        });
+        return;
+      } catch (err) {
+        console.warn('GIS renderButton error:', err);
+      }
+    }
+
+    // Si aún no hay Client ID registrado
+    container.innerHTML = `
+      <button type="button" id="btnLaunchMockOfficialGoogle" class="btn btn-secondary w-full py-2.5 text-xs flex items-center justify-center gap-2 border border-slate-700">
+        <svg class="w-4 h-4" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/></svg>
+        <span>Acceso Oficial con Google</span>
+      </button>
+    `;
+
+    const mockBtn = document.getElementById('btnLaunchMockOfficialGoogle');
+    if (mockBtn) {
+      mockBtn.addEventListener('click', () => {
+        const emailInput = document.getElementById('inputGoogleEmail');
+        if (emailInput) emailInput.focus();
+        showToast('Ingresa tu correo abajo o añade tu Client ID de Google Cloud para el botón directo.', 'info');
+      });
+    }
+  }
+
+  const btnSaveGClient = document.getElementById('btnSaveGoogleClientId');
+  if (btnSaveGClient) {
+    btnSaveGClient.addEventListener('click', async () => {
+      const val = (document.getElementById('inputGoogleClientId').value || '').trim();
+      if (!val) {
+        showToast('Ingresa un Client ID de Google Cloud válido', 'error');
+        return;
+      }
+      await window.db.setSetting('google_client_id', val);
+      showToast('Client ID de Google guardado', 'success');
+      initGoogleOfficialGis();
+    });
+  }
 
   // ----------------------------------------------------
   // REGISTRO DE SERVICE WORKER (PWA)

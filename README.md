@@ -95,15 +95,32 @@ Si usas extensiones de navegador como **Shortcut Manager**:
 - Cada producto se registra en su moneda original (USD o Bs.) y el sistema genera automáticamente el valor en la otra moneda.
 - Opción de actualizar la tasa manualmente en cualquier momento si estás sin conexión a internet.
 
-### 4. 🛒 "Programar Mercado" (Optimizador de Canasta)
-- Selecciona los productos que necesitas comprar.
-- El sistema evalúa todas las tiendas y te muestra:
-  1. 💰 **La Tienda Más Barata**: Calcula el costo total de la canasta con los precios actualizados.
+### 4. 🛒 "Programar Mercado" (Canasta Interactiva con Cantidades + y -)
+- **Catálogo Disponible**: Cada producto cuenta con un botón verde `+` para añadir unidades inmediatamente a la canasta.
+- **Canasta Elegida**:
+  - Control de unidades dinámico con botones `-` y `+`. Al reducir la cantidad a 0, el producto se retira automáticamente de la canasta.
+  - Indicador de unidades totales y cantidad de productos seleccionados.
+  - Botón para vaciar la canasta en un solo clic.
+- **Optimizador Multi-Criterio**: Multiplica los precios unitarios por las cantidades elegidas y calcula:
+  1. 💰 **La Tienda Más Barata**: Calcula el costo total exacto de la canasta con los precios actualizados.
   2. 📍 **La Tienda Más Cercana**: Mide la distancia en km utilizando coordenadas GPS o Google Maps.
   3. ⭐ **La Tienda Mejor Valorada**: Promedia las estrellas (1-5 ⭐) de los productos de tu canasta en cada comercio.
 - Te indica si falta algún producto en una tienda específica para que no hagas viajes en vano.
 
-### 5. 📊 Zona de Contabilidad (Control de Gastos Diarios)
+### 5. 🎨 Identificadores Visuales Obligatorios (Íconos SVG y Fotos)
+- **Tiendas**: Toda tienda debe contar obligatoriamente con una foto real o un ícono SVG estándar (Supermercado, Minimarket, Farmacia, Panadería, Carnicería, Frutería, etc.).
+- **Productos**: Todo producto debe contar obligatoriamente con una foto real optimizada en WebP o un ícono SVG estándar (Granos/Harinas, Lácteos, Carnes, Frutas, Enlatados, Café, Limpieza, Farmacia, etc.).
+- **Tienda Interactiva**: Al tocar o presionar el bloque de cualquier tienda, se despliega una ventana emergente interactiva con todos los productos registrados en ese comercio y un botón directo para agregar nuevos productos vinculados a esa tienda.
+
+### 6. ⭐ Calificación de Estrellas Compartida
+- Los productos que compartan el **mismo nombre y la misma imagen o ícono**, aunque pertenezcan a diferentes tiendas, **comparten automáticamente su valoración de calidad (1 a 5 estrellas)**.
+- Se valora el producto intrínseco (su sabor, frescura o marca) y no el comercio que lo distribuye.
+
+### 7. 📍 Geoperimetraje y Aviso de Ubicación en Tiempo Real
+- Al iniciar, la aplicación solicita permiso para obtener la ubicación GPS en tiempo real.
+- Si el usuario bloquea o deniega el permiso, se presenta una ventana emergente informativa detallando qué funciones se pierden (cálculo de distancias en km, filtro de la tienda más cercana y autollenado de coordenadas al registrar comercios).
+
+### 8. 📊 Zona de Contabilidad (Control de Gastos Diarios)
 - Filtros por período: **Hoy, Esta Semana, Este Mes y Todo**.
 - Visualización de totales tanto en USD como en Bolívares.
 - Asientos automáticos procedentes de facturas procesadas y botón para **+ Cargar Gastos Manuales** (transporte, propinas, comidas callejeras, servicios).

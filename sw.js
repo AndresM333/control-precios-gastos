@@ -1,5 +1,5 @@
 // Service Worker for "Control de Precios y Gastos"
-const CACHE_NAME = 'precios-gastos-v2';
+const CACHE_NAME = 'precios-gastos-v3';
 const STATIC_ASSETS = [
   './',
   './index.html',
@@ -7,6 +7,7 @@ const STATIC_ASSETS = [
   './css/styles.css',
   './icons/icon.svg',
   './js/db.js',
+  './js/icons-library.js',
   './js/bcv.js',
   './js/image-compressor.js',
   './js/ai-scanner.js',

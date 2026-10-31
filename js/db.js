@@ -216,6 +216,18 @@ class AppDB {
     if (!productData.workspace_id) {
       productData.workspace_id = window.authGroups ? window.authGroups.getActiveWorkspaceId() : 'personal';
     }
+    // Asegurar imagen/icono obligatorio
+    if (!productData.image_type) productData.image_type = 'icon';
+    if (!productData.image_data) productData.image_data = 'general';
+
+    // Regla: si el producto no tiene rating, verificar si existe otro producto con el mismo nombre y misma foto/icono para heredar sus estrellas
+    if (productData.rating === undefined || productData.rating === null) {
+      const match = await this.findMatchingSharedProduct(productData.name, productData.image_type, productData.image_data);
+      if (match && match.rating) {
+        productData.rating = match.rating;
+      }
+    }
+
     let productId = productData.id;
     let isNew = !productId;
 
@@ -242,7 +254,62 @@ class AppDB {
       });
     }
 
+    // Sincronizar calificación con productos hermanos si se proporcionó una
+    if (productData.rating) {
+      await this.updateProductRatingShared(productId, productData.rating);
+    }
+
     return productData;
+  }
+
+  /**
+   * Actualiza la valoración de estrellas de un producto y la comparte con TODOS los productos
+   * que tengan el MISMO nombre y la MISMA foto o icono en cualquier tienda
+   */
+  async updateProductRatingShared(productId, newRating) {
+    const prod = await this.getById('products', productId);
+    if (!prod) return 0;
+
+    const val = (newRating && parseInt(newRating) > 0) ? parseInt(newRating) : null;
+    prod.rating = val;
+    await this.put('products', prod);
+
+    const allProds = await this.getAll('products');
+    const cleanName = (prod.name || '').trim().toLowerCase();
+    const prodImgType = prod.image_type || 'icon';
+    const prodImgData = prod.image_data || 'general';
+
+    let updatedCount = 1;
+    for (const p of allProds) {
+      if (p.id !== prod.id) {
+        const pClean = (p.name || '').trim().toLowerCase();
+        const pImgType = p.image_type || 'icon';
+        const pImgData = p.image_data || 'general';
+
+        // Regla estricta: Mismo nombre Y Misma foto/icono
+        if (pClean === cleanName && pImgType === prodImgType && pImgData === prodImgData) {
+          p.rating = val;
+          await this.put('products', p);
+          updatedCount++;
+        }
+      }
+    }
+
+    return updatedCount;
+  }
+
+  async findMatchingSharedProduct(name, imageType, imageData) {
+    const allProds = await this.getAll('products');
+    const cleanName = (name || '').trim().toLowerCase();
+    const imgType = imageType || 'icon';
+    const imgData = imageData || 'general';
+
+    return allProds.find(p => {
+      const pClean = (p.name || '').trim().toLowerCase();
+      const pType = p.image_type || 'icon';
+      const pData = p.image_data || 'general';
+      return pClean === cleanName && pType === imgType && pData === imgData && p.rating;
+    });
   }
 
   // --- Groups (Grupos Compartidos / Familias) ---
@@ -352,7 +419,10 @@ class AppDB {
     
     // Store 1: Automercados Plaza's
     const store1Id = await this.add('stores', {
+      workspace_id: 'personal',
       name: "Automercados Plaza's",
+      image_type: 'icon',
+      image_data: 'supermarket',
       maps_url: "https://maps.google.com/?q=Automercados+Plazas+Caracas",
       lat: 10.4910,
       lng: -66.8530,
@@ -363,7 +433,10 @@ class AppDB {
 
     // Store 2: Farmatodo
     const store2Id = await this.add('stores', {
+      workspace_id: 'personal',
       name: "Farmatodo",
+      image_type: 'icon',
+      image_data: 'pharmacy',
       maps_url: "https://maps.google.com/?q=Farmatodo+Las+Mercedes",
       lat: 10.4820,
       lng: -66.8610,
@@ -374,7 +447,10 @@ class AppDB {
 
     // Store 3: Excelsior Gama
     const store3Id = await this.add('stores', {
+      workspace_id: 'personal',
       name: "Excelsior Gama",
+      image_type: 'icon',
+      image_data: 'supermarket',
       maps_url: "https://maps.google.com/?q=Excelsior+Gama+La+Trinidad",
       lat: 10.4350,
       lng: -66.8550,
@@ -385,8 +461,11 @@ class AppDB {
 
     // Products & Price History for Store 1
     const p1Id = await this.add('products', {
+      workspace_id: 'personal',
       store_id: store1Id,
       name: "Harina PAN 1kg",
+      image_type: 'icon',
+      image_data: 'grain',
       current_price: 1.25,
       original_currency: "USD",
       rating: 5,
@@ -401,8 +480,11 @@ class AppDB {
     await this.add('price_history', { product_id: p1Id, store_id: store1Id, price: 1.25, currency: "USD", bcv_rate: currentBcvRate, date: new Date().toISOString(), source: 'FACTURA' });
 
     const p2Id = await this.add('products', {
+      workspace_id: 'personal',
       store_id: store1Id,
       name: "Café Fama de América 500g",
+      image_type: 'icon',
+      image_data: 'coffee',
       current_price: 4.50,
       original_currency: "USD",
       rating: 4,
@@ -414,8 +496,11 @@ class AppDB {
     await this.add('price_history', { product_id: p2Id, store_id: store1Id, price: 4.50, currency: "USD", bcv_rate: currentBcvRate, date: new Date().toISOString(), source: 'FACTURA' });
 
     const p3Id = await this.add('products', {
+      workspace_id: 'personal',
       store_id: store1Id,
       name: "Aceite de Maíz Mazeite 1L",
+      image_type: 'icon',
+      image_data: 'produce',
       current_price: 3.80,
       original_currency: "USD",
       rating: 5,
@@ -428,11 +513,14 @@ class AppDB {
 
     // Store 2 Products (Farmatodo)
     const p4Id = await this.add('products', {
+      workspace_id: 'personal',
       store_id: store2Id,
       name: "Harina PAN 1kg",
+      image_type: 'icon',
+      image_data: 'grain',
       current_price: 1.35,
       original_currency: "USD",
-      rating: 4,
+      rating: 5, // Misma calificación compartida que Store 1 por tener mismo nombre y misma foto
       description: "Harina de maíz blanco precocida.",
       created_at: new Date(Date.now() - 25 * 86400000).toISOString(),
       updated_at: new Date().toISOString()
@@ -440,8 +528,11 @@ class AppDB {
     await this.add('price_history', { product_id: p4Id, store_id: store2Id, price: 1.35, currency: "USD", bcv_rate: currentBcvRate, date: new Date().toISOString(), source: 'TABLA' });
 
     const p5Id = await this.add('products', {
+      workspace_id: 'personal',
       store_id: store2Id,
       name: "Leche Completa La Pastoreña 1L",
+      image_type: 'icon',
+      image_data: 'dairy',
       current_price: 2.10,
       original_currency: "USD",
       rating: 5,

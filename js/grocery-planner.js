@@ -42,10 +42,25 @@ class GroceryPlannerService {
   }
 
   /**
-   * Analiza todas las tiendas contra la lista de productos seleccionados
-   * @param {Array<string>} selectedProductNames - Lista de nombres de productos que el usuario desea comprar
+   * Analiza todas las tiendas contra la lista de productos y cantidades seleccionadas
+   * @param {Array<string|Object>|Object} selectedInput - Lista de nombres o mapa { nombre: cantidad }
    */
-  async planMarket(selectedProductNames) {
+  async planMarket(selectedInput) {
+    let itemsMap = {};
+    if (Array.isArray(selectedInput)) {
+      for (const item of selectedInput) {
+        if (typeof item === 'string') {
+          itemsMap[item] = (itemsMap[item] || 0) + 1;
+        } else if (item && item.name) {
+          itemsMap[item.name] = (itemsMap[item.name] || 0) + (parseInt(item.quantity) || 1);
+        }
+      }
+    } else if (selectedInput && typeof selectedInput === 'object') {
+      itemsMap = { ...selectedInput };
+    }
+
+    const selectedProductNames = Object.keys(itemsMap);
+
     if (!selectedProductNames || selectedProductNames.length === 0) {
       return {
         totalRequested: 0,
@@ -74,6 +89,7 @@ class GroceryPlannerService {
       let ratingsCount = 0;
 
       for (const targetName of selectedProductNames) {
+        const qty = itemsMap[targetName] || 1;
         const targetClean = targetName.trim().toLowerCase();
 
         // Buscar coincidencia en los productos de la tienda
@@ -92,8 +108,8 @@ class GroceryPlannerService {
             priceVes = priceUsd * currentRate;
           }
 
-          totalCostUSD += priceUsd;
-          totalCostVES += priceVes;
+          totalCostUSD += (priceUsd * qty);
+          totalCostVES += (priceVes * qty);
 
           if (found.rating && !isNaN(found.rating) && found.rating > 0) {
             ratingsSum += parseInt(found.rating);
@@ -102,13 +118,16 @@ class GroceryPlannerService {
 
           available.push({
             requestedName: targetName,
+            quantity: qty,
             matchedProduct: found,
-            priceUSD: priceUsd,
-            priceVES: priceVes,
+            unitPriceUSD: priceUsd,
+            unitPriceVES: priceVes,
+            totalPriceUSD: priceUsd * qty,
+            totalPriceVES: priceVes * qty,
             rating: found.rating || null
           });
         } else {
-          missing.push(targetName);
+          missing.push({ name: targetName, quantity: qty });
         }
       }
 
