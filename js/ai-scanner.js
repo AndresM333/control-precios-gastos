@@ -3,10 +3,11 @@ class AIScannerService {
   constructor() {
     this.modelTier = 'flash'; // 'flash' (Gratuito / Rápido) o 'pro' (Clase Especial / Mayor Nivel)
     this.tierModels = {
-      flash: ['gemini-3.8-flash', 'gemini-2.5-flash', 'gemini-1.5-flash'],
-      pro: ['gemini-3.8-pro', 'gemini-2.5-pro', 'gemini-1.5-pro', 'gemini-pro']
+      flash: ['gemini-3.8-flash', 'gemini-2.5-flash', 'gemini-flash'],
+      pro: ['gemini-3.8-pro', 'gemini-2.5-pro', 'gemini-pro']
     };
     this.defaultModel = 'gemini-3.8-flash';
+    this.cachedDiscoveredModels = null;
   }
 
   async getApiKey() {
@@ -14,10 +15,12 @@ class AIScannerService {
   }
 
   async setApiKey(key) {
+    this.cachedDiscoveredModels = null;
     return await window.db.setSetting('gemini_api_key', key.trim());
   }
 
   async removeApiKey() {
+    this.cachedDiscoveredModels = null;
     return await window.db.setSetting('gemini_api_key', '');
   }
 
@@ -35,10 +38,77 @@ class AIScannerService {
     return validTier;
   }
 
-  async getCandidateModels() {
+  /**
+   * Consulta a Google la lista oficial y activa de modelos disponibles para esta API Key
+   * Endpoint oficial de Google AI Studio: GET /v1beta/models?key=...
+   */
+  async discoverModels(customKey = null) {
+    const key = (customKey !== null ? customKey : await this.getApiKey() || '').trim();
+    if (!key) return null;
+
+    try {
+      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(key)}`;
+      const response = await fetch(endpoint, { method: 'GET' });
+      if (!response.ok) return null;
+
+      const data = await response.json();
+      if (!data.models || !Array.isArray(data.models)) return null;
+
+      // Filtrar únicamente los modelos que soportan generateContent y procesan contenido visual/texto
+      const validModels = data.models
+        .filter(m => Array.isArray(m.supportedGenerationMethods) && m.supportedGenerationMethods.includes('generateContent'))
+        .map(m => m.name.replace(/^models\//, ''))
+        .filter(name => !name.includes('embedding') && !name.includes('aqa') && !name.includes('imagen') && !name.includes('tts'));
+
+      if (validModels.length === 0) return null;
+
+      const flash = validModels.filter(n => n.toLowerCase().includes('flash'));
+      const pro = validModels.filter(n => n.toLowerCase().includes('pro'));
+      const others = validModels.filter(n => !n.toLowerCase().includes('flash') && !n.toLowerCase().includes('pro'));
+
+      // Ordenar con versiones más recientes primero (3.8 > 2.5, etc.)
+      const sortFn = (a, b) => b.localeCompare(a, undefined, { numeric: true, sensitivity: 'base' });
+      flash.sort(sortFn);
+      pro.sort(sortFn);
+
+      const result = {
+        flash: flash.length > 0 ? flash : ['gemini-3.8-flash', 'gemini-2.5-flash', 'gemini-flash'],
+        pro: pro.length > 0 ? pro : ['gemini-3.8-pro', 'gemini-2.5-pro', 'gemini-pro'],
+        all: [...pro, ...flash, ...others]
+      };
+
+      this.cachedDiscoveredModels = result;
+      return result;
+    } catch (err) {
+      console.warn('No se pudo listar modelos dinámicamente desde Google:', err);
+      return null;
+    }
+  }
+
+  async getCandidateModels(apiKey = null) {
     const tier = await this.getModelTier();
-    const primary = this.tierModels[tier] || this.tierModels.flash;
-    const fallback = tier === 'pro' ? this.tierModels.flash : this.tierModels.pro;
+
+    // Intentar obtener los modelos dinámicamente de Google si no los tenemos en caché
+    let models = this.cachedDiscoveredModels;
+    if (!models) {
+      const key = apiKey || await this.getApiKey();
+      if (key) {
+        models = await this.discoverModels(key);
+      }
+    }
+
+    if (models) {
+      const primary = tier === 'pro' ? models.pro : models.flash;
+      const fallback = tier === 'pro' ? models.flash : models.pro;
+      return Array.from(new Set([...primary, ...fallback, ...models.all]));
+    }
+
+    // Lista estática segura sin modelos obsoletos/retirados
+    const defaultFlash = ['gemini-3.8-flash', 'gemini-2.5-flash', 'gemini-flash'];
+    const defaultPro = ['gemini-3.8-pro', 'gemini-2.5-pro', 'gemini-pro'];
+
+    const primary = tier === 'pro' ? defaultPro : defaultFlash;
+    const fallback = tier === 'pro' ? defaultFlash : defaultPro;
     return Array.from(new Set([this.defaultModel, ...primary, ...fallback]));
   }
 
@@ -53,7 +123,10 @@ class AIScannerService {
       throw new Error('No hay ninguna clave API ingresada para probar.');
     }
 
-    const candidateModels = await this.getCandidateModels();
+    // Descubrir los modelos oficiales soportados por esta clave
+    await this.discoverModels(key);
+
+    const candidateModels = await this.getCandidateModels(key);
     let lastError = null;
 
     for (const model of candidateModels) {
@@ -72,7 +145,7 @@ class AIScannerService {
           } catch (e) {}
 
           const isUnavailable = response.status === 404 || response.status === 503 || response.status === 429 ||
-            msg.includes('no longer available') || msg.includes('not found') ||
+            msg.includes('no longer available') || msg.includes('not found') || msg.includes('not supported') ||
             msg.includes('high demand') || msg.includes('overloaded');
 
           if (isUnavailable) {
@@ -92,8 +165,8 @@ class AIScannerService {
       } catch (err) {
         lastError = err;
         const msg = err.message || '';
-        const isRetryable = msg.includes('no longer available') || msg.includes('not found') ||
-          msg.includes('404') || msg.includes('high demand') || msg.includes('503') || msg.includes('overloaded');
+        const isRetryable = msg.includes('no longer available') || msg.includes('not found') || msg.includes('not supported') ||
+          msg.includes('404') || msg.includes('high demand') || msg.includes('503') || msg.includes('429') || msg.includes('overloaded');
         if (isRetryable) {
           continue;
         }
@@ -311,7 +384,7 @@ REGLAS CRÍTICAS:
       }
     };
 
-    const candidateModels = await this.getCandidateModels();
+    const candidateModels = await this.getCandidateModels(apiKey);
     let lastError = null;
 
     for (const modelName of candidateModels) {
@@ -337,7 +410,7 @@ REGLAS CRÍTICAS:
           // Si el modelo específico ya no está disponible, da 404, o tiene alta demanda temporal (503 / 429),
           // intentar automáticamente con el siguiente modelo de la lista para evitar fallos al usuario
           const isRetryable = response.status === 404 || response.status === 503 || response.status === 429 ||
-            msg.includes('no longer available') || msg.includes('not found') ||
+            msg.includes('no longer available') || msg.includes('not found') || msg.includes('not supported') ||
             msg.includes('high demand') || msg.includes('overloaded');
 
           if (isRetryable) {
@@ -373,7 +446,7 @@ REGLAS CRÍTICAS:
       } catch (err) {
         lastError = err;
         const msg = err.message || '';
-        const isRetryable = msg.includes('no longer available') || msg.includes('not found') ||
+        const isRetryable = msg.includes('no longer available') || msg.includes('not found') || msg.includes('not supported') ||
           msg.includes('404') || msg.includes('high demand') || msg.includes('503') || msg.includes('429') || msg.includes('overloaded');
         if (isRetryable) {
           continue;
@@ -382,7 +455,8 @@ REGLAS CRÍTICAS:
       }
     }
 
-    throw lastError || new Error('No se pudo analizar la imagen con los modelos de Gemini disponibles.');
+    const activeTierName = this.modelTier === 'pro' ? 'Gemini Pro' : 'Gemini Flash';
+    throw lastError || new Error(`No se pudo analizar la imagen con los modelos disponibles de ${activeTierName}.`);
   }
 
   /**
