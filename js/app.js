@@ -412,16 +412,23 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
   document.getElementById('btnBannerManageGroup').addEventListener('click', openGroupManagement);
 
-  // Formulario para invitar miembro por correo
+  // Formulario para invitar miembro por correo (Validación @gmail.com)
   document.getElementById('formInviteMember').addEventListener('submit', async (e) => {
     e.preventDefault();
     const activeWs = window.authGroups.getActiveWorkspace();
-    const emailToInvite = document.getElementById('inputInviteMemberEmail').value;
+    const emailInput = document.getElementById('inputInviteMemberEmail');
+    const emailToInvite = (emailInput.value || '').trim().toLowerCase();
+
+    if (!emailToInvite.endsWith('@gmail.com') || emailToInvite === '@gmail.com') {
+      showToast('⚠️ El correo debe terminar en @gmail.com para asegurar que sea de Google', 'error');
+      emailInput.focus();
+      return;
+    }
 
     try {
       await window.authGroups.inviteMember(activeWs.id, emailToInvite);
       showToast(`¡Invitación registrada! ${emailToInvite} podrá unirse al iniciar sesión con Google.`, 'success');
-      document.getElementById('inputInviteMemberEmail').value = '';
+      emailInput.value = '';
       openGroupManagement();
     } catch (err) {
       showToast(err.message, 'error');
@@ -3370,7 +3377,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // REGISTRO DE SERVICE WORKER (PWA)
   // ----------------------------------------------------
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js?v=20').then((reg) => {
+    navigator.serviceWorker.register('./sw.js?v=21').then((reg) => {
       console.log('Service Worker registrado con éxito:', reg.scope);
       reg.update();
     }).catch((err) => {

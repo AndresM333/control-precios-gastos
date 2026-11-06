@@ -199,6 +199,9 @@ class AuthGroupsService {
     if (!cleanEmail || !cleanEmail.includes('@')) {
       throw new Error('Correo electrónico inválido.');
     }
+    if (!cleanEmail.endsWith('@gmail.com') || cleanEmail === '@gmail.com') {
+      throw new Error('El correo debe terminar en @gmail.com para asegurar que sea una cuenta oficial de Google.');
+    }
 
     const members = (group.members || []).map(m => m.toLowerCase());
     if (members.includes(cleanEmail)) {

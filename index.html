@@ -12,7 +12,7 @@
   <link rel="manifest" href="./manifest.json">
   <link rel="icon" type="image/svg+xml" href="./icons/icon.svg">
   <link rel="apple-touch-icon" href="./icons/icon.svg">
-  <link rel="stylesheet" href="./css/styles.css?v=20">
+  <link rel="stylesheet" href="./css/styles.css?v=21">
   <!-- Tailwind Utilities (CDN for instant responsive styling) -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -1516,10 +1516,10 @@
         <div id="inviteMemberSection" class="p-4 bg-slate-800/40 rounded-xl border border-slate-700/60">
           <h4 class="text-xs font-bold uppercase text-blue-400 mb-1">➕ Invitar persona por su correo</h4>
           <p class="text-[11px] text-slate-400 mb-3">
-            El invitado solo podrá unirse si inicia sesión con este correo de Google específico.
+            El invitado solo podrá unirse si inicia sesión con este correo de Google específico (@gmail.com).
           </p>
           <form id="formInviteMember" class="flex gap-2">
-            <input type="email" id="inputInviteMemberEmail" class="form-input flex-1 text-xs" required placeholder="correo_amigo@gmail.com">
+            <input type="email" id="inputInviteMemberEmail" class="form-input flex-1 text-xs" required placeholder="correo_amigo@gmail.com" pattern=".+@gmail\.com$" title="Debe ser una cuenta de Google terminada en @gmail.com">
             <button type="submit" class="btn btn-primary btn-sm flex-shrink-0">
               Invitar
             </button>
@@ -1580,16 +1580,16 @@
   <div id="toastContainer" class="toast-container"></div>
 
   <!-- Core Scripts -->
-  <script src="./js/db.js?v=20"></script>
-  <script src="./js/icons-library.js?v=20"></script>
-  <script src="./js/bcv.js?v=20"></script>
-  <script src="./js/image-compressor.js?v=20"></script>
-  <script src="./js/ai-scanner.js?v=20"></script>
-  <script src="./js/charts.js?v=20"></script>
-  <script src="./js/grocery-planner.js?v=20"></script>
-  <script src="./js/accounting.js?v=20"></script>
-  <script src="./js/backup-drive.js?v=20"></script>
-  <script src="./js/auth-groups.js?v=20"></script>
-  <script src="./js/app.js?v=20"></script>
+  <script src="./js/db.js?v=21"></script>
+  <script src="./js/icons-library.js?v=21"></script>
+  <script src="./js/bcv.js?v=21"></script>
+  <script src="./js/image-compressor.js?v=21"></script>
+  <script src="./js/ai-scanner.js?v=21"></script>
+  <script src="./js/charts.js?v=21"></script>
+  <script src="./js/grocery-planner.js?v=21"></script>
+  <script src="./js/accounting.js?v=21"></script>
+  <script src="./js/backup-drive.js?v=21"></script>
+  <script src="./js/auth-groups.js?v=21"></script>
+  <script src="./js/app.js?v=21"></script>
 </body>
 </html>
