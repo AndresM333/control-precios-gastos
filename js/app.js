@@ -3304,7 +3304,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (setupCard) setupCard.classList.add('hidden');
 
+    let gisAttempts = 0;
     function renderGis() {
+      gisAttempts++;
       if (window.google && window.google.accounts && window.google.accounts.id) {
         try {
           window.google.accounts.id.initialize({
@@ -3331,11 +3333,18 @@ document.addEventListener('DOMContentLoaded', async () => {
             text: 'continue_with',
             width: 280
           });
+
+          // Al renderizarse el botón oficial de Google, ocultamos el botón manual para que haya UN SOLO botón limpio
+          if (btnDirect) btnDirect.classList.add('hidden');
         } catch (err) {
           console.warn('GIS renderButton error:', err);
+          if (btnDirect) btnDirect.classList.remove('hidden');
         }
-      } else {
+      } else if (gisAttempts < 10) {
         setTimeout(renderGis, 300);
+      } else {
+        // Si el script oficial de Google no cargó tras 3 segundos, mostrar el botón de respaldo
+        if (btnDirect) btnDirect.classList.remove('hidden');
       }
     }
 
@@ -3361,7 +3370,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // REGISTRO DE SERVICE WORKER (PWA)
   // ----------------------------------------------------
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js?v=19').then((reg) => {
+    navigator.serviceWorker.register('./sw.js?v=20').then((reg) => {
       console.log('Service Worker registrado con éxito:', reg.scope);
       reg.update();
     }).catch((err) => {
