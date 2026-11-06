@@ -12,7 +12,7 @@
   <link rel="manifest" href="./manifest.json">
   <link rel="icon" type="image/svg+xml" href="./icons/icon.svg">
   <link rel="apple-touch-icon" href="./icons/icon.svg">
-  <link rel="stylesheet" href="./css/styles.css?v=23">
+  <link rel="stylesheet" href="./css/styles.css?v=24">
   <!-- Tailwind Utilities (CDN for instant responsive styling) -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -50,6 +50,16 @@
 
     <!-- Header Actions (Google Auth, BCV & Drive Pills) -->
     <div class="header-actions">
+      <!-- Botón Campana de Notificaciones -->
+      <button id="btnNotificationsBell" class="relative flex items-center justify-center w-8 h-8 rounded-full bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-slate-200 transition" title="Centro de Notificaciones">
+        <svg class="w-4 h-4 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+        </svg>
+        <span id="notifBadge" class="hidden absolute -top-1 -right-1 px-1.5 min-w-[18px] h-[18px] rounded-full bg-red-500 text-white font-black text-[10px] flex items-center justify-center ring-2 ring-slate-900 shadow pointer-events-none animate-bounce">
+          0
+        </span>
+      </button>
+
       <!-- Google Auth Pill -->
       <button id="googleAuthBtn" class="flex items-center gap-1.5 p-1.5 sm:px-2.5 sm:py-1 rounded-full bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-xs font-semibold text-slate-200 transition" title="Iniciar sesión con Google">
         <svg class="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/></svg>
@@ -445,9 +455,14 @@
             <h3 class="text-xs font-bold uppercase tracking-wider text-blue-400 flex items-center gap-1.5">
               <span>🛒</span> 2. Canasta Elegida
             </h3>
-            <button id="btnClearPlannerCart" class="text-[11px] text-slate-400 hover:text-red-400 transition hidden">
-              Vaciar
-            </button>
+            <div class="flex items-center gap-2">
+              <button id="btnNotifyGroupCart" class="btn btn-secondary btn-sm text-[10px] py-1 px-2.5 hidden flex items-center gap-1" title="Avisar a los miembros del grupo sobre la lista de compras actual">
+                <span>📢</span> Avisar al Grupo
+              </button>
+              <button id="btnClearPlannerCart" class="text-[11px] text-slate-400 hover:text-red-400 transition hidden">
+                Vaciar
+              </button>
+            </div>
           </div>
 
           <div id="plannerCartList" class="flex-1 max-h-[400px] overflow-y-auto space-y-2 pr-1 mb-3">
@@ -739,6 +754,55 @@
                 📂 Seleccionar Archivo JSON
               </button>
             </div>
+          </div>
+        </div>
+
+        <!-- Card: Preferencias de Notificaciones de Grupos -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 md:col-span-2">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="text-xl">🔔</span>
+            <h3 class="font-bold text-slate-100 text-sm">Notificaciones y Alertas de Grupos</h3>
+          </div>
+          <p class="text-xs text-slate-400 mb-4 leading-relaxed">
+            Personaliza qué avisos e invitaciones deseas recibir en la campana de notificaciones de la aplicación:
+          </p>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+            <!-- Switch 1: Invitaciones -->
+            <label class="flex items-start gap-3 cursor-pointer p-3 rounded-xl bg-slate-950/80 border border-slate-800 hover:border-slate-700 transition">
+              <input type="checkbox" id="chkNotifyInvitations" checked class="mt-0.5 rounded bg-slate-900 border-slate-700 text-blue-500 focus:ring-0">
+              <div class="min-w-0">
+                <span class="font-bold text-slate-200 block">✉️ Invitaciones a Grupos</span>
+                <span class="text-[11px] text-slate-400 block mt-0.5">Recibir avisos cuando otros usuarios me inviten a unirme a grupos de compras.</span>
+              </div>
+            </label>
+
+            <!-- Switch 2: Catálogo -->
+            <label class="flex items-start gap-3 cursor-pointer p-3 rounded-xl bg-slate-950/80 border border-slate-800 hover:border-slate-700 transition">
+              <input type="checkbox" id="chkNotifyCatalog" checked class="mt-0.5 rounded bg-slate-900 border-slate-700 text-blue-500 focus:ring-0">
+              <div class="min-w-0">
+                <span class="font-bold text-slate-200 block">📦 Catálogo y Nuevos Productos</span>
+                <span class="text-[11px] text-slate-400 block mt-0.5">Avisarme cuando se agreguen o editen productos y tiendas en mis grupos.</span>
+              </div>
+            </label>
+
+            <!-- Switch 3: Carro de Mercado -->
+            <label class="flex items-start gap-3 cursor-pointer p-3 rounded-xl bg-slate-950/80 border border-slate-800 hover:border-slate-700 transition">
+              <input type="checkbox" id="chkNotifyCart" checked class="mt-0.5 rounded bg-slate-900 border-slate-700 text-blue-500 focus:ring-0">
+              <div class="min-w-0">
+                <span class="font-bold text-slate-200 block">🛒 Cambios en Carro de Mercado</span>
+                <span class="text-[11px] text-slate-400 block mt-0.5">Recibir alertas manuales cuando un miembro actualice la lista de compras del grupo.</span>
+              </div>
+            </label>
+
+            <!-- Switch 4: Permisos -->
+            <label class="flex items-start gap-3 cursor-pointer p-3 rounded-xl bg-slate-950/80 border border-slate-800 hover:border-slate-700 transition">
+              <input type="checkbox" id="chkNotifyPermissions" checked class="mt-0.5 rounded bg-slate-900 border-slate-700 text-blue-500 focus:ring-0">
+              <div class="min-w-0">
+                <span class="font-bold text-slate-200 block">🛡️ Permisos de Miembros y Usuario</span>
+                <span class="text-[11px] text-slate-400 block mt-0.5">Avisarme cuando el Administrador cambie permisos de miembros o de mi propio usuario.</span>
+              </div>
+            </label>
           </div>
         </div>
 
@@ -1573,20 +1637,50 @@
     </div>
   </div>
 
+  <!-- MODAL: CENTRO DE NOTIFICACIONES -->
+  <div id="modalNotifications" class="modal-overlay">
+    <div class="modal-content max-w-lg">
+      <div class="modal-header">
+        <div class="flex items-center gap-2 min-w-0">
+          <span class="text-xl flex-shrink-0">🔔</span>
+          <div class="truncate">
+            <h3 class="modal-title truncate">Centro de Notificaciones</h3>
+            <p class="text-[11px] text-slate-400">Avisos del grupo, invitaciones y carro de compras</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-1.5 flex-shrink-0">
+          <button id="btnMarkAllNotifsRead" class="btn btn-secondary btn-sm text-[10px] py-1 px-2" title="Marcar todas como leídas">
+            ✓ Leer todo
+          </button>
+          <button id="btnClearAllNotifs" class="btn btn-outline-danger btn-sm text-[10px] py-1 px-2" title="Eliminar todas las notificaciones">
+            🗑️ Limpiar
+          </button>
+          <button class="modal-close" data-modal="modalNotifications">&times;</button>
+        </div>
+      </div>
+      <div class="modal-body space-y-3">
+        <!-- Lista Dinámica de Notificaciones -->
+        <div id="notificationsList" class="space-y-2.5 max-h-[60vh] overflow-y-auto pr-1">
+          <!-- Rendered dynamically -->
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast Notification Container -->
   <div id="toastContainer" class="toast-container"></div>
 
   <!-- Core Scripts -->
-  <script src="./js/db.js?v=23"></script>
-  <script src="./js/icons-library.js?v=23"></script>
-  <script src="./js/bcv.js?v=23"></script>
-  <script src="./js/image-compressor.js?v=23"></script>
-  <script src="./js/ai-scanner.js?v=23"></script>
-  <script src="./js/charts.js?v=23"></script>
-  <script src="./js/grocery-planner.js?v=23"></script>
-  <script src="./js/accounting.js?v=23"></script>
-  <script src="./js/backup-drive.js?v=23"></script>
-  <script src="./js/auth-groups.js?v=23"></script>
-  <script src="./js/app.js?v=23"></script>
+  <script src="./js/db.js?v=24"></script>
+  <script src="./js/icons-library.js?v=24"></script>
+  <script src="./js/bcv.js?v=24"></script>
+  <script src="./js/image-compressor.js?v=24"></script>
+  <script src="./js/ai-scanner.js?v=24"></script>
+  <script src="./js/charts.js?v=24"></script>
+  <script src="./js/grocery-planner.js?v=24"></script>
+  <script src="./js/accounting.js?v=24"></script>
+  <script src="./js/backup-drive.js?v=24"></script>
+  <script src="./js/auth-groups.js?v=24"></script>
+  <script src="./js/app.js?v=24"></script>
 </body>
 </html>

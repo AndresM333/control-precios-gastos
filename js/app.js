@@ -1608,6 +1608,29 @@ document.addEventListener('DOMContentLoaded', async () => {
     closeModal('modalProduct');
     renderProducts();
     if (currentModalStoreId) renderStoreModalProductsList();
+
+    // Notificación al grupo si se guardó en un espacio grupal
+    const activeWs = window.authGroups.getActiveWorkspace();
+    if (activeWs && activeWs.type === 'GROUP' && window.db.addNotification) {
+      try {
+        const user = window.authGroups.getCurrentUser();
+        const uName = user ? (user.displayName || user.email) : 'Un miembro';
+        await window.db.addNotification({
+          recipient_email: 'ALL_GROUP_MEMBERS',
+          sender_email: user ? user.email : null,
+          sender_name: uName,
+          group_id: activeWs.id,
+          group_name: activeWs.name,
+          type: 'CATALOG',
+          title: id ? `✏️ Producto editado en "${activeWs.name}"` : `📦 Nuevo producto en "${activeWs.name}"`,
+          message: `${uName} ${id ? 'actualizó' : 'registró'} el producto "${name}" a un precio de $ ${priceInUsd.toFixed(2)} USD.`,
+          data: { groupId: activeWs.id, productName: name }
+        });
+        if (typeof updateNotificationBadge === 'function') updateNotificationBadge();
+      } catch (errNotif) {
+        console.warn('Error al registrar notificación de catálogo:', errNotif);
+      }
+    }
   });
 
   // ----------------------------------------------------
@@ -2117,6 +2140,29 @@ document.addEventListener('DOMContentLoaded', async () => {
         'success'
       );
 
+      // Notificación al grupo sobre escaneo múltiple con IA
+      const activeWs = window.authGroups.getActiveWorkspace();
+      if (activeWs && activeWs.type === 'GROUP' && window.db.addNotification) {
+        try {
+          const user = window.authGroups.getCurrentUser();
+          const uName = user ? (user.displayName || user.email) : 'Un miembro';
+          await window.db.addNotification({
+            recipient_email: 'ALL_GROUP_MEMBERS',
+            sender_email: user ? user.email : null,
+            sender_name: uName,
+            group_id: activeWs.id,
+            group_name: activeWs.name,
+            type: 'CATALOG',
+            title: `📸 Productos escaneados en "${activeWs.name}"`,
+            message: `${uName} guardó ${commitRes.totalItemsProcessed} productos escaneados con IA en la tienda "${commitRes.store.name}".`,
+            data: { groupId: activeWs.id, storeName: commitRes.store.name }
+          });
+          if (typeof updateNotificationBadge === 'function') updateNotificationBadge();
+        } catch (errNotif) {
+          console.warn('Error al registrar notificación de escaneo:', errNotif);
+        }
+      }
+
       // Limpiar estado del escáner
       activeExtractionData = null;
       activeCompressedPhoto = null;
@@ -2233,6 +2279,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     const cartContainer = document.getElementById('plannerCartList');
     const summaryEl = document.getElementById('plannerCartSummary');
     const clearBtn = document.getElementById('btnClearPlannerCart');
+    const notifyBtn = document.getElementById('btnNotifyGroupCart');
+    const activeWs = window.authGroups.getActiveWorkspace();
+    const isGroup = activeWs && activeWs.type === 'GROUP';
     if (!cartContainer) return;
 
     const products = await window.db.getProducts();
@@ -2252,10 +2301,14 @@ document.addEventListener('DOMContentLoaded', async () => {
       `;
       if (summaryEl) summaryEl.textContent = '0 unidades (0 productos)';
       if (clearBtn) clearBtn.classList.add('hidden');
+      if (notifyBtn) notifyBtn.classList.add('hidden');
       return;
     }
 
     if (clearBtn) clearBtn.classList.remove('hidden');
+    if (notifyBtn) {
+      notifyBtn.classList.toggle('hidden', !isGroup);
+    }
 
     let totalUnits = 0;
     let totalUsdCost = 0;
@@ -2461,6 +2514,51 @@ document.addEventListener('DOMContentLoaded', async () => {
     loadPlannerProductList();
     showToast('Canasta vaciada', 'info');
   });
+
+  // Notificación manual al grupo sobre el carro de compras
+  const btnNotifyCart = document.getElementById('btnNotifyGroupCart');
+  if (btnNotifyCart) {
+    btnNotifyCart.addEventListener('click', async () => {
+      const activeWs = window.authGroups.getActiveWorkspace();
+      if (activeWs.type !== 'GROUP') {
+        showToast('⚠️ Cambia a un espacio de grupo familiar para notificar a sus miembros.', 'info');
+        return;
+      }
+      if (plannerCart.size === 0) {
+        showToast('⚠️ Tu canasta está vacía. Añade al menos un producto antes de avisar.', 'error');
+        return;
+      }
+
+      let totalUnits = 0;
+      plannerCart.forEach(q => totalUnits += q);
+      const itemsCount = plannerCart.size;
+
+      const ok = confirm(`¿Deseas enviar una notificación a todos los miembros de "${activeWs.name}" avisando sobre la canasta actual (${totalUnits} unidades de ${itemsCount} productos)?`);
+      if (!ok) return;
+
+      const user = window.authGroups.getCurrentUser();
+      const uName = user ? (user.displayName || user.email) : 'Un miembro';
+
+      try {
+        await window.db.addNotification({
+          recipient_email: 'ALL_GROUP_MEMBERS',
+          sender_email: user ? user.email : null,
+          sender_name: uName,
+          group_id: activeWs.id,
+          group_name: activeWs.name,
+          type: 'CART',
+          title: `🛒 Carro de compras actualizado en "${activeWs.name}"`,
+          message: `${uName} preparó y actualizó la canasta con ${totalUnits} unidades de ${itemsCount} productos. ¡Ya pueden revisarla u optimizarla en el planificador!`,
+          data: { groupId: activeWs.id, totalUnits, itemsCount }
+        });
+
+        showToast('📢 ¡Aviso sobre el carro enviado a los miembros del grupo!', 'success');
+        if (typeof updateNotificationBadge === 'function') updateNotificationBadge();
+      } catch (err) {
+        showToast('Error al enviar notificación: ' + err.message, 'error');
+      }
+    });
+  }
 
   document.getElementById('plannerSearchInput').addEventListener('input', loadPlannerProductList);
 
@@ -3559,10 +3657,377 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // ----------------------------------------------------
+  // SISTEMA DE NOTIFICACIONES DE GRUPO Y CAMPANA
+  // ----------------------------------------------------
+
+  async function getNotificationSettings() {
+    const invitations = await window.db.getSetting('notify_group_invitations', true);
+    const catalog = await window.db.getSetting('notify_catalog_changes', true);
+    const cart = await window.db.getSetting('notify_cart_updates', true);
+    const permissions = await window.db.getSetting('notify_permission_changes', true);
+    return {
+      notify_group_invitations: invitations !== false,
+      notify_catalog_changes: catalog !== false,
+      notify_cart_updates: cart !== false,
+      notify_permission_changes: permissions !== false
+    };
+  }
+
+  async function loadNotificationSettings() {
+    const settings = await getNotificationSettings();
+    const chkInv = document.getElementById('chkNotifyInvitations');
+    const chkCat = document.getElementById('chkNotifyCatalog');
+    const chkCart = document.getElementById('chkNotifyCart');
+    const chkPerm = document.getElementById('chkNotifyPermissions');
+
+    if (chkInv) chkInv.checked = settings.notify_group_invitations;
+    if (chkCat) chkCat.checked = settings.notify_catalog_changes;
+    if (chkCart) chkCart.checked = settings.notify_cart_updates;
+    if (chkPerm) chkPerm.checked = settings.notify_permission_changes;
+  }
+
+  function bindNotificationSettingsEvents() {
+    const bindToggle = (id, settingKey, label) => {
+      const el = document.getElementById(id);
+      if (el) {
+        el.addEventListener('change', async (e) => {
+          const val = e.target.checked;
+          await window.db.setSetting(settingKey, val);
+          showToast(`Notificaciones de "${label}" ${val ? 'activadas' : 'desactivadas'}.`, 'info');
+          await updateNotificationBadge();
+        });
+      }
+    };
+
+    bindToggle('chkNotifyInvitations', 'notify_group_invitations', 'Invitaciones');
+    bindToggle('chkNotifyCatalog', 'notify_catalog_changes', 'Catálogo');
+    bindToggle('chkNotifyCart', 'notify_cart_updates', 'Carro de compras');
+    bindToggle('chkNotifyPermissions', 'notify_permission_changes', 'Permisos');
+  }
+
+  async function getFilteredNotifications() {
+    const all = await window.db.getNotifications();
+    const settings = await getNotificationSettings();
+    const currentUser = window.authGroups.getCurrentUser();
+    const userEmail = currentUser ? currentUser.email.toLowerCase().trim() : null;
+    const userGroups = window.authGroups.groups || [];
+    const userGroupIds = new Set(userGroups.map(g => g.id));
+
+    return all.filter(n => {
+      // 1. Filtrar según preferencias de usuario configuradas en Ajustes
+      if (n.type === 'INVITATION' && !settings.notify_group_invitations) return false;
+      if (n.type === 'CATALOG' && !settings.notify_catalog_changes) return false;
+      if (n.type === 'CART' && !settings.notify_cart_updates) return false;
+      if (n.type === 'PERMISSIONS' && !settings.notify_permission_changes) return false;
+
+      // 2. Filtrar destinatario
+      const recipient = (n.recipient_email || '').toLowerCase().trim();
+
+      // Invitaciones dirigidas al correo del usuario actual
+      if (n.type === 'INVITATION') {
+        if (!userEmail) return false;
+        return recipient === userEmail;
+      }
+
+      // Si está dirigido a un usuario específico
+      if (recipient !== 'all_group_members') {
+        if (!userEmail) return false;
+        return recipient === userEmail;
+      }
+
+      // Si está dirigido a todos los miembros del grupo
+      if (recipient === 'all_group_members') {
+        return userGroupIds.has(n.group_id);
+      }
+
+      return false;
+    });
+  }
+
+  async function updateNotificationBadge() {
+    const badge = document.getElementById('notifBadge');
+    if (!badge) return;
+
+    try {
+      const filtered = await getFilteredNotifications();
+      const unreadCount = filtered.filter(n => !n.read).length;
+
+      if (unreadCount > 0) {
+        badge.textContent = unreadCount > 9 ? '9+' : unreadCount;
+        badge.classList.remove('hidden');
+      } else {
+        badge.classList.add('hidden');
+      }
+    } catch (err) {
+      console.warn('Error al actualizar contador de notificaciones:', err);
+    }
+  }
+
+  async function openNotificationsModal() {
+    const list = document.getElementById('notificationsList');
+    if (!list) return;
+
+    const notifs = await getFilteredNotifications();
+
+    if (notifs.length === 0) {
+      list.innerHTML = `
+        <div class="text-center py-10 px-4 text-slate-500">
+          <p class="text-4xl mb-2">🔔</p>
+          <p class="font-bold text-slate-200 text-sm">No tienes notificaciones pendientes</p>
+          <p class="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
+            Aquí recibirás invitaciones a grupos familiares, avisos de nuevos productos en el catálogo, actualizaciones del carro de compras y cambios en tus permisos.
+          </p>
+        </div>
+      `;
+    } else {
+      list.innerHTML = notifs.map(n => {
+        const isUnread = !n.read;
+        let typeIcon = '🔔';
+        let typeBadgeClass = 'bg-slate-700 text-slate-300';
+        let typeLabel = 'Aviso';
+
+        if (n.type === 'INVITATION') {
+          typeIcon = '✉️';
+          typeBadgeClass = 'bg-blue-500/20 text-blue-300 border border-blue-500/30';
+          typeLabel = 'Invitación';
+        } else if (n.type === 'CATALOG') {
+          typeIcon = '📦';
+          typeBadgeClass = 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30';
+          typeLabel = 'Catálogo';
+        } else if (n.type === 'CART') {
+          typeIcon = '🛒';
+          typeBadgeClass = 'bg-purple-500/20 text-purple-300 border border-purple-500/30';
+          typeLabel = 'Carro de Compras';
+        } else if (n.type === 'PERMISSIONS') {
+          typeIcon = '🛡️';
+          typeBadgeClass = 'bg-amber-500/20 text-amber-300 border border-amber-500/30';
+          typeLabel = 'Permisos';
+        }
+
+        const timeStr = formatNotificationTime(n.created_at);
+
+        return `
+          <div class="p-3 rounded-xl border transition ${isUnread ? 'bg-slate-800/95 border-blue-500/40 shadow-sm' : 'bg-slate-900/60 border-slate-800 opacity-90'}" data-notif-id="${n.id}">
+            <div class="flex items-start justify-between gap-2.5">
+              <div class="flex items-start gap-2.5 min-w-0 flex-1">
+                <span class="text-xl flex-shrink-0 mt-0.5">${typeIcon}</span>
+                <div class="min-w-0 flex-1">
+                  <div class="flex items-center gap-2 flex-wrap mb-0.5">
+                    <span class="font-bold text-xs ${isUnread ? 'text-white' : 'text-slate-300'}">${escapeHtml(n.title)}</span>
+                    <span class="px-1.5 py-0.2 rounded text-[10px] font-semibold ${typeBadgeClass}">
+                      ${typeLabel}
+                    </span>
+                    ${isUnread ? '<span class="w-2 h-2 rounded-full bg-blue-400"></span>' : ''}
+                  </div>
+                  <p class="text-[11px] text-slate-300 leading-relaxed mb-2">${escapeHtml(n.message)}</p>
+                  
+                  <div class="flex items-center gap-3 text-[10px] text-slate-400 flex-wrap">
+                    <span>🕒 ${timeStr}</span>
+                    ${n.group_name ? `<span class="bg-slate-800 px-1.5 py-0.5 rounded text-slate-300">👥 Grupo: ${escapeHtml(n.group_name)}</span>` : ''}
+                  </div>
+                </div>
+              </div>
+
+              <!-- Acciones individuales -->
+              <div class="flex flex-col items-end gap-1.5 flex-shrink-0">
+                ${renderNotificationActionButton(n)}
+                <button class="btn-delete-single-notif text-[11px] text-slate-500 hover:text-red-400 p-1" data-id="${n.id}" title="Eliminar notificación">
+                  ✕
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // Enlazar eventos de acciones dentro del modal
+    bindNotificationModalActions();
+
+    openModal('modalNotifications');
+  }
+
+  function renderNotificationActionButton(n) {
+    if (n.type === 'INVITATION') {
+      return `
+        <button class="btn btn-primary btn-sm text-[10px] py-1 px-2.5 font-bold btn-notif-action-join" data-group-id="${n.group_id}" data-id="${n.id}">
+          ✨ Ir al Grupo
+        </button>
+      `;
+    }
+    if (n.type === 'CART') {
+      return `
+        <button class="btn btn-secondary btn-sm text-[10px] py-1 px-2 btn-notif-action-cart" data-group-id="${n.group_id}" data-id="${n.id}">
+          🛒 Ver Canasta
+        </button>
+      `;
+    }
+    if (n.type === 'CATALOG') {
+      return `
+        <button class="btn btn-secondary btn-sm text-[10px] py-1 px-2 btn-notif-action-catalog" data-group-id="${n.group_id}" data-id="${n.id}">
+          📦 Ver Catálogo
+        </button>
+      `;
+    }
+    if (n.type === 'PERMISSIONS') {
+      return `
+        <button class="btn btn-secondary btn-sm text-[10px] py-1 px-2 btn-notif-action-perms" data-group-id="${n.group_id}" data-id="${n.id}">
+          🛡️ Ver Permisos
+        </button>
+      `;
+    }
+    return '';
+  }
+
+  function bindNotificationModalActions() {
+    const list = document.getElementById('notificationsList');
+    if (!list) return;
+
+    // Acción para unirse o ir al grupo
+    list.querySelectorAll('.btn-notif-action-join').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const groupId = btn.dataset.groupId;
+        const notifId = btn.dataset.id;
+        await window.db.markNotificationAsRead(notifId);
+        closeModal('modalNotifications');
+        try {
+          await window.authGroups.switchToGroup(groupId);
+          showToast('¡Has accedido al grupo compartido!', 'success');
+        } catch (err) {
+          showToast(err.message, 'error');
+        }
+        updateNotificationBadge();
+      });
+    });
+
+    // Acción para ver el carro de compras
+    list.querySelectorAll('.btn-notif-action-cart').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const groupId = btn.dataset.groupId;
+        const notifId = btn.dataset.id;
+        await window.db.markNotificationAsRead(notifId);
+        closeModal('modalNotifications');
+        try {
+          if (groupId && window.authGroups.getActiveWorkspaceId() !== groupId) {
+            await window.authGroups.switchToGroup(groupId);
+          }
+          switchView('planner');
+        } catch (err) {
+          console.error(err);
+        }
+        updateNotificationBadge();
+      });
+    });
+
+    // Acción para ver productos / catálogo
+    list.querySelectorAll('.btn-notif-action-catalog').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const groupId = btn.dataset.groupId;
+        const notifId = btn.dataset.id;
+        await window.db.markNotificationAsRead(notifId);
+        closeModal('modalNotifications');
+        try {
+          if (groupId && window.authGroups.getActiveWorkspaceId() !== groupId) {
+            await window.authGroups.switchToGroup(groupId);
+          }
+          switchView('products');
+        } catch (err) {
+          console.error(err);
+        }
+        updateNotificationBadge();
+      });
+    });
+
+    // Acción para ver permisos
+    list.querySelectorAll('.btn-notif-action-perms').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const groupId = btn.dataset.groupId;
+        const notifId = btn.dataset.id;
+        await window.db.markNotificationAsRead(notifId);
+        closeModal('modalNotifications');
+        try {
+          if (groupId && window.authGroups.getActiveWorkspaceId() !== groupId) {
+            await window.authGroups.switchToGroup(groupId);
+          }
+          openGroupManagement();
+        } catch (err) {
+          console.error(err);
+        }
+        updateNotificationBadge();
+      });
+    });
+
+    // Eliminar notificación individual
+    list.querySelectorAll('.btn-delete-single-notif').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const id = btn.dataset.id;
+        await window.db.deleteNotification(id);
+        openNotificationsModal();
+        updateNotificationBadge();
+      });
+    });
+  }
+
+  function formatNotificationTime(isoDate) {
+    if (!isoDate) return '';
+    try {
+      const d = new Date(isoDate);
+      const now = new Date();
+      const diffSecs = Math.floor((now - d) / 1000);
+      if (diffSecs < 60) return 'Hace un momento';
+      const diffMins = Math.floor(diffSecs / 60);
+      if (diffMins < 60) return `Hace ${diffMins} min`;
+      const diffHours = Math.floor(diffMins / 60);
+      if (diffHours < 24) return `Hace ${diffHours} h`;
+      return d.toLocaleDateString('es-VE', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+    } catch {
+      return '';
+    }
+  }
+
+  // Botón campana de notificaciones
+  const bellBtn = document.getElementById('btnNotificationsBell');
+  if (bellBtn) {
+    bellBtn.addEventListener('click', () => {
+      openNotificationsModal();
+    });
+  }
+
+  // Leer todas las notificaciones
+  const markAllBtn = document.getElementById('btnMarkAllNotifsRead');
+  if (markAllBtn) {
+    markAllBtn.addEventListener('click', async () => {
+      await window.db.markAllNotificationsAsRead();
+      showToast('Todas las notificaciones han sido marcadas como leídas', 'success');
+      openNotificationsModal();
+      updateNotificationBadge();
+    });
+  }
+
+  // Limpiar todas las notificaciones
+  const clearNotifsBtn = document.getElementById('btnClearAllNotifs');
+  if (clearNotifsBtn) {
+    clearNotifsBtn.addEventListener('click', async () => {
+      if (confirm('¿Deseas eliminar todas las notificaciones?')) {
+        await window.db.clearAllNotifications();
+        showToast('Notificaciones vaciadas', 'info');
+        openNotificationsModal();
+        updateNotificationBadge();
+      }
+    });
+  }
+
+  // Inicializar Preferencias y Badge de Notificaciones
+  loadNotificationSettings();
+  bindNotificationSettingsEvents();
+  updateNotificationBadge();
+
+  // ----------------------------------------------------
   // REGISTRO DE SERVICE WORKER (PWA)
   // ----------------------------------------------------
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js?v=23').then((reg) => {
+    navigator.serviceWorker.register('./sw.js?v=24').then((reg) => {
       console.log('Service Worker registrado con éxito:', reg.scope);
       reg.update();
     }).catch((err) => {

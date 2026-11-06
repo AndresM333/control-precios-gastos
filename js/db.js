@@ -1,6 +1,6 @@
 // IndexedDB Engine for "Control de Precios y Gastos"
 const DB_NAME = 'ControlPreciosGastosDB';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 class AppDB {
   constructor() {
@@ -60,6 +60,15 @@ class AppDB {
         if (!db.objectStoreNames.contains('groups')) {
           const grpOS = db.createObjectStore('groups', { keyPath: 'id' });
           grpOS.createIndex('owner_email', 'owner_email', { unique: false });
+        }
+
+        // Notifications (Notificaciones de grupos, invitaciones, carro y catálogo)
+        if (!db.objectStoreNames.contains('notifications')) {
+          const notifOS = db.createObjectStore('notifications', { keyPath: 'id' });
+          notifOS.createIndex('recipient_email', 'recipient_email', { unique: false });
+          notifOS.createIndex('group_id', 'group_id', { unique: false });
+          notifOS.createIndex('created_at', 'created_at', { unique: false });
+          notifOS.createIndex('read', 'read', { unique: false });
         }
       };
 
@@ -460,6 +469,63 @@ class AppDB {
     return this.put('settings', { key, value, updated_at: new Date().toISOString() });
   }
 
+  // --- Notifications (Notificaciones de grupos, invitaciones, carro y catálogo) ---
+  async getNotifications() {
+    const all = await this.getAll('notifications');
+    return (all || []).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  }
+
+  async addNotification(notifData) {
+    const now = new Date().toISOString();
+    const notifItem = {
+      id: notifData.id || ('notif_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7)),
+      recipient_email: (notifData.recipient_email || 'ALL_GROUP_MEMBERS').toLowerCase(),
+      sender_email: notifData.sender_email ? notifData.sender_email.toLowerCase() : null,
+      sender_name: notifData.sender_name || null,
+      group_id: notifData.group_id || null,
+      group_name: notifData.group_name || '',
+      type: notifData.type || 'GENERAL', // INVITATION | CATALOG | CART | PERMISSIONS | GENERAL
+      title: notifData.title || 'Nueva notificación',
+      message: notifData.message || '',
+      data: notifData.data || {},
+      read: false,
+      created_at: now
+    };
+    await this.put('notifications', notifItem);
+    return notifItem;
+  }
+
+  async markNotificationAsRead(id) {
+    const item = await this.getById('notifications', id);
+    if (item) {
+      item.read = true;
+      item.read_at = new Date().toISOString();
+      await this.put('notifications', item);
+    }
+    return item;
+  }
+
+  async markAllNotificationsAsRead() {
+    const all = await this.getAll('notifications');
+    const now = new Date().toISOString();
+    for (const item of all) {
+      if (!item.read) {
+        item.read = true;
+        item.read_at = now;
+        await this.put('notifications', item);
+      }
+    }
+    return true;
+  }
+
+  async deleteNotification(id) {
+    return this.delete('notifications', id);
+  }
+
+  async clearAllNotifications() {
+    return this.clear('notifications');
+  }
+
   // Limpia completamente la base de datos para una instalación limpia (0 tiendas, 0 productos, 0 gastos)
   async clearAllPersonalData() {
     await this.clear('stores');
@@ -467,6 +533,7 @@ class AppDB {
     await this.clear('price_history');
     await this.clear('expenses');
     await this.clear('invoices');
+    await this.clear('notifications');
     await this.setSetting('app_clean_install', true);
     console.log('Base de datos reseteada a instalación limpia (0 datos preestablecidos).');
     return true;

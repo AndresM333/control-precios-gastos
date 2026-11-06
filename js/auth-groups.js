@@ -233,6 +233,26 @@ class AuthGroupsService {
 
     await window.db.saveGroup(group);
     await this.refreshUserGroups();
+
+    // Crear notificación para el miembro invitado
+    if (window.db && window.db.addNotification) {
+      try {
+        await window.db.addNotification({
+          recipient_email: cleanEmail,
+          sender_email: this.currentUser.email,
+          sender_name: this.currentUser.displayName || this.currentUser.email.split('@')[0],
+          group_id: groupId,
+          group_name: group.name,
+          type: 'INVITATION',
+          title: `✉️ Invitación al grupo "${group.name}"`,
+          message: `${this.currentUser.email} te ha invitado a unirte a su grupo de compras "${group.name}".`,
+          data: { groupId, groupName: group.name, inviter: this.currentUser.email }
+        });
+      } catch (errNotif) {
+        console.warn('Error al registrar notificación de invitación:', errNotif);
+      }
+    }
+
     this.notify();
     return group;
   }
@@ -354,6 +374,47 @@ class AuthGroupsService {
     // Sincronizar activeWorkspace si es el grupo activo
     if (this.activeWorkspace && this.activeWorkspace.id === groupId) {
       this.activeWorkspace.member_permissions = group.member_permissions;
+    }
+
+    // Registrar notificación de cambio de permisos
+    if (window.db && window.db.addNotification) {
+      try {
+        const permLabels = {
+          can_manage_catalog: 'Gestión de Catálogo (productos y tiendas)',
+          can_manage_cart: 'Modificar Carro de Mercado',
+          can_rate_products: 'Votar Calidad de Productos'
+        };
+        const actionText = value ? 'activado' : 'revocado';
+        const adminName = this.currentUser.displayName || this.currentUser.email;
+
+        // Notificación para el miembro específico
+        await window.db.addNotification({
+          recipient_email: cleanEmail,
+          sender_email: this.currentUser.email,
+          sender_name: adminName,
+          group_id: groupId,
+          group_name: group.name,
+          type: 'PERMISSIONS',
+          title: `🛡️ Tus permisos han sido actualizados en "${group.name}"`,
+          message: `El Administrador (${adminName}) ha ${actionText} tu permiso de "${permLabels[permissionKey]}".`,
+          data: { groupId, groupName: group.name, memberEmail: cleanEmail, permKey: permissionKey, value, isSelf: true }
+        });
+
+        // Notificación para el grupo
+        await window.db.addNotification({
+          recipient_email: 'ALL_GROUP_MEMBERS',
+          sender_email: this.currentUser.email,
+          sender_name: adminName,
+          group_id: groupId,
+          group_name: group.name,
+          type: 'PERMISSIONS',
+          title: `🛡️ Permisos modificados en "${group.name}"`,
+          message: `El Administrador ha ${actionText} el permiso de "${permLabels[permissionKey]}" para ${cleanEmail}.`,
+          data: { groupId, groupName: group.name, memberEmail: cleanEmail, permKey: permissionKey, value, isSelf: false }
+        });
+      } catch (errNotif) {
+        console.warn('Error al registrar notificación de permisos:', errNotif);
+      }
     }
 
     this.notify();
