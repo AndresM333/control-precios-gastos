@@ -1,3 +1,6 @@
+// Client ID de Google OAuth 2.0 oficial fijado para la aplicación
+const GOOGLE_CLIENT_ID_CONFIG = '920432502731-cfcp5ijfhmfuche9d3b2np3n4sp6ghu7.apps.googleusercontent.com';
+
 // Controlador Principal de la Aplicación (Precios & Gastos PWA)
 document.addEventListener('DOMContentLoaded', async () => {
   console.log('Iniciando Precios & Gastos PWA...');
@@ -301,6 +304,16 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (googleAuthBtn) {
     googleAuthBtn.addEventListener('click', () => {
       openModal('modalGoogleLogin');
+    });
+  }
+
+  // Botón directo a accounts.google.com dentro del modal
+  const btnGoogleDirect = document.getElementById('btnGoogleDirectRedirect');
+  if (btnGoogleDirect) {
+    btnGoogleDirect.addEventListener('click', async (e) => {
+      e.preventDefault();
+      const clientId = await getAppGoogleClientId();
+      redirectToGoogleOAuth(clientId);
     });
   }
 
@@ -3160,7 +3173,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Redirección oficial a Google OAuth 2.0 (accounts.google.com)
   function redirectToGoogleOAuth(clientId) {
-    if (!clientId) {
+    const finalId = clientId || GOOGLE_CLIENT_ID_CONFIG;
+    if (!finalId) {
       showToast('Se requiere un Client ID de Google Cloud para abrir accounts.google.com', 'error');
       const notice = document.getElementById('googleClientSetupNotice');
       if (notice) notice.classList.remove('hidden');
@@ -3184,7 +3198,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const scope = encodeURIComponent('email profile openid');
     const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
-      `client_id=${encodeURIComponent(clientId)}&` +
+      `client_id=${encodeURIComponent(finalId)}&` +
       `redirect_uri=${encodeURIComponent(redirectUri)}&` +
       `response_type=token&` +
       `scope=${scope}&` +
@@ -3192,9 +3206,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       `prompt=select_account`;
 
     showToast('Abriendo ventana oficial de Google...', 'info');
-    setTimeout(() => {
-      window.location.href = authUrl;
-    }, 250);
+    window.location.assign(authUrl);
   }
 
   // Verificación de callback tras la redirección desde accounts.google.com
@@ -3250,12 +3262,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  // Client ID de Google OAuth 2.0 fijado para la aplicación
-  // Al integrarse aquí, ningún usuario final ve solicitudes de credenciales técnicas
-  const GOOGLE_CLIENT_ID_CONFIG = '920432502731-cfcp5ijfhmfuche9d3b2np3n4sp6ghu7.apps.googleusercontent.com';
-
   async function getAppGoogleClientId() {
-    if (GOOGLE_CLIENT_ID_CONFIG && GOOGLE_CLIENT_ID_CONFIG.trim()) {
+    if (typeof GOOGLE_CLIENT_ID_CONFIG !== 'undefined' && GOOGLE_CLIENT_ID_CONFIG && GOOGLE_CLIENT_ID_CONFIG.trim()) {
       return GOOGLE_CLIENT_ID_CONFIG.trim();
     }
     const saved = await window.db.getSetting('google_client_id');
@@ -3275,7 +3283,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Vincular botón directo a accounts.google.com
     if (btnDirect) {
-      btnDirect.onclick = async () => {
+      const handleDirectClick = async (e) => {
+        if (e) e.preventDefault();
         const clientId = await getAppGoogleClientId();
         if (clientId) {
           redirectToGoogleOAuth(clientId);
@@ -3283,6 +3292,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           showToast('Google requiere vincular el proyecto con Google Cloud (Ver instrucciones del desarrollador)', 'info');
         }
       };
+      btnDirect.onclick = handleDirectClick;
     }
 
     if (!container) return;
@@ -3351,7 +3361,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // REGISTRO DE SERVICE WORKER (PWA)
   // ----------------------------------------------------
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js?v=18').then((reg) => {
+    navigator.serviceWorker.register('./sw.js?v=19').then((reg) => {
       console.log('Service Worker registrado con éxito:', reg.scope);
       reg.update();
     }).catch((err) => {
