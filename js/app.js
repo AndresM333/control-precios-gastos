@@ -3252,7 +3252,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Client ID de Google OAuth 2.0 fijado para la aplicación
   // Al integrarse aquí, ningún usuario final ve solicitudes de credenciales técnicas
-  const GOOGLE_CLIENT_ID_CONFIG = '';
+  const GOOGLE_CLIENT_ID_CONFIG = '920432502731-cfcp5ijfhmfuche9d3b2np3n4sp6ghu7.apps.googleusercontent.com';
 
   async function getAppGoogleClientId() {
     if (GOOGLE_CLIENT_ID_CONFIG && GOOGLE_CLIENT_ID_CONFIG.trim()) {
@@ -3351,7 +3351,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // REGISTRO DE SERVICE WORKER (PWA)
   // ----------------------------------------------------
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js?v=17').then((reg) => {
+    navigator.serviceWorker.register('./sw.js?v=18').then((reg) => {
       console.log('Service Worker registrado con éxito:', reg.scope);
       reg.update();
     }).catch((err) => {
