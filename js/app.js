@@ -45,6 +45,98 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Inicializar Google Identity Services Oficial
   initGoogleOfficialGis();
 
+  // ----------------------------------------------------
+  // GESTIÓN DE MONEDA DE VISUALIZACIÓN ($ USD vs Bs. VES)
+  // ----------------------------------------------------
+  let activeDisplayCurrency = localStorage.getItem('app_display_currency') || 'USD';
+  window.activeDisplayCurrency = activeDisplayCurrency;
+  let lastPlannerPlan = null;
+
+  function updateCurrencySwitcherUI() {
+    document.querySelectorAll('.btn-toggle-curr').forEach(btn => {
+      const isTarget = btn.dataset.currency === activeDisplayCurrency;
+      if (isTarget) {
+        btn.classList.add('bg-blue-600', 'text-white', 'shadow-md');
+        btn.classList.remove('text-slate-400', 'hover:text-slate-200');
+      } else {
+        btn.classList.remove('bg-blue-600', 'text-white', 'shadow-md');
+        btn.classList.add('text-slate-400', 'hover:text-slate-200');
+      }
+    });
+
+    const globalPillText = document.getElementById('globalCurrencyToggleText');
+    if (globalPillText) {
+      globalPillText.textContent = activeDisplayCurrency === 'USD' ? 'USD' : 'Bs.';
+    }
+  }
+
+  function formatDisplayPrice(priceUsd, targetCurrency = activeDisplayCurrency) {
+    const rate = (window.bcvService && window.bcvService.rate > 0) ? window.bcvService.rate : 45.0;
+    const usd = parseFloat(priceUsd) || 0;
+    const ves = usd * rate;
+    const isVes = targetCurrency === 'VES';
+
+    if (isVes) {
+      return {
+        primary: `Bs. ${ves.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+        secondary: `$ ${usd.toFixed(2)} USD`,
+        usd,
+        ves,
+        isVes: true
+      };
+    } else {
+      return {
+        primary: `$ ${usd.toFixed(2)}`,
+        secondary: `Bs. ${ves.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+        usd,
+        ves,
+        isVes: false
+      };
+    }
+  }
+  window.formatDisplayPrice = formatDisplayPrice;
+
+  function setDisplayCurrency(currency) {
+    activeDisplayCurrency = (currency === 'VES') ? 'VES' : 'USD';
+    window.activeDisplayCurrency = activeDisplayCurrency;
+    localStorage.setItem('app_display_currency', activeDisplayCurrency);
+    updateCurrencySwitcherUI();
+
+    if (window.activePriceChart && window.activePriceChart.setCurrency) {
+      window.activePriceChart.setCurrency(activeDisplayCurrency);
+    }
+
+    renderProducts();
+    renderStoreModalProductsList();
+    renderPlannerCart();
+    loadPlannerProductList();
+
+    if (lastPlannerPlan) {
+      renderPlannerOptimizationCards(lastPlannerPlan);
+    }
+  }
+  window.setDisplayCurrency = setDisplayCurrency;
+
+  // Escuchar clics globales en botones de cambio de moneda ($ USD / Bs. VES)
+  document.addEventListener('click', (e) => {
+    const toggleBtn = e.target.closest('.btn-toggle-curr');
+    if (toggleBtn && toggleBtn.dataset.currency) {
+      e.preventDefault();
+      setDisplayCurrency(toggleBtn.dataset.currency);
+      return;
+    }
+
+    const globalPill = e.target.closest('#globalCurrencyToggleBtn');
+    if (globalPill) {
+      e.preventDefault();
+      setDisplayCurrency(activeDisplayCurrency === 'USD' ? 'VES' : 'USD');
+      return;
+    }
+  });
+
+  // Inicializar UI de selector de moneda al cargar
+  setTimeout(updateCurrencySwitcherUI, 50);
+
   // Variables de Estado en Memoria
   let currentActiveView = 'stores';
   let activeCompressedPhoto = null;
@@ -381,8 +473,17 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   window.bcvService.subscribe((rate) => {
     updateBcvUI(rate);
-    // Si la vista actual muestra precios convertidos, refrescar
-    if (currentActiveView === 'products') renderProducts();
+    updateCurrencySwitcherUI();
+    // Si la moneda activa es VES o la vista actual lo requiere, refrescar dinámicamente
+    if (currentActiveView === 'products' || activeDisplayCurrency === 'VES') {
+      renderProducts();
+    }
+    if (currentActiveView === 'planner' || activeDisplayCurrency === 'VES') {
+      renderPlannerCart();
+      loadPlannerProductList();
+      if (lastPlannerPlan) renderPlannerOptimizationCards(lastPlannerPlan);
+    }
+    if (currentModalStoreId) renderStoreModalProductsList();
     if (currentActiveView === 'accounting') renderAccounting();
   });
   updateBcvUI(window.bcvService.rate);
@@ -758,13 +859,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     container.innerHTML = filtered.map(p => {
-      let priceUsd = p.current_price;
-      let priceVes = p.current_price;
+      let rawUsd = parseFloat(p.current_price) || 0;
       if (p.original_currency === 'VES') {
-        priceUsd = currentRate > 0 ? p.current_price / currentRate : 0;
-      } else {
-        priceVes = p.current_price * currentRate;
+        rawUsd = currentRate > 0 ? rawUsd / currentRate : 0;
       }
+      const priceFormatted = formatDisplayPrice(rawUsd);
 
       const mediaHtml = window.AppIcons ? window.AppIcons.renderProductMedia(p, 'w-10 h-10') : '🏷️';
 
@@ -780,8 +879,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             <div class="truncate">
               <h4 class="font-bold text-slate-100 text-xs truncate">${escapeHtml(p.name)}</h4>
               <div class="flex items-center gap-2 mt-0.5">
-                <span class="text-xs font-black text-slate-200">$ ${priceUsd.toFixed(2)}</span>
-                <span class="text-[10px] text-emerald-400 font-semibold">Bs. ${priceVes.toFixed(2)}</span>
+                <span class="text-xs font-black text-slate-200">${priceFormatted.primary}</span>
+                <span class="text-[10px] font-semibold ${priceFormatted.isVes ? 'text-blue-400' : 'text-emerald-400'}">${priceFormatted.secondary}</span>
               </div>
             </div>
           </div>
@@ -826,6 +925,9 @@ document.addEventListener('DOMContentLoaded', async () => {
           const history = await window.db.getPriceHistory(prodId);
           document.getElementById('modalChartProductName').textContent = prod.name;
           document.getElementById('modalChartStoreName').textContent = `Comercio: ${store ? store.name : 'Tienda'}`;
+          if (window.activePriceChart.setCurrency) {
+            window.activePriceChart.setCurrency(activeDisplayCurrency);
+          }
           window.activePriceChart.setData(prod, history);
           openModal('modalPriceChart');
         }
@@ -841,8 +943,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('modalProductTitle').textContent = 'Nuevo Producto';
     document.getElementById('formProduct').reset();
     document.getElementById('inputProductId').value = '';
+    document.getElementById('inputProductCurrency').value = 'USD';
     setProductMedia('icon', 'grain');
     setModalRatingStars(0);
+    if (typeof updateProductPriceHint === 'function') updateProductPriceHint();
     closeModal('modalStoreProducts');
     openModal('modalProduct');
   });
@@ -1061,15 +1165,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     productsGrid.innerHTML = filtered.map(prod => {
       const store = storesMap.get(prod.store_id) || { name: 'Tienda sin asignar' };
 
-      // Conversión dual dinámica (USD y VES)
-      let priceUsd = prod.current_price;
-      let priceVes = prod.current_price;
-
+      // Conversión de precio según moneda de visualización seleccionada (USD o Bs)
+      let rawUsd = parseFloat(prod.current_price) || 0;
       if (prod.original_currency === 'VES') {
-        priceUsd = currentRate > 0 ? prod.current_price / currentRate : 0;
-      } else {
-        priceVes = prod.current_price * currentRate;
+        rawUsd = currentRate > 0 ? rawUsd / currentRate : 0;
       }
+      const priceFormatted = formatDisplayPrice(rawUsd);
 
       const mediaHtml = window.AppIcons ? window.AppIcons.renderProductMedia(prod) : '🏷️';
 
@@ -1090,10 +1191,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                   <h3 class="card-title text-base mt-0.5 truncate">${escapeHtml(prod.name)}</h3>
                 </div>
               </div>
-              <!-- Dual Price Badge -->
+              <!-- Price Badge according to selected display currency -->
               <div class="text-right flex-shrink-0">
-                <span class="text-base font-extrabold text-slate-100 block">$ ${priceUsd.toFixed(2)}</span>
-                <span class="text-[11px] font-semibold text-emerald-400">Bs. ${priceVes.toFixed(2)}</span>
+                <span class="text-base font-extrabold text-slate-100 block">${priceFormatted.primary}</span>
+                <span class="text-[11px] font-semibold ${priceFormatted.isVes ? 'text-blue-400' : 'text-emerald-400'}">${priceFormatted.secondary}</span>
               </div>
             </div>
 
@@ -1180,6 +1281,9 @@ document.addEventListener('DOMContentLoaded', async () => {
           document.getElementById('modalChartProductName').textContent = prod.name;
           document.getElementById('modalChartStoreName').textContent = `Comercio: ${store.name}`;
 
+          if (window.activePriceChart && window.activePriceChart.setCurrency) {
+            window.activePriceChart.setCurrency(activeDisplayCurrency);
+          }
           window.activePriceChart.setData(prod, history);
           openModal('modalPriceChart');
         }
@@ -1196,10 +1300,11 @@ document.addEventListener('DOMContentLoaded', async () => {
           document.getElementById('inputProductId').value = prod.id;
           document.getElementById('inputProductName').value = prod.name;
           document.getElementById('inputProductPrice').value = prod.current_price;
-          document.getElementById('inputProductCurrency').value = prod.original_currency || 'USD';
+          document.getElementById('inputProductCurrency').value = 'USD';
           document.getElementById('inputProductDesc').value = prod.description || '';
           setProductMedia(prod.image_type || 'icon', prod.image_data || 'grain');
           setModalRatingStars(prod.rating || 0);
+          updateProductPriceHint();
           openModal('modalProduct');
         }
       });
@@ -1247,6 +1352,37 @@ document.addEventListener('DOMContentLoaded', async () => {
     `).join('');
   }
 
+  // Previsualización y ayuda dinámica de conversión al ingresar precio en Bs o USD
+  function updateProductPriceHint() {
+    const priceInput = document.getElementById('inputProductPrice');
+    const currSelect = document.getElementById('inputProductCurrency');
+    const hintContainer = document.getElementById('productPriceConversionHint');
+    const hintText = document.getElementById('productPriceConversionHintText');
+    if (!priceInput || !currSelect || !hintContainer || !hintText) return;
+
+    const val = parseFloat(priceInput.value);
+    const curr = currSelect.value;
+    const rate = (window.bcvService && window.bcvService.rate > 0) ? window.bcvService.rate : 45.0;
+
+    if (isNaN(val) || val <= 0) {
+      hintContainer.classList.add('hidden');
+      return;
+    }
+
+    if (curr === 'VES') {
+      const usdEquiv = val / rate;
+      hintText.innerHTML = `Precio ingresado en Bolívares. Se convertirá y <strong>guardará en dólares a $ ${usdEquiv.toFixed(2)} USD</strong> (Tasa oficial BCV: Bs. ${rate.toFixed(2)}). El precio en Bs no se guarda en el sistema.`;
+      hintContainer.classList.remove('hidden');
+    } else {
+      const vesEquiv = val * rate;
+      hintText.innerHTML = `Se guardará como <strong>$ ${val.toFixed(2)} USD</strong> (Equivale hoy a Bs. ${vesEquiv.toFixed(2)} a tasa oficial BCV).`;
+      hintContainer.classList.remove('hidden');
+    }
+  }
+
+  document.getElementById('inputProductPrice').addEventListener('input', updateProductPriceHint);
+  document.getElementById('inputProductCurrency').addEventListener('change', updateProductPriceHint);
+
   document.getElementById('btnNewProduct').addEventListener('click', async () => {
     const stores = await window.db.getStores();
     if (stores.length === 0) {
@@ -1258,8 +1394,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('modalProductTitle').textContent = 'Nuevo Producto';
     document.getElementById('formProduct').reset();
     document.getElementById('inputProductId').value = '';
+    document.getElementById('inputProductCurrency').value = 'USD';
     setProductMedia('icon', 'grain');
     setModalRatingStars(0);
+    updateProductPriceHint();
     openModal('modalProduct');
   });
 
@@ -1274,27 +1412,40 @@ document.addEventListener('DOMContentLoaded', async () => {
     const desc = document.getElementById('inputProductDesc').value.trim();
     const imageType = document.getElementById('inputProductImageType').value || 'icon';
     const imageData = document.getElementById('inputProductImageData').value || 'grain';
+    const currentRate = (window.bcvService && window.bcvService.rate > 0) ? window.bcvService.rate : 45.0;
+
+    // Regla de Oro: Si el usuario ingresó el precio en Bolívares (VES),
+    // se convierte de inmediato a dólares (USD) usando la tasa BCV del día.
+    // El precio en bolívares NO se guarda en la base de datos.
+    let priceInUsd = price;
+    if (currency === 'VES') {
+      priceInUsd = currentRate > 0 ? parseFloat((price / currentRate).toFixed(4)) : price;
+    }
 
     const saved = await window.db.saveProduct({
       id: id ? parseInt(id) : undefined,
       store_id: storeId,
       name,
-      current_price: price,
-      original_currency: currency,
+      current_price: priceInUsd,
+      original_currency: 'USD',
       rating: ratingVal,
       description: desc,
       image_type: imageType,
       image_data: imageData
-    }, 'MANUAL', window.bcvService.rate);
+    }, 'MANUAL', currentRate);
 
     // Si se especificó calificación, sincronizarla automáticamente con productos idénticos
     if (ratingVal && saved && saved.id) {
       await window.db.updateProductRatingShared(saved.id, ratingVal);
     }
 
-    showToast('Producto guardado con éxito', 'success');
+    const toastMsg = (currency === 'VES')
+      ? `Producto guardado en USD ($ ${priceInUsd.toFixed(2)}) convertido de Bs. ${price.toFixed(2)}`
+      : 'Producto guardado con éxito ($ USD)';
+    showToast(toastMsg, 'success');
     closeModal('modalProduct');
     renderProducts();
+    if (currentModalStoreId) renderStoreModalProductsList();
   });
 
   // ----------------------------------------------------
@@ -1851,10 +2002,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         </div>
       `;
     } else {
+      const currentRate = (window.bcvService && window.bcvService.rate > 0) ? window.bcvService.rate : 45.0;
       catalogContainer.innerHTML = filtered.map(name => {
         const prod = productsByName.get(name);
         const mediaHtml = window.AppIcons ? window.AppIcons.renderProductMedia(prod, 'w-8 h-8') : '🏷️';
         const inCartQty = plannerCart.get(name) || 0;
+        let priceUsd = prod ? parseFloat(prod.current_price) : 0;
+        if (prod && prod.original_currency === 'VES') {
+          priceUsd = currentRate > 0 ? priceUsd / currentRate : 0;
+        }
+        const priceInfo = prod ? formatDisplayPrice(priceUsd) : null;
 
         return `
           <div class="flex items-center justify-between p-2 rounded-xl bg-slate-800/40 hover:bg-slate-800 border border-slate-800/60 transition gap-2">
@@ -1862,7 +2019,10 @@ document.addEventListener('DOMContentLoaded', async () => {
               ${mediaHtml}
               <div class="truncate">
                 <span class="text-xs font-semibold text-slate-200 block truncate">${escapeHtml(name)}</span>
-                <span class="text-[10px] text-slate-400 block">${inCartQty > 0 ? `<span class="text-emerald-400 font-bold">${inCartQty} en canasta</span>` : 'Disponible'}</span>
+                <div class="flex items-center gap-1.5 text-[10px]">
+                  ${priceInfo ? `<span class="text-slate-300 font-bold">${priceInfo.primary}</span>` : ''}
+                  ${inCartQty > 0 ? `<span class="text-emerald-400 font-bold">• ${inCartQty} en canasta</span>` : '<span class="text-slate-500">• Disponible</span>'}
+                </div>
               </div>
             </div>
             <button class="btn-planner-add-item w-8 h-8 rounded-full bg-emerald-500/20 hover:bg-emerald-500 text-emerald-400 hover:text-white font-bold flex items-center justify-center flex-shrink-0 transition shadow" data-name="${escapeHtml(name)}" title="Agregar 1 unidad a la canasta">
@@ -1917,21 +2077,44 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (clearBtn) clearBtn.classList.remove('hidden');
 
     let totalUnits = 0;
-    plannerCart.forEach(qty => totalUnits += qty);
+    let totalUsdCost = 0;
+    const currentRate = (window.bcvService && window.bcvService.rate > 0) ? window.bcvService.rate : 45.0;
+
+    plannerCart.forEach((qty, name) => {
+      totalUnits += qty;
+      const prod = productsByName.get(name);
+      if (prod && prod.current_price) {
+        let pUsd = parseFloat(prod.current_price) || 0;
+        if (prod.original_currency === 'VES') pUsd = currentRate > 0 ? pUsd / currentRate : 0;
+        totalUsdCost += (pUsd * qty);
+      }
+    });
+
+    const totalCostFormatted = formatDisplayPrice(totalUsdCost);
+
     if (summaryEl) {
-      summaryEl.textContent = `${totalUnits} unidad${totalUnits === 1 ? '' : 'es'} (${plannerCart.size} producto${plannerCart.size === 1 ? '' : 's'})`;
+      summaryEl.innerHTML = `
+        <span>${totalUnits} und (${plannerCart.size} prod)</span>
+        <span class="text-emerald-400 font-extrabold ml-1.5">${totalCostFormatted.primary}</span>
+      `;
     }
 
     const cartEntries = Array.from(plannerCart.entries());
     cartContainer.innerHTML = cartEntries.map(([name, qty]) => {
       const prod = productsByName.get(name) || { name };
+      let itemUsd = parseFloat(prod.current_price) || 0;
+      if (prod.original_currency === 'VES') itemUsd = currentRate > 0 ? itemUsd / currentRate : 0;
+      const subtotalFormatted = formatDisplayPrice(itemUsd * qty);
       const mediaHtml = window.AppIcons ? window.AppIcons.renderProductMedia(prod, 'w-8 h-8') : '🛒';
 
       return `
         <div class="flex items-center justify-between p-2 rounded-xl bg-slate-800/80 border border-slate-700/70 gap-2">
           <div class="flex items-center gap-2.5 min-w-0">
             ${mediaHtml}
-            <span class="text-xs font-bold text-slate-100 truncate">${escapeHtml(name)}</span>
+            <div class="truncate">
+              <span class="text-xs font-bold text-slate-100 block truncate">${escapeHtml(name)}</span>
+              <span class="text-[10px] text-slate-400 font-semibold block">${subtotalFormatted.primary}</span>
+            </div>
           </div>
 
           <div class="flex items-center gap-1.5 flex-shrink-0">
@@ -1981,33 +2164,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  document.getElementById('btnClearPlannerCart').addEventListener('click', () => {
-    plannerCart.clear();
-    renderPlannerCart();
-    loadPlannerProductList();
-    showToast('Canasta vaciada', 'info');
-  });
-
-  document.getElementById('plannerSearchInput').addEventListener('input', loadPlannerProductList);
-
-  document.getElementById('btnExecutePlanner').addEventListener('click', async () => {
-    if (plannerCart.size === 0) {
-      showToast('Añade al menos un producto a tu canasta usando el botón +', 'error');
-      return;
-    }
-
-    const items = Array.from(plannerCart.entries()).map(([name, qty]) => ({ name, qty }));
-    const totalSelectedCount = items.length;
-
-    showToast('Optimizando compra con las cantidades elegidas...', 'info');
-    const plan = await window.groceryPlanner.planMarket(items);
+  function renderPlannerOptimizationCards(plan, totalCount = null) {
+    if (!plan) return;
+    lastPlannerPlan = plan;
+    const totalSelectedCount = totalCount || plan.totalRequested || (plan.bestCheapest ? plan.bestCheapest.available.length : 0);
+    const isVes = (activeDisplayCurrency === 'VES');
 
     // 1. Tarjeta La Más Barata
     const cardCheapest = document.getElementById('cardBestCheapest');
     if (plan.bestCheapest) {
       cardCheapest.querySelector('.store-name').textContent = plan.bestCheapest.store.name;
       cardCheapest.querySelector('.store-summary').textContent = `${plan.bestCheapest.available.length}/${totalSelectedCount} productos disponibles`;
-      cardCheapest.querySelector('.store-price').textContent = `$ ${plan.bestCheapest.totalCostUSD.toFixed(2)}`;
+      cardCheapest.querySelector('.store-price').textContent = isVes
+        ? `Bs. ${plan.bestCheapest.totalCostVES.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+        : `$ ${plan.bestCheapest.totalCostUSD.toFixed(2)}`;
     } else {
       cardCheapest.querySelector('.store-name').textContent = 'No disponible';
     }
@@ -2038,14 +2208,27 @@ document.addEventListener('DOMContentLoaded', async () => {
     const listContainer = document.getElementById('plannerResultsList');
     listContainer.innerHTML = plan.recommendations.map(r => {
       const missingTags = r.missing.map(m => `
-        <span class="text-[10px] bg-red-500/10 text-red-400 border border-red-500/20 px-1.5 py-0.5 rounded">Falta: ${escapeHtml(m)}</span>
+        <span class="text-[10px] bg-red-500/10 text-red-400 border border-red-500/20 px-1.5 py-0.5 rounded">Falta: ${escapeHtml(m.name || m)}</span>
       `).join(' ');
 
-      const availableItemsSummary = r.available.map(a => `
-        <span class="text-[10px] bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded border border-slate-700">
-          ${escapeHtml(a.product.name)} (x${a.qty || 1}): $${((a.product.current_price || 0) * (a.qty || 1)).toFixed(2)}
-        </span>
-      `).join(' ');
+      const availableItemsSummary = r.available.map(a => {
+        const itemCost = isVes
+          ? `Bs. ${((a.totalPriceVES || 0)).toFixed(2)}`
+          : `$ ${((a.totalPriceUSD || 0)).toFixed(2)}`;
+        const pName = a.matchedProduct ? a.matchedProduct.name : (a.product ? a.product.name : a.requestedName);
+        return `
+          <span class="text-[10px] bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded border border-slate-700">
+            ${escapeHtml(pName)} (x${a.quantity || a.qty || 1}): ${itemCost}
+          </span>
+        `;
+      }).join(' ');
+
+      const mainCost = isVes
+        ? `Bs. ${r.totalCostVES.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+        : `$ ${r.totalCostUSD.toFixed(2)}`;
+      const subCost = isVes
+        ? `$ ${r.totalCostUSD.toFixed(2)} USD`
+        : `Bs. ${r.totalCostVES.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
       return `
         <div class="p-3 bg-slate-800/60 border border-slate-700/60 rounded-xl flex flex-col gap-2 text-xs">
@@ -2061,8 +2244,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             <div class="flex items-center gap-4 text-right">
               <div>
-                <span class="text-sm font-extrabold text-emerald-400 block">$ ${r.totalCostUSD.toFixed(2)}</span>
-                <span class="text-[10px] text-slate-400">Bs. ${r.totalCostVES.toFixed(2)}</span>
+                <span class="text-sm font-extrabold text-emerald-400 block">${mainCost}</span>
+                <span class="text-[10px] text-slate-400">${subCost}</span>
               </div>
               <a href="${r.store.maps_url || '#'}" target="_blank" class="btn btn-secondary btn-sm">
                 📍 Ir
@@ -2077,6 +2260,29 @@ document.addEventListener('DOMContentLoaded', async () => {
         </div>
       `;
     }).join('');
+  }
+
+  document.getElementById('btnClearPlannerCart').addEventListener('click', () => {
+    plannerCart.clear();
+    renderPlannerCart();
+    loadPlannerProductList();
+    showToast('Canasta vaciada', 'info');
+  });
+
+  document.getElementById('plannerSearchInput').addEventListener('input', loadPlannerProductList);
+
+  document.getElementById('btnExecutePlanner').addEventListener('click', async () => {
+    if (plannerCart.size === 0) {
+      showToast('Añade al menos un producto a tu canasta usando el botón +', 'error');
+      return;
+    }
+
+    const items = Array.from(plannerCart.entries()).map(([name, qty]) => ({ name, qty }));
+    const totalSelectedCount = items.length;
+
+    showToast('Optimizando compra con las cantidades elegidas...', 'info');
+    const plan = await window.groceryPlanner.planMarket(items);
+    renderPlannerOptimizationCards(plan, totalSelectedCount);
   });
 
   // ----------------------------------------------------
@@ -3016,7 +3222,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // REGISTRO DE SERVICE WORKER (PWA)
   // ----------------------------------------------------
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js?v=13').then((reg) => {
+    navigator.serviceWorker.register('./sw.js?v=14').then((reg) => {
       console.log('Service Worker registrado con éxito:', reg.scope);
       reg.update();
     }).catch((err) => {

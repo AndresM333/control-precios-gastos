@@ -369,13 +369,20 @@ REGLAS CRÍTICAS:
       const quantity = parseFloat(item.quantity) || 1;
       const totalItem = parseFloat(item.total) || (unitPrice * quantity);
 
+      // Regla: Si el documento/menú escaneado estaba en bolívares (VES),
+      // convertir el precio unitario a dólares usando la tasa BCV del día.
+      // El precio en Bs NO se guarda; se almacena 100% en USD.
+      const unitPriceUsd = currency === 'VES'
+        ? (currentBcvRate > 0 ? parseFloat((unitPrice / currentBcvRate).toFixed(4)) : unitPrice)
+        : unitPrice;
+
       // Buscar si ya existe en esta tienda
       const existingProduct = await window.db.findProductByStoreAndName(store.id, cleanName);
 
       if (existingProduct) {
-        // Actualizar precio actual, preservar valoración personal de 1 a 5 estrellas intacta
-        existingProduct.current_price = unitPrice;
-        existingProduct.original_currency = currency;
+        // Actualizar precio actual en USD, preservar valoración personal de 1 a 5 estrellas intacta
+        existingProduct.current_price = unitPriceUsd;
+        existingProduct.original_currency = 'USD';
         existingProduct.updated_at = new Date().toISOString();
 
         await window.db.saveProduct(existingProduct, docType, currentBcvRate);
@@ -394,12 +401,12 @@ REGLAS CRÍTICAS:
           workspace_id: activeWs,
           store_id: store.id,
           name: cleanName,
-          current_price: unitPrice,
-          original_currency: currency,
+          current_price: unitPriceUsd,
+          original_currency: 'USD',
           image_type: 'icon',
           image_data: guessedIcon,
           rating: null, // Dejado en blanco para valoración manual del usuario
-          description: `Registrado automáticamente desde ${docType.toLowerCase()}.`
+          description: `Registrado automáticamente desde ${docType.toLowerCase()}${currency === 'VES' ? ` (Convertido de Bs. ${unitPrice.toFixed(2)} a tasa BCV)` : ''}.`
         };
 
         const savedProd = await window.db.saveProduct(newProduct, docType, currentBcvRate);

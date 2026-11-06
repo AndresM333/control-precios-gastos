@@ -66,6 +66,7 @@ class AppDB {
       request.onsuccess = (event) => {
         this.db = event.target.result;
         resolve(this.db);
+        setTimeout(() => this.migrateVesProductsToUsd(), 300);
       };
 
       request.onerror = (event) => {
@@ -230,6 +231,19 @@ class AppDB {
       }
     }
 
+    // Regla de Oro: Los precios de los productos se guardan SIEMPRE en USD.
+    // Si se envía un precio en bolívares (VES), se convierte inmediatamente usando la tasa del día
+    // y el precio en bolívares NO se guarda en la base de datos.
+    const activeRate = bcvRate || (window.bcvService && window.bcvService.rate > 0 ? window.bcvService.rate : null) || 45.0;
+    if (productData.original_currency === 'VES') {
+      const vesVal = parseFloat(productData.current_price) || 0;
+      productData.current_price = activeRate > 0 ? parseFloat((vesVal / activeRate).toFixed(4)) : vesVal;
+      productData.original_currency = 'USD';
+    } else {
+      productData.original_currency = 'USD';
+      productData.current_price = parseFloat(productData.current_price) || 0;
+    }
+
     let productId = productData.id;
     let isNew = !productId;
 
@@ -243,14 +257,14 @@ class AppDB {
       productData.id = productId;
     }
 
-    // Always register price history point
+    // Always register price history point in USD
     if (productData.current_price !== undefined && productData.current_price !== null) {
       await this.addPriceHistory({
         product_id: productId,
         store_id: productData.store_id,
         price: parseFloat(productData.current_price),
-        currency: productData.original_currency || 'USD',
-        bcv_rate: bcvRate,
+        currency: 'USD',
+        bcv_rate: activeRate,
         date: productData.updated_at || now,
         source: priceHistorySource
       });
@@ -262,6 +276,31 @@ class AppDB {
     }
 
     return productData;
+  }
+
+  /**
+   * Migración automática para convertir productos antiguos que se hubiesen guardado en Bs a USD
+   */
+  async migrateVesProductsToUsd() {
+    try {
+      const allProducts = await this.getAll('products');
+      const rate = (window.bcvService && window.bcvService.rate > 0) ? window.bcvService.rate : 45.0;
+      let migrated = 0;
+      for (const prod of allProducts) {
+        if (prod.original_currency === 'VES') {
+          const oldVes = parseFloat(prod.current_price) || 0;
+          prod.current_price = rate > 0 ? parseFloat((oldVes / rate).toFixed(4)) : oldVes;
+          prod.original_currency = 'USD';
+          await this.put('products', prod);
+          migrated++;
+        }
+      }
+      if (migrated > 0) {
+        console.log(`[DB Migration] Se migraron ${migrated} productos guardados en Bs a USD automáticamente.`);
+      }
+    } catch (e) {
+      console.warn('[DB Migration] Error al verificar productos VES:', e);
+    }
   }
 
   /**
