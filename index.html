@@ -12,7 +12,7 @@
   <link rel="manifest" href="./manifest.json">
   <link rel="icon" type="image/svg+xml" href="./icons/icon.svg">
   <link rel="apple-touch-icon" href="./icons/icon.svg">
-  <link rel="stylesheet" href="./css/styles.css?v=22">
+  <link rel="stylesheet" href="./css/styles.css?v=23">
   <!-- Tailwind Utilities (CDN for instant responsive styling) -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -742,21 +742,18 @@
           </div>
         </div>
 
-        <!-- Card 4: Instalación Limpia / Vaciar Datos de Prueba -->
-        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 md:col-span-2">
+        <!-- Card 4: Zona de Peligro - Borrar Toda la Base de Datos -->
+        <div class="bg-red-950/20 border border-red-500/30 rounded-2xl p-5 md:col-span-2">
           <div class="flex items-center gap-2 mb-2">
-            <span class="text-xl">✨</span>
-            <h3 class="font-bold text-slate-100 text-sm">Instalación Limpia y Datos de Prueba</h3>
+            <span class="text-xl">⚠️</span>
+            <h3 class="font-bold text-red-400 text-sm">Zona de Peligro: Borrar Toda la Base de Datos</h3>
           </div>
-          <p class="text-xs text-slate-400 mb-3 leading-relaxed">
-            Si deseas vaciar las tiendas de muestra o empezar totalmente en blanco con tu biblioteca personal limpia (0 tiendas y 0 productos):
+          <p class="text-xs text-slate-300 mb-4 leading-relaxed">
+            Elimina permanentemente toda la información de la aplicación: tiendas, productos, listas de precios, historial de variaciones, registros de compras y gastos. Esta acción es <strong>definitiva e irreversible</strong>.
           </p>
-          <div class="flex flex-wrap items-center gap-3">
-            <button type="button" id="btnResetCleanInstall" class="btn btn-outline-danger btn-sm text-xs py-2 px-3.5 flex items-center gap-2">
-              <span>🗑️</span> Vaciar Todo y Dejar App Limpia (0 Tiendas / 0 Productos)
-            </button>
-            <button type="button" id="btnLoadDemoData" class="btn btn-secondary btn-sm text-xs py-2 px-3.5 flex items-center gap-2">
-              <span>🧪</span> Cargar Datos de Demostración
+          <div>
+            <button type="button" id="btnDeleteEntireDatabase" class="btn btn-outline-danger btn-sm text-xs py-2.5 px-4 flex items-center gap-2 font-bold hover:bg-red-600 hover:text-white transition shadow-sm">
+              <span>🗑️</span> Borrar Toda la Base de Datos
             </button>
           </div>
         </div>
@@ -1580,16 +1577,16 @@
   <div id="toastContainer" class="toast-container"></div>
 
   <!-- Core Scripts -->
-  <script src="./js/db.js?v=22"></script>
-  <script src="./js/icons-library.js?v=22"></script>
-  <script src="./js/bcv.js?v=22"></script>
-  <script src="./js/image-compressor.js?v=22"></script>
-  <script src="./js/ai-scanner.js?v=22"></script>
-  <script src="./js/charts.js?v=22"></script>
-  <script src="./js/grocery-planner.js?v=22"></script>
-  <script src="./js/accounting.js?v=22"></script>
-  <script src="./js/backup-drive.js?v=22"></script>
-  <script src="./js/auth-groups.js?v=22"></script>
-  <script src="./js/app.js?v=22"></script>
+  <script src="./js/db.js?v=23"></script>
+  <script src="./js/icons-library.js?v=23"></script>
+  <script src="./js/bcv.js?v=23"></script>
+  <script src="./js/image-compressor.js?v=23"></script>
+  <script src="./js/ai-scanner.js?v=23"></script>
+  <script src="./js/charts.js?v=23"></script>
+  <script src="./js/grocery-planner.js?v=23"></script>
+  <script src="./js/accounting.js?v=23"></script>
+  <script src="./js/backup-drive.js?v=23"></script>
+  <script src="./js/auth-groups.js?v=23"></script>
+  <script src="./js/app.js?v=23"></script>
 </body>
 </html>

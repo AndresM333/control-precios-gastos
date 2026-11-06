@@ -3239,36 +3239,56 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
-  // Resetear e iniciar instalación limpia (0 tiendas / 0 productos)
-  const btnResetClean = document.getElementById('btnResetCleanInstall');
-  if (btnResetClean) {
-    btnResetClean.addEventListener('click', async () => {
+  // Borrar Toda la Base de Datos (Doble Confirmación de Seguridad)
+  const btnDeleteDb = document.getElementById('btnDeleteEntireDatabase');
+  if (btnDeleteDb) {
+    btnDeleteDb.addEventListener('click', async () => {
       if (!window.authGroups.hasPermission('can_manage_catalog')) {
-        showToast('⚠️ No tienes permiso para vaciar o modificar el catálogo en este grupo.', 'error');
+        showToast('⚠️ No tienes permiso para borrar la base de datos en este grupo.', 'error');
         return;
       }
-      const ok = confirm('¿Deseas vaciar todas las tiendas y productos para dejar la aplicación 100% limpia y sin datos de prueba?');
-      if (!ok) return;
-      await window.db.clearAllPersonalData();
-      await renderStores();
-      await renderProducts();
-      showToast('✨ Base de datos 100% limpia. Lista para registrar tus compras.', 'success');
-    });
-  }
 
-  // Cargar datos de demostración
-  const btnLoadDemo = document.getElementById('btnLoadDemoData');
-  if (btnLoadDemo) {
-    btnLoadDemo.addEventListener('click', async () => {
-      if (!window.authGroups.hasPermission('can_manage_catalog')) {
-        showToast('⚠️ No tienes permiso para cargar datos de prueba en este grupo.', 'error');
+      // PREGUNTA 1: Primer aviso detallado con advertencia de pérdidas
+      const confirmacion1 = confirm(
+        '⚠️ AVISO DE SEGURIDAD (Paso 1 de 2):\n\n' +
+        '¿Estás seguro de que deseas borrar TODA la base de datos de la aplicación?\n\n' +
+        'Esta acción eliminará de forma PERMANENTE e IRREVERSIBLE:\n' +
+        '• Todas las tiendas y comercios registrados.\n' +
+        '• Todos los productos, precios y valoraciones de calidad.\n' +
+        '• Todo el historial histórico de precios y gráficas.\n' +
+        '• Todos los registros de gastos, facturas e imágenes guardadas.\n\n' +
+        '¿Deseas continuar al paso final de confirmación?'
+      );
+
+      if (!confirmacion1) return;
+
+      // PREGUNTA 2: Segundo aviso de confirmación definitiva
+      const confirmacion2 = confirm(
+        '🚨 ÚLTIMA ADVERTENCIA DE SEGURIDAD (Paso 2 de 2):\n\n' +
+        '¡ATENCIÓN! No habrá manera de recuperar la información eliminada salvo que dispongas de un respaldo previo en Google Drive.\n\n' +
+        '¿Confirmas DEFINITIVAMENTE que deseas BORRAR TODOS LOS DATOS ahora mismo?'
+      );
+
+      if (!confirmacion2) {
+        showToast('Operación cancelada. Tus datos están seguros.', 'info');
         return;
       }
-      await window.db.setSetting('app_clean_install', false);
-      await window.db.seedInitialDataIfEmpty(window.bcvService.rate);
-      await renderStores();
-      await renderProducts();
-      showToast('🧪 Datos de demostración cargados en la aplicación.', 'info');
+
+      try {
+        await window.db.clearAllPersonalData();
+        plannerCart.clear();
+        await renderStores();
+        await renderProducts();
+        if (currentModalStoreId) renderStoreModalProductsList();
+        renderPlannerCart();
+        loadPlannerProductList();
+        if (typeof renderAccounting === 'function') await renderAccounting();
+
+        showToast('🗑️ Toda la base de datos ha sido borrada con éxito. La app quedó 100% limpia.', 'success');
+      } catch (err) {
+        console.error('Error al borrar la base de datos:', err);
+        showToast('Error al borrar la base de datos: ' + err.message, 'error');
+      }
     });
   }
 
@@ -3542,7 +3562,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // REGISTRO DE SERVICE WORKER (PWA)
   // ----------------------------------------------------
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js?v=22').then((reg) => {
+    navigator.serviceWorker.register('./sw.js?v=23').then((reg) => {
       console.log('Service Worker registrado con éxito:', reg.scope);
       reg.update();
     }).catch((err) => {
