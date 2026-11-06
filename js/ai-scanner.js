@@ -1,7 +1,8 @@
 // Servicio de Escaneo Inteligente con IA (Google Gemini Flash)
 class AIScannerService {
   constructor() {
-    this.defaultModel = 'gemini-2.0-flash';
+    this.models = ['gemini-3.8-flash', 'gemini-2.5-flash', 'gemini-1.5-flash'];
+    this.defaultModel = 'gemini-3.8-flash';
   }
 
   async getApiKey() {
@@ -27,23 +28,44 @@ class AIScannerService {
       throw new Error('No hay ninguna clave API ingresada para probar.');
     }
 
-    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${this.defaultModel}?key=${encodeURIComponent(key)}`;
-    const response = await fetch(endpoint, { method: 'GET' });
+    const candidateModels = Array.from(new Set([this.defaultModel, ...this.models]));
+    let lastError = null;
 
-    if (!response.ok) {
-      const errText = await response.text();
-      let msg = `Error (${response.status}): Clave no válida o sin permisos`;
+    for (const model of candidateModels) {
       try {
-        const errObj = JSON.parse(errText);
-        if (errObj.error && errObj.error.message) {
-          msg = errObj.error.message;
+        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}?key=${encodeURIComponent(key)}`;
+        const response = await fetch(endpoint, { method: 'GET' });
+
+        if (!response.ok) {
+          const errText = await response.text();
+          let msg = `Error (${response.status}): Clave no válida o sin permisos`;
+          try {
+            const errObj = JSON.parse(errText);
+            if (errObj.error && errObj.error.message) {
+              msg = errObj.error.message;
+            }
+          } catch (e) {}
+
+          if (response.status === 404 || msg.includes('no longer available') || msg.includes('not found')) {
+            lastError = new Error(msg);
+            continue;
+          }
+          throw new Error(msg);
         }
-      } catch (e) {}
-      throw new Error(msg);
+
+        const data = await response.json();
+        this.defaultModel = model;
+        return { ok: true, model: data.displayName || data.name || model };
+      } catch (err) {
+        lastError = err;
+        if (err.message && (err.message.includes('no longer available') || err.message.includes('not found') || err.message.includes('404'))) {
+          continue;
+        }
+        throw err;
+      }
     }
 
-    const data = await response.json();
-    return { ok: true, model: data.displayName || data.name || this.defaultModel };
+    throw lastError || new Error('No se pudo verificar la clave con los modelos disponibles.');
   }
 
   /**
@@ -233,8 +255,6 @@ REGLAS CRÍTICAS:
 8. Devuelve SOLO el objeto JSON puro sin bloques markdown (\`\`\`json) ni explicaciones adicionales.
 `;
 
-    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${this.defaultModel}:generateContent?key=${apiKey}`;
-
     const requestBody = {
       contents: [
         {
@@ -255,44 +275,70 @@ REGLAS CRÍTICAS:
       }
     };
 
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(requestBody)
-    });
+    const candidateModels = Array.from(new Set([this.defaultModel, ...this.models]));
+    let lastError = null;
 
-    if (!response.ok) {
-      const errText = await response.text();
-      let msg = `Error de API Gemini (${response.status})`;
+    for (const modelName of candidateModels) {
       try {
-        const errObj = JSON.parse(errText);
-        if (errObj.error && errObj.error.message) {
-          msg = errObj.error.message;
+        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
+
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(requestBody)
+        });
+
+        if (!response.ok) {
+          const errText = await response.text();
+          let msg = `Error de API Gemini (${response.status})`;
+          try {
+            const errObj = JSON.parse(errText);
+            if (errObj.error && errObj.error.message) {
+              msg = errObj.error.message;
+            }
+          } catch (e) {}
+
+          // Si el modelo específico ya no está disponible o da 404, intentar con el siguiente modelo moderno
+          if (response.status === 404 || msg.includes('no longer available') || msg.includes('not found')) {
+            console.warn(`Modelo ${modelName} no disponible (${msg}), probando siguiente modelo de respaldo...`);
+            lastError = new Error(msg);
+            continue;
+          }
+          throw new Error(msg);
         }
-      } catch (e) {}
-      throw new Error(msg);
+
+        const data = await response.json();
+        const candidate = data.candidates?.[0];
+        if (!candidate || !candidate.content || !candidate.content.parts?.[0]?.text) {
+          throw new Error('La IA no devolvió contenido interpretable de la imagen.');
+        }
+
+        const rawJson = candidate.content.parts[0].text;
+        let parsedResult;
+        try {
+          parsedResult = JSON.parse(rawJson);
+        } catch (e) {
+          const cleaned = rawJson.replace(/```json/g, '').replace(/```/g, '').trim();
+          parsedResult = JSON.parse(cleaned);
+        }
+
+        if (!parsedResult.items || !Array.isArray(parsedResult.items)) {
+          parsedResult.items = [];
+        }
+
+        // Si tuvo éxito, recordar este modelo como el preferido
+        this.defaultModel = modelName;
+        return parsedResult;
+      } catch (err) {
+        lastError = err;
+        if (err.message && (err.message.includes('no longer available') || err.message.includes('not found') || err.message.includes('404'))) {
+          continue;
+        }
+        throw err;
+      }
     }
 
-    const data = await response.json();
-    const candidate = data.candidates?.[0];
-    if (!candidate || !candidate.content || !candidate.content.parts?.[0]?.text) {
-      throw new Error('La IA no devolvió contenido interpretable de la imagen.');
-    }
-
-    const rawJson = candidate.content.parts[0].text;
-    let parsedResult;
-    try {
-      parsedResult = JSON.parse(rawJson);
-    } catch (e) {
-      const cleaned = rawJson.replace(/```json/g, '').replace(/```/g, '').trim();
-      parsedResult = JSON.parse(cleaned);
-    }
-
-    if (!parsedResult.items || !Array.isArray(parsedResult.items)) {
-      parsedResult.items = [];
-    }
-
-    return parsedResult;
+    throw lastError || new Error('No se pudo analizar la imagen con los modelos de Gemini disponibles.');
   }
 
   /**
