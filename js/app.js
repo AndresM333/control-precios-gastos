@@ -142,6 +142,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   let activeCompressedPhoto = null;
   let activeExtractionData = null;
   let activeScanMode = 'FACTURA';
+  let activeModelTier = 'flash';
   let pendingImportPayload = null;
 
   // ----------------------------------------------------
@@ -169,12 +170,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (viewName === 'stores') renderStores();
     if (viewName === 'products') renderProducts();
     if (viewName === 'planner') loadPlannerProductList();
-    if (viewName === 'scanner') updateApiKeyUI();
+    if (viewName === 'scanner') {
+      updateApiKeyUI();
+      updateModelTierUI();
+    }
     if (viewName === 'accounting') renderAccounting();
     if (viewName === 'invoices') renderInvoicesArchive();
     if (viewName === 'settings') {
       loadSettingsForm();
       updateApiKeyUI();
+      updateModelTierUI();
     }
 
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1455,9 +1460,24 @@ document.addEventListener('DOMContentLoaded', async () => {
   const scanModeMenuBtn = document.getElementById('scanModeMenuBtn');
   const scanModeTableBtn = document.getElementById('scanModeTableBtn');
 
+  function updateProcessBtnLabel() {
+    const processBtn = document.getElementById('btnProcessAI');
+    if (!processBtn) return;
+    const isPro = activeModelTier === 'pro';
+    const tierName = isPro ? 'Gemini Pro' : 'Gemini Flash';
+    const icon = isPro ? '⭐' : '✨';
+
+    if (activeScanMode === 'FACTURA') {
+      processBtn.innerHTML = `${icon} Analizar Factura con ${tierName}`;
+    } else if (activeScanMode === 'MENU_LISTA') {
+      processBtn.innerHTML = `${icon} Escanear Menú / Lista con ${tierName}`;
+    } else {
+      processBtn.innerHTML = `${icon} Analizar Tablita con ${tierName}`;
+    }
+  }
+
   function setScanMode(mode) {
     activeScanMode = mode;
-    const processBtn = document.getElementById('btnProcessAI');
     const inactiveCls = 'p-2.5 sm:p-3 rounded-xl border border-slate-700 bg-slate-800 text-slate-400 hover:text-slate-200 font-semibold text-xs sm:text-sm flex items-center justify-center gap-2 transition';
     const activeCls = 'p-2.5 sm:p-3 rounded-xl border border-blue-500 bg-blue-500/10 text-blue-400 font-semibold text-xs sm:text-sm flex items-center justify-center gap-2 transition';
 
@@ -1465,15 +1485,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (scanModeMenuBtn) scanModeMenuBtn.className = (mode === 'MENU_LISTA' ? activeCls : inactiveCls);
     if (scanModeTableBtn) scanModeTableBtn.className = (mode === 'TABLA_PRECIOS' ? activeCls : inactiveCls);
 
-    if (processBtn) {
-      if (mode === 'FACTURA') {
-        processBtn.innerHTML = '✨ Analizar Factura con Gemini Flash';
-      } else if (mode === 'MENU_LISTA') {
-        processBtn.innerHTML = '✨ Escanear Menú / Lista con Gemini Flash';
-      } else {
-        processBtn.innerHTML = '✨ Analizar Tablita de Precios con Gemini Flash';
-      }
-    }
+    updateProcessBtnLabel();
   }
 
   if (scanModeInvoiceBtn) scanModeInvoiceBtn.addEventListener('click', () => setScanMode('FACTURA'));
@@ -1799,14 +1811,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     const apiKey = await window.aiScanner.getApiKey();
     if (!apiKey) {
       await updateApiKeyUI();
+      await updateModelTierUI();
       openModal('modalGeminiApiKey');
-      showToast('Configura tu clave gratuita de Google Gemini para iniciar el escaneo con IA', 'info');
+      showToast('Configura tu clave de Google Gemini para iniciar el escaneo con IA', 'info');
       return;
     }
 
     const processBtn = document.getElementById('btnProcessAI');
     processBtn.disabled = true;
-    processBtn.innerHTML = '⏳ Extrayendo productos con Gemini Flash...';
+    const isPro = activeModelTier === 'pro';
+    processBtn.innerHTML = isPro
+      ? '⭐ Extrayendo productos con Gemini Pro...'
+      : '⏳ Extrayendo productos con Gemini Flash...';
 
     try {
       const result = await window.aiScanner.analyzeImage(activeCompressedPhoto.dataUrl, activeScanMode);
@@ -2643,6 +2659,84 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
+  // ----------------------------------------------------
+  // GESTIÓN REACTIVA DE NIVEL DE MODELO (FLASH vs PRO)
+  // ----------------------------------------------------
+  async function updateModelTierUI() {
+    if (!window.aiScanner || !window.aiScanner.getModelTier) return;
+    activeModelTier = await window.aiScanner.getModelTier();
+    const isPro = activeModelTier === 'pro';
+
+    // 1. Selector en vista Escáner
+    const scannerIcon = document.getElementById('scannerTierIcon');
+    if (scannerIcon) {
+      scannerIcon.textContent = isPro ? '⭐' : '⚡';
+      scannerIcon.className = `w-8 h-8 rounded-xl ${isPro ? 'bg-amber-500/20 text-amber-300' : 'bg-blue-500/10 text-blue-400'} flex items-center justify-center font-bold text-base flex-shrink-0`;
+    }
+
+    const scannerBadge = document.getElementById('scannerTierBadge');
+    if (scannerBadge) {
+      if (isPro) {
+        scannerBadge.className = 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30';
+        scannerBadge.textContent = '⭐ Gemini Pro (Clase Especial)';
+      } else {
+        scannerBadge.className = 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/20 text-blue-300 border border-blue-500/30';
+        scannerBadge.textContent = '⚡ Gemini Flash (Gratuito)';
+      }
+    }
+
+    const scannerHint = document.getElementById('scannerTierHint');
+    if (scannerHint) {
+      scannerHint.textContent = isPro
+        ? '⭐ Clase Especial activa: Máxima precisión, razonamiento avanzado y sin saturación'
+        : '⚡ Flash: Rápido y gratis • ⭐ Pro: Clase especial con máxima precisión';
+    }
+
+    // Botones de nivel en Escáner y Ajustes
+    document.querySelectorAll('.btn-model-tier').forEach(btn => {
+      const tier = btn.dataset.tier;
+      const isSelected = tier === activeModelTier;
+      if (isSelected) {
+        if (tier === 'pro') {
+          btn.className = 'btn-model-tier px-2.5 sm:px-3 py-1 rounded-lg text-xs font-bold transition bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow';
+        } else {
+          btn.className = 'btn-model-tier px-2.5 sm:px-3 py-1 rounded-lg text-xs font-bold transition bg-blue-600 text-white shadow';
+        }
+      } else {
+        btn.className = 'btn-model-tier px-2.5 sm:px-3 py-1 rounded-lg text-xs font-bold transition text-slate-400 hover:text-slate-200';
+      }
+    });
+
+    // 2. Descripción en Ajustes
+    const settingsDesc = document.getElementById('settingsTierDesc');
+    if (settingsDesc) {
+      settingsDesc.textContent = isPro ? '⭐ Gemini Pro (Clase Especial / Mayor Nivel)' : '⚡ Gemini Flash (100% Gratuito)';
+    }
+
+    // 3. Modal de Clave API
+    const modalBadge = document.getElementById('modalSelectedTierBadge');
+    if (modalBadge) {
+      modalBadge.textContent = isPro ? '⭐ Gemini Pro (Clase Especial)' : '⚡ Gemini Flash (Gratuito)';
+      modalBadge.className = `text-[11px] font-bold ${isPro ? 'text-amber-300' : 'text-blue-400'}`;
+    }
+
+    document.querySelectorAll('.btn-modal-tier').forEach(btn => {
+      const tier = btn.dataset.tier;
+      const isSelected = tier === activeModelTier;
+      if (isSelected) {
+        if (tier === 'pro') {
+          btn.className = 'btn-modal-tier p-2.5 rounded-xl border text-left transition bg-amber-500/15 border-amber-500/60 ring-2 ring-amber-500/30';
+        } else {
+          btn.className = 'btn-modal-tier p-2.5 rounded-xl border text-left transition bg-blue-500/15 border-blue-500/60 ring-2 ring-blue-500/30';
+        }
+      } else {
+        btn.className = 'btn-modal-tier p-2.5 rounded-xl border text-left transition bg-slate-900 border-slate-800 opacity-60 hover:opacity-100';
+      }
+    });
+
+    updateProcessBtnLabel();
+  }
+
   async function handleSaveApiKey(keyValue) {
     const cleanKey = (keyValue || '').trim();
     if (!cleanKey) {
@@ -2651,6 +2745,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     await window.aiScanner.setApiKey(cleanKey);
     await updateApiKeyUI();
+    await updateModelTierUI();
     showToast('¡Clave de Google Gemini guardada exitosamente!', 'success');
   }
 
@@ -2668,7 +2763,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     try {
-      showToast('Verificando conexión con Google Gemini Flash...', 'info');
+      const isPro = activeModelTier === 'pro';
+      showToast(isPro ? 'Verificando conexión con Google Gemini Pro...' : 'Verificando conexión con Google Gemini Flash...', 'info');
       const testRes = await window.aiScanner.testApiKey(key);
       showToast(`¡Conexión exitosa! Tu API Key de Gemini (${testRes.model}) es válida y está activa.`, 'success');
     } catch (err) {
@@ -2686,6 +2782,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (confirm('¿Estás seguro de que deseas eliminar la clave API de Gemini guardada? No podrás escanear con IA hasta que agregues una nueva.')) {
       await window.aiScanner.removeApiKey();
       await updateApiKeyUI();
+      await updateModelTierUI();
       showToast('Clave API eliminada correctamente', 'info');
     }
   }
@@ -2695,6 +2792,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (btnOpenApiKeyModalScanner) {
     btnOpenApiKeyModalScanner.addEventListener('click', () => {
       updateApiKeyUI();
+      updateModelTierUI();
       openModal('modalGeminiApiKey');
     });
   }
@@ -2703,6 +2801,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (btnOpenApiKeyGuideScanner) {
     btnOpenApiKeyGuideScanner.addEventListener('click', () => {
       updateApiKeyUI();
+      updateModelTierUI();
       openModal('modalGeminiApiKey');
     });
   }
@@ -2711,6 +2810,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (btnOpenApiKeyModalSettings) {
     btnOpenApiKeyModalSettings.addEventListener('click', () => {
       updateApiKeyUI();
+      updateModelTierUI();
       openModal('modalGeminiApiKey');
     });
   }
@@ -2782,6 +2882,35 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (btnRemoveSettingsKey) {
     btnRemoveSettingsKey.addEventListener('click', handleRemoveApiKey);
   }
+
+  // Selector de Nivel de Modelo (Flash vs Pro)
+  document.querySelectorAll('.btn-model-tier').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const tier = btn.dataset.tier;
+      if (!tier) return;
+      await window.aiScanner.setModelTier(tier);
+      await updateModelTierUI();
+      if (tier === 'pro') {
+        showToast('⭐ Nivel Gemini Pro (Clase Especial) activado', 'success');
+      } else {
+        showToast('⚡ Nivel Gemini Flash (Gratuito) activado', 'info');
+      }
+    });
+  });
+
+  document.querySelectorAll('.btn-modal-tier').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const tier = btn.dataset.tier;
+      if (!tier) return;
+      await window.aiScanner.setModelTier(tier);
+      await updateModelTierUI();
+      if (tier === 'pro') {
+        showToast('⭐ Nivel Gemini Pro (Clase Especial) seleccionado', 'success');
+      } else {
+        showToast('⚡ Nivel Gemini Flash (Gratuito) seleccionado', 'info');
+      }
+    });
+  });
 
   const btnDriveConnect = document.getElementById('btnDriveConnectGoogle');
   if (btnDriveConnect) {
@@ -3222,7 +3351,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // REGISTRO DE SERVICE WORKER (PWA)
   // ----------------------------------------------------
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js?v=15').then((reg) => {
+    navigator.serviceWorker.register('./sw.js?v=16').then((reg) => {
       console.log('Service Worker registrado con éxito:', reg.scope);
       reg.update();
     }).catch((err) => {
@@ -3241,8 +3370,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       .replace(/'/g, '&#039;');
   }
 
-  // Inicializar estado de API Key al cargar
+  // Inicializar estado de API Key y Nivel de Modelo al cargar
   updateApiKeyUI();
+  updateModelTierUI();
 
   // Soporte para accesos directos de Shortcut Manager / PWA Shortcuts
   const urlParams = new URLSearchParams(window.location.search);

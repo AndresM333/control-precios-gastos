@@ -12,7 +12,7 @@
   <link rel="manifest" href="./manifest.json">
   <link rel="icon" type="image/svg+xml" href="./icons/icon.svg">
   <link rel="apple-touch-icon" href="./icons/icon.svg">
-  <link rel="stylesheet" href="./css/styles.css?v=15">
+  <link rel="stylesheet" href="./css/styles.css?v=16">
   <!-- Tailwind Utilities (CDN for instant responsive styling) -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -210,7 +210,7 @@
       </div>
 
       <!-- Quick Status & Config Bar for Gemini API Key -->
-      <div class="max-w-2xl mx-auto mb-5 p-3 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-md">
+      <div class="max-w-2xl mx-auto mb-3 p-3 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-md">
         <div class="flex items-center gap-2.5 w-full sm:w-auto">
           <span class="w-8 h-8 rounded-xl bg-blue-500/10 text-blue-400 flex items-center justify-center flex-shrink-0 font-bold">🔑</span>
           <div class="min-w-0">
@@ -227,6 +227,28 @@
           </button>
           <button type="button" id="btnOpenApiKeyGuideScanner" class="btn btn-secondary btn-sm text-xs py-1.5 px-2.5 flex items-center gap-1 flex-shrink-0" title="Ver guía paso a paso para conseguirla gratis">
             <span>❓</span> Guía
+          </button>
+        </div>
+      </div>
+
+      <!-- Selector de Nivel de IA (Flash Gratuito vs Pro Clase Especial) -->
+      <div class="max-w-2xl mx-auto mb-5 p-2.5 rounded-2xl bg-slate-900/90 border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-2.5 shadow-md">
+        <div class="flex items-center gap-2.5 w-full sm:w-auto">
+          <span id="scannerTierIcon" class="w-8 h-8 rounded-xl bg-blue-500/10 text-blue-400 flex items-center justify-center font-bold text-base flex-shrink-0">⚡</span>
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-bold text-slate-200">Nivel de Inteligencia:</span>
+              <span id="scannerTierBadge" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/20 text-blue-300 border border-blue-500/30">⚡ Gemini Flash</span>
+            </div>
+            <p id="scannerTierHint" class="text-[11px] text-slate-400">⚡ Flash: Rápido y gratis • ⭐ Pro: Clase especial con máxima precisión</p>
+          </div>
+        </div>
+        <div class="inline-flex rounded-xl p-1 bg-slate-950 border border-slate-800 flex-shrink-0 w-full sm:w-auto justify-center">
+          <button type="button" class="btn-model-tier flex-1 sm:flex-none px-3 py-1 rounded-lg text-xs font-bold transition" data-tier="flash" title="Nivel Estándar Gratuito (Gemini Flash)">
+            ⚡ Flash (Gratis)
+          </button>
+          <button type="button" class="btn-model-tier flex-1 sm:flex-none px-3 py-1 rounded-lg text-xs font-bold transition" data-tier="pro" title="Clase Especial / Mayor Nivel (Gemini Pro)">
+            ⭐ Pro (Especial)
           </button>
         </div>
       </div>
@@ -588,9 +610,20 @@
                 Verificando...
               </span>
             </div>
-            <p class="text-xs text-slate-400 mb-4 leading-relaxed">
-              Google Gemini Flash (3.8 Flash) lee tickets arrugados, menús y listas. Es 100% gratuito mediante Google AI Studio y puedes cambiar o actualizar tu clave en cualquier momento.
+            <p class="text-xs text-slate-400 mb-3 leading-relaxed">
+              Google Gemini lee tickets arrugados, menús y listas. Puedes usar el nivel gratuito (Gemini Flash) o la clase especial de mayor nivel (Gemini Pro).
             </p>
+            <!-- Selector de Nivel en Ajustes -->
+            <div class="flex items-center justify-between p-2.5 mb-3 rounded-xl bg-slate-950/80 border border-slate-800">
+              <div class="text-xs">
+                <span class="font-bold text-slate-200 block">Nivel de Modelo</span>
+                <span id="settingsTierDesc" class="text-[11px] text-slate-400">⚡ Flash (Gratis)</span>
+              </div>
+              <div class="inline-flex rounded-xl p-0.5 bg-slate-900 border border-slate-800">
+                <button type="button" class="btn-model-tier px-2.5 py-1 rounded-lg text-xs font-bold transition" data-tier="flash">⚡ Flash</button>
+                <button type="button" class="btn-model-tier px-2.5 py-1 rounded-lg text-xs font-bold transition" data-tier="pro">⭐ Pro</button>
+              </div>
+            </div>
             <div class="form-group mb-3">
               <label class="form-label flex items-center justify-between">
                 <span>Clave API de Gemini:</span>
@@ -1257,6 +1290,28 @@
           </span>
         </div>
 
+        <!-- Selector de Nivel: Gratuito Flash vs Clase Especial Pro -->
+        <div class="form-group mb-1">
+          <label class="form-label flex items-center justify-between">
+            <span>Nivel de Modelo de Inteligencia Artificial:</span>
+            <span id="modalSelectedTierBadge" class="text-[11px] font-bold text-blue-400">⚡ Flash (Gratuito)</span>
+          </label>
+          <div class="grid grid-cols-2 gap-2">
+            <button type="button" class="btn-modal-tier p-2.5 rounded-xl border text-left transition" data-tier="flash">
+              <div class="flex items-center gap-1.5 font-bold text-xs text-slate-100">
+                <span>⚡</span> Gemini Flash
+              </div>
+              <p class="text-[10px] text-slate-400 mt-1">Nivel Gratuito. Rápido y sin costo con Google AI Studio.</p>
+            </button>
+            <button type="button" class="btn-modal-tier p-2.5 rounded-xl border text-left transition" data-tier="pro">
+              <div class="flex items-center gap-1.5 font-bold text-xs text-amber-300">
+                <span>⭐</span> Gemini Pro
+              </div>
+              <p class="text-[10px] text-slate-400 mt-1">Clase Especial / Mayor Nivel. Máxima potencia y prioridad sin saturación.</p>
+            </button>
+          </div>
+        </div>
+
         <!-- Form Input -->
         <div class="form-group mb-0">
           <label class="form-label flex items-center justify-between">
@@ -1525,16 +1580,16 @@
   <div id="toastContainer" class="toast-container"></div>
 
   <!-- Core Scripts -->
-  <script src="./js/db.js?v=15"></script>
-  <script src="./js/icons-library.js?v=15"></script>
-  <script src="./js/bcv.js?v=15"></script>
-  <script src="./js/image-compressor.js?v=15"></script>
-  <script src="./js/ai-scanner.js?v=15"></script>
-  <script src="./js/charts.js?v=15"></script>
-  <script src="./js/grocery-planner.js?v=15"></script>
-  <script src="./js/accounting.js?v=15"></script>
-  <script src="./js/backup-drive.js?v=15"></script>
-  <script src="./js/auth-groups.js?v=15"></script>
-  <script src="./js/app.js?v=15"></script>
+  <script src="./js/db.js?v=16"></script>
+  <script src="./js/icons-library.js?v=16"></script>
+  <script src="./js/bcv.js?v=16"></script>
+  <script src="./js/image-compressor.js?v=16"></script>
+  <script src="./js/ai-scanner.js?v=16"></script>
+  <script src="./js/charts.js?v=16"></script>
+  <script src="./js/grocery-planner.js?v=16"></script>
+  <script src="./js/accounting.js?v=16"></script>
+  <script src="./js/backup-drive.js?v=16"></script>
+  <script src="./js/auth-groups.js?v=16"></script>
+  <script src="./js/app.js?v=16"></script>
 </body>
 </html>

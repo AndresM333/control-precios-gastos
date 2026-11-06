@@ -1,7 +1,11 @@
-// Servicio de Escaneo Inteligente con IA (Google Gemini Flash)
+// Servicio de Escaneo Inteligente con IA (Google Gemini Flash & Gemini Pro)
 class AIScannerService {
   constructor() {
-    this.models = ['gemini-3.8-flash', 'gemini-2.5-flash', 'gemini-1.5-flash'];
+    this.modelTier = 'flash'; // 'flash' (Gratuito / Rápido) o 'pro' (Clase Especial / Mayor Nivel)
+    this.tierModels = {
+      flash: ['gemini-3.8-flash', 'gemini-2.5-flash', 'gemini-1.5-flash'],
+      pro: ['gemini-3.8-pro', 'gemini-2.5-pro', 'gemini-1.5-pro', 'gemini-pro']
+    };
     this.defaultModel = 'gemini-3.8-flash';
   }
 
@@ -17,10 +21,31 @@ class AIScannerService {
     return await window.db.setSetting('gemini_api_key', '');
   }
 
+  async getModelTier() {
+    const saved = await window.db.getSetting('gemini_model_tier', 'flash');
+    this.modelTier = saved === 'pro' ? 'pro' : 'flash';
+    return this.modelTier;
+  }
+
+  async setModelTier(tier) {
+    const validTier = tier === 'pro' ? 'pro' : 'flash';
+    this.modelTier = validTier;
+    await window.db.setSetting('gemini_model_tier', validTier);
+    this.defaultModel = this.tierModels[validTier][0];
+    return validTier;
+  }
+
+  async getCandidateModels() {
+    const tier = await this.getModelTier();
+    const primary = this.tierModels[tier] || this.tierModels.flash;
+    const fallback = tier === 'pro' ? this.tierModels.flash : this.tierModels.pro;
+    return Array.from(new Set([this.defaultModel, ...primary, ...fallback]));
+  }
+
   /**
    * Prueba una clave API contra el endpoint oficial de Gemini
    * @param {string|null} customKey - Clave opcional para probar antes de guardar
-   * @returns {Promise<{ok: boolean, model: string}>}
+   * @returns {Promise<{ok: boolean, model: string, tier: string}>}
    */
   async testApiKey(customKey = null) {
     const key = (customKey !== null ? customKey : await this.getApiKey() || '').trim();
@@ -28,7 +53,7 @@ class AIScannerService {
       throw new Error('No hay ninguna clave API ingresada para probar.');
     }
 
-    const candidateModels = Array.from(new Set([this.defaultModel, ...this.models]));
+    const candidateModels = await this.getCandidateModels();
     let lastError = null;
 
     for (const model of candidateModels) {
@@ -46,7 +71,11 @@ class AIScannerService {
             }
           } catch (e) {}
 
-          if (response.status === 404 || msg.includes('no longer available') || msg.includes('not found')) {
+          const isUnavailable = response.status === 404 || response.status === 503 || response.status === 429 ||
+            msg.includes('no longer available') || msg.includes('not found') ||
+            msg.includes('high demand') || msg.includes('overloaded');
+
+          if (isUnavailable) {
             lastError = new Error(msg);
             continue;
           }
@@ -55,10 +84,17 @@ class AIScannerService {
 
         const data = await response.json();
         this.defaultModel = model;
-        return { ok: true, model: data.displayName || data.name || model };
+        return {
+          ok: true,
+          model: data.displayName || data.name || model,
+          tier: this.modelTier
+        };
       } catch (err) {
         lastError = err;
-        if (err.message && (err.message.includes('no longer available') || err.message.includes('not found') || err.message.includes('404'))) {
+        const msg = err.message || '';
+        const isRetryable = msg.includes('no longer available') || msg.includes('not found') ||
+          msg.includes('404') || msg.includes('high demand') || msg.includes('503') || msg.includes('overloaded');
+        if (isRetryable) {
           continue;
         }
         throw err;
@@ -275,7 +311,7 @@ REGLAS CRÍTICAS:
       }
     };
 
-    const candidateModels = Array.from(new Set([this.defaultModel, ...this.models]));
+    const candidateModels = await this.getCandidateModels();
     let lastError = null;
 
     for (const modelName of candidateModels) {
@@ -298,9 +334,14 @@ REGLAS CRÍTICAS:
             }
           } catch (e) {}
 
-          // Si el modelo específico ya no está disponible o da 404, intentar con el siguiente modelo moderno
-          if (response.status === 404 || msg.includes('no longer available') || msg.includes('not found')) {
-            console.warn(`Modelo ${modelName} no disponible (${msg}), probando siguiente modelo de respaldo...`);
+          // Si el modelo específico ya no está disponible, da 404, o tiene alta demanda temporal (503 / 429),
+          // intentar automáticamente con el siguiente modelo de la lista para evitar fallos al usuario
+          const isRetryable = response.status === 404 || response.status === 503 || response.status === 429 ||
+            msg.includes('no longer available') || msg.includes('not found') ||
+            msg.includes('high demand') || msg.includes('overloaded');
+
+          if (isRetryable) {
+            console.warn(`Modelo ${modelName} con alta demanda o no disponible (${msg}), probando siguiente modelo de respaldo...`);
             lastError = new Error(msg);
             continue;
           }
@@ -331,7 +372,10 @@ REGLAS CRÍTICAS:
         return parsedResult;
       } catch (err) {
         lastError = err;
-        if (err.message && (err.message.includes('no longer available') || err.message.includes('not found') || err.message.includes('404'))) {
+        const msg = err.message || '';
+        const isRetryable = msg.includes('no longer available') || msg.includes('not found') ||
+          msg.includes('404') || msg.includes('high demand') || msg.includes('503') || msg.includes('429') || msg.includes('overloaded');
+        if (isRetryable) {
           continue;
         }
         throw err;
