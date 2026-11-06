@@ -364,25 +364,86 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('inviteMemberSection').style.display = isOwner ? 'block' : 'none';
     document.getElementById('deleteGroupSection').classList.toggle('hidden', !isOwner);
 
-    // Listar miembros
+    // Listar miembros y sus permisos
     const membersList = document.getElementById('groupMembersList');
     membersList.innerHTML = (activeWs.members || []).map(m => {
       const isAdmin = m.toLowerCase() === activeWs.owner_email.toLowerCase();
       const canRemove = isOwner && !isAdmin;
+      const perms = window.authGroups.getMemberPermissions(activeWs.id, m);
+
       return `
-        <div class="flex items-center justify-between p-2 rounded-lg bg-slate-800/60 border border-slate-700/60 text-xs">
-          <div class="flex items-center gap-2">
-            <span>👤</span>
-            <span class="font-medium text-slate-200">${escapeHtml(m)}</span>
-            <span class="px-1.5 py-0.5 rounded text-[10px] font-bold ${isAdmin ? 'bg-amber-500/20 text-amber-300' : 'bg-slate-700 text-slate-300'}">
-              ${isAdmin ? '👑 Admin' : 'Miembro'}
-            </span>
+        <div class="p-3.5 rounded-xl bg-slate-800/80 border border-slate-700/70 text-xs space-y-2.5">
+          <div class="flex items-center justify-between gap-2">
+            <div class="flex items-center gap-2 min-w-0">
+              <span class="text-base flex-shrink-0">${isAdmin ? '👑' : '👤'}</span>
+              <div class="truncate">
+                <span class="font-bold text-slate-100 block truncate">${escapeHtml(m)}</span>
+                <span class="text-[10px] font-semibold ${isAdmin ? 'text-amber-400' : 'text-slate-400'}">
+                  ${isAdmin ? '👑 Administrador Principal' : 'Miembro del Grupo'}
+                </span>
+              </div>
+            </div>
+            ${canRemove ? `
+              <button class="btn btn-outline-danger btn-sm text-[10px] py-1 px-2.5 btn-remove-member flex-shrink-0" data-email="${escapeHtml(m)}">
+                Expulsar
+              </button>
+            ` : ''}
           </div>
-          ${canRemove ? `
-            <button class="btn btn-outline-danger btn-sm text-[10px] py-0.5 px-2 btn-remove-member" data-email="${escapeHtml(m)}">
-              Expulsar
-            </button>
-          ` : ''}
+
+          <!-- Permisos del Miembro -->
+          ${isAdmin ? `
+            <div class="bg-amber-500/10 border border-amber-500/20 rounded-lg p-2 text-[11px] text-amber-300 flex items-center gap-2">
+              <span>🛡️</span>
+              <span>Control total: Administra miembros, catálogo, carros de compra y valoraciones.</span>
+            </div>
+          ` : `
+            <div class="pt-2.5 border-t border-slate-700/60 space-y-2">
+              <div class="flex items-center justify-between text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                <span>Permisos de este Miembro</span>
+                <span>${isOwner ? '⚡ Haz clic para activar o revocar' : '🔒 Solo editable por Admin'}</span>
+              </div>
+
+              <!-- Permiso 1: Catálogo -->
+              <label class="flex items-center gap-2.5 p-2 rounded-lg bg-slate-900/60 border border-slate-800 ${isOwner ? 'cursor-pointer hover:border-slate-700 transition' : 'opacity-85'}">
+                <input type="checkbox" class="perm-checkbox w-4 h-4 rounded text-blue-500 border-slate-700 bg-slate-800 focus:ring-0 ${!isOwner ? 'pointer-events-none' : ''}"
+                  data-email="${escapeHtml(m)}" data-perm="can_manage_catalog" ${perms.can_manage_catalog ? 'checked' : ''} ${!isOwner ? 'disabled' : ''}>
+                <div class="min-w-0 flex-1">
+                  <div class="font-bold text-slate-200 text-xs flex items-center gap-1.5">
+                    <span>📦</span>
+                    <span>Gestionar Catálogo</span>
+                  </div>
+                  <div class="text-[10px] text-slate-400">Poder agregar, eliminar o editar productos y tiendas existentes.</div>
+                </div>
+              </label>
+
+              <!-- Permiso 2: Carro de compras -->
+              <label class="flex items-center gap-2.5 p-2 rounded-lg bg-slate-900/60 border border-slate-800 ${isOwner ? 'cursor-pointer hover:border-slate-700 transition' : 'opacity-85'}">
+                <input type="checkbox" class="perm-checkbox w-4 h-4 rounded text-blue-500 border-slate-700 bg-slate-800 focus:ring-0 ${!isOwner ? 'pointer-events-none' : ''}"
+                  data-email="${escapeHtml(m)}" data-perm="can_manage_cart" ${perms.can_manage_cart ? 'checked' : ''} ${!isOwner ? 'disabled' : ''}>
+                <div class="min-w-0 flex-1">
+                  <div class="font-bold text-slate-200 text-xs flex items-center gap-1.5">
+                    <span>🛒</span>
+                    <span>Carro de Mercado</span>
+                  </div>
+                  <div class="text-[10px] text-slate-400">Poder agregar o quitar productos del carro de compras.</div>
+                </div>
+              </label>
+
+              <!-- Permiso 3: Votar sobre la calidad del producto -->
+              <label class="flex items-center gap-2.5 p-2 rounded-lg bg-slate-900/60 border border-slate-800 ${isOwner ? 'cursor-pointer hover:border-slate-700 transition' : 'opacity-85'}">
+                <input type="checkbox" class="perm-checkbox w-4 h-4 rounded text-amber-500 border-slate-700 bg-slate-800 focus:ring-0 ${!isOwner ? 'pointer-events-none' : ''}"
+                  data-email="${escapeHtml(m)}" data-perm="can_rate_products" ${perms.can_rate_products ? 'checked' : ''} ${!isOwner ? 'disabled' : ''}>
+                <div class="min-w-0 flex-1">
+                  <div class="font-bold text-slate-200 text-xs flex items-center gap-1.5">
+                    <span>⭐</span>
+                    <span>Votar Calidad del Producto</span>
+                    <span class="text-[9px] px-1 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-semibold">Activo por defecto</span>
+                  </div>
+                  <div class="text-[10px] text-slate-400">Calificar calidad con estrellas (1 a 5). Desmarca si deseas quitarle el permiso de votar.</div>
+                </div>
+              </label>
+            </div>
+          `}
         </div>
       `;
     }).join('');
@@ -402,6 +463,30 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
       });
     });
+
+    // Listeners para modificar permisos de miembros (Solo si es Administrador)
+    if (isOwner) {
+      membersList.querySelectorAll('.perm-checkbox').forEach(cb => {
+        cb.addEventListener('change', async (e) => {
+          const email = e.target.dataset.email;
+          const permKey = e.target.dataset.perm;
+          const isChecked = e.target.checked;
+          const permLabels = {
+            can_manage_catalog: 'Gestión de catálogo',
+            can_manage_cart: 'Modificar carro de mercado',
+            can_rate_products: 'Votar calidad de productos'
+          };
+          try {
+            await window.authGroups.updateMemberPermission(activeWs.id, email, permKey, isChecked);
+            const statusText = isChecked ? 'concedido' : 'revocado';
+            showToast(`Permiso "${permLabels[permKey]}" ${statusText} para ${email}`, isChecked ? 'success' : 'info');
+          } catch (err) {
+            e.target.checked = !isChecked; // revertir en caso de error
+            showToast(err.message, 'error');
+          }
+        });
+      });
+    }
 
     openModal('modalManageGroup');
   }
@@ -925,6 +1010,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Attach listeners in modal
     container.querySelectorAll('.store-modal-stars .star').forEach(star => {
       star.addEventListener('click', async () => {
+        if (!window.authGroups.hasPermission('can_rate_products')) {
+          showToast('⚠️ El administrador ha desactivado tu permiso para calificar la calidad de los productos.', 'error');
+          return;
+        }
         const prodId = parseInt(star.dataset.prodId);
         const rating = parseInt(star.dataset.rating);
         const prod = await window.db.getById('products', prodId);
@@ -963,6 +1052,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('storeModalFilterInput').addEventListener('input', renderStoreModalProductsList);
 
   document.getElementById('btnStoreModalAddProduct').addEventListener('click', async () => {
+    if (!window.authGroups.hasPermission('can_manage_catalog')) {
+      showToast('⚠️ No tienes permiso para agregar productos en este grupo.', 'error');
+      return;
+    }
     if (!currentModalStoreId) return;
     await populateStoreSelect('inputProductStoreId', currentModalStoreId);
     document.getElementById('modalProductTitle').textContent = 'Nuevo Producto';
@@ -1082,6 +1175,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.querySelectorAll('.btn-edit-store').forEach(btn => {
       btn.addEventListener('click', async (e) => {
         e.stopPropagation();
+        if (!window.authGroups.hasPermission('can_manage_catalog')) {
+          showToast('⚠️ No tienes permiso para editar tiendas en este grupo.', 'error');
+          return;
+        }
         const store = await window.db.getById('stores', parseInt(btn.dataset.id));
         if (store) {
           document.getElementById('modalStoreTitle').textContent = 'Editar Tienda';
@@ -1100,6 +1197,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.querySelectorAll('.btn-delete-store').forEach(btn => {
       btn.addEventListener('click', async (e) => {
         e.stopPropagation();
+        if (!window.authGroups.hasPermission('can_manage_catalog')) {
+          showToast('⚠️ No tienes permiso para eliminar tiendas en este grupo.', 'error');
+          return;
+        }
         if (confirm('¿Eliminar esta tienda y todos sus productos registrados?')) {
           await window.db.deleteStore(parseInt(btn.dataset.id));
           showToast('Tienda eliminada', 'info');
@@ -1112,6 +1213,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('storeSearchInput').addEventListener('input', renderStores);
 
   document.getElementById('btnNewStore').addEventListener('click', () => {
+    if (!window.authGroups.hasPermission('can_manage_catalog')) {
+      showToast('⚠️ No tienes permiso para registrar nuevas tiendas en este grupo.', 'error');
+      return;
+    }
     document.getElementById('modalStoreTitle').textContent = 'Nueva Tienda';
     document.getElementById('formStore').reset();
     document.getElementById('inputStoreId').value = '';
@@ -1121,6 +1226,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   document.getElementById('formStore').addEventListener('submit', async (e) => {
     e.preventDefault();
+    if (!window.authGroups.hasPermission('can_manage_catalog')) {
+      showToast('⚠️ No tienes permiso para agregar o editar tiendas en este grupo.', 'error');
+      return;
+    }
     const id = document.getElementById('inputStoreId').value;
     const name = document.getElementById('inputStoreName').value.trim();
     let mapsUrl = document.getElementById('inputStoreMapsUrl').value.trim();
@@ -1279,6 +1388,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Attach click listener on stars to update rating directly (SHARED rating sync)
     document.querySelectorAll('.card-stars .star').forEach(star => {
       star.addEventListener('click', async () => {
+        if (!window.authGroups.hasPermission('can_rate_products')) {
+          showToast('⚠️ El administrador ha desactivado tu permiso para calificar la calidad de los productos.', 'error');
+          return;
+        }
         const prodId = parseInt(star.dataset.prodId);
         const rating = parseInt(star.dataset.rating);
         const prod = await window.db.getById('products', prodId);
@@ -1318,6 +1431,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Edit Product
     document.querySelectorAll('.btn-edit-product').forEach(btn => {
       btn.addEventListener('click', async () => {
+        if (!window.authGroups.hasPermission('can_manage_catalog')) {
+          showToast('⚠️ No tienes permiso para editar productos en este grupo.', 'error');
+          return;
+        }
         const prod = await window.db.getById('products', parseInt(btn.dataset.id));
         if (prod) {
           await populateStoreSelect('inputProductStoreId', prod.store_id);
@@ -1338,6 +1455,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Delete Product
     document.querySelectorAll('.btn-delete-product').forEach(btn => {
       btn.addEventListener('click', async () => {
+        if (!window.authGroups.hasPermission('can_manage_catalog')) {
+          showToast('⚠️ No tienes permiso para eliminar productos en este grupo.', 'error');
+          return;
+        }
         if (confirm('¿Eliminar este producto y su historial de precios?')) {
           await window.db.deleteProduct(parseInt(btn.dataset.id));
           showToast('Producto eliminado', 'info');
@@ -1361,11 +1482,19 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   document.querySelectorAll('#productModalRatingStars .star').forEach(star => {
     star.addEventListener('click', () => {
+      if (!window.authGroups.hasPermission('can_rate_products')) {
+        showToast('⚠️ El administrador ha desactivado tu permiso para calificar la calidad de los productos.', 'error');
+        return;
+      }
       setModalRatingStars(parseInt(star.dataset.val));
     });
   });
 
   document.getElementById('btnClearProductRating').addEventListener('click', () => {
+    if (!window.authGroups.hasPermission('can_rate_products')) {
+      showToast('⚠️ El administrador ha desactivado tu permiso para calificar la calidad de los productos.', 'error');
+      return;
+    }
     setModalRatingStars(0);
   });
 
@@ -1409,6 +1538,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('inputProductCurrency').addEventListener('change', updateProductPriceHint);
 
   document.getElementById('btnNewProduct').addEventListener('click', async () => {
+    if (!window.authGroups.hasPermission('can_manage_catalog')) {
+      showToast('⚠️ No tienes permiso para agregar productos en este grupo.', 'error');
+      return;
+    }
     const stores = await window.db.getStores();
     if (stores.length === 0) {
       showToast('Debes crear al menos una tienda antes de registrar productos', 'error');
@@ -1428,6 +1561,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   document.getElementById('formProduct').addEventListener('submit', async (e) => {
     e.preventDefault();
+    if (!window.authGroups.hasPermission('can_manage_catalog')) {
+      showToast('⚠️ No tienes permiso para agregar o editar productos en este grupo.', 'error');
+      return;
+    }
     const id = document.getElementById('inputProductId').value;
     const storeId = parseInt(document.getElementById('inputProductStoreId').value);
     const name = document.getElementById('inputProductName').value.trim();
@@ -1929,6 +2066,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Confirmar y Guardar Registro Múltiple en BD
   document.getElementById('btnConfirmScan').addEventListener('click', async () => {
     if (!activeExtractionData) return;
+    if (!window.authGroups.hasPermission('can_manage_catalog')) {
+      showToast('⚠️ No tienes permiso para agregar productos en este grupo.', 'error');
+      return;
+    }
 
     const selectedProducts = scannedItems.filter(item => item.selected && item.name.trim().length > 0);
     if (selectedProducts.length === 0) {
@@ -2072,6 +2213,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Attach listeners on catalog add buttons
     catalogContainer.querySelectorAll('.btn-planner-add-item').forEach(btn => {
       btn.addEventListener('click', () => {
+        if (!window.authGroups.hasPermission('can_manage_cart')) {
+          showToast('⚠️ No tienes permiso para agregar productos al carro de compras en este grupo.', 'error');
+          return;
+        }
         const name = btn.dataset.name;
         const current = plannerCart.get(name) || 0;
         plannerCart.set(name, current + 1);
@@ -2176,6 +2321,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Attach listeners on cart buttons
     cartContainer.querySelectorAll('.btn-cart-plus').forEach(btn => {
       btn.addEventListener('click', () => {
+        if (!window.authGroups.hasPermission('can_manage_cart')) {
+          showToast('⚠️ No tienes permiso para modificar el carro de compras en este grupo.', 'error');
+          return;
+        }
         const name = btn.dataset.name;
         const current = plannerCart.get(name) || 0;
         plannerCart.set(name, current + 1);
@@ -2186,6 +2335,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     cartContainer.querySelectorAll('.btn-cart-minus').forEach(btn => {
       btn.addEventListener('click', () => {
+        if (!window.authGroups.hasPermission('can_manage_cart')) {
+          showToast('⚠️ No tienes permiso para modificar el carro de compras en este grupo.', 'error');
+          return;
+        }
         const name = btn.dataset.name;
         const current = plannerCart.get(name) || 0;
         if (current <= 1) {
@@ -2299,6 +2452,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   document.getElementById('btnClearPlannerCart').addEventListener('click', () => {
+    if (!window.authGroups.hasPermission('can_manage_cart')) {
+      showToast('⚠️ No tienes permiso para vaciar el carro de compras en este grupo.', 'error');
+      return;
+    }
     plannerCart.clear();
     renderPlannerCart();
     loadPlannerProductList();
@@ -3086,6 +3243,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   const btnResetClean = document.getElementById('btnResetCleanInstall');
   if (btnResetClean) {
     btnResetClean.addEventListener('click', async () => {
+      if (!window.authGroups.hasPermission('can_manage_catalog')) {
+        showToast('⚠️ No tienes permiso para vaciar o modificar el catálogo en este grupo.', 'error');
+        return;
+      }
       const ok = confirm('¿Deseas vaciar todas las tiendas y productos para dejar la aplicación 100% limpia y sin datos de prueba?');
       if (!ok) return;
       await window.db.clearAllPersonalData();
@@ -3099,6 +3260,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   const btnLoadDemo = document.getElementById('btnLoadDemoData');
   if (btnLoadDemo) {
     btnLoadDemo.addEventListener('click', async () => {
+      if (!window.authGroups.hasPermission('can_manage_catalog')) {
+        showToast('⚠️ No tienes permiso para cargar datos de prueba en este grupo.', 'error');
+        return;
+      }
       await window.db.setSetting('app_clean_install', false);
       await window.db.seedInitialDataIfEmpty(window.bcvService.rate);
       await renderStores();
@@ -3377,7 +3542,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // REGISTRO DE SERVICE WORKER (PWA)
   // ----------------------------------------------------
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js?v=21').then((reg) => {
+    navigator.serviceWorker.register('./sw.js?v=22').then((reg) => {
       console.log('Service Worker registrado con éxito:', reg.scope);
       reg.update();
     }).catch((err) => {

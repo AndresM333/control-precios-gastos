@@ -120,7 +120,8 @@ class AuthGroupsService {
       name: group.name,
       owner_email: group.owner_email,
       isOwner,
-      members: group.members || []
+      members: group.members || [],
+      member_permissions: group.member_permissions || {}
     });
   }
 
@@ -161,11 +162,19 @@ class AuthGroupsService {
     const groupId = 'grp_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
     const now = new Date().toISOString();
 
+    const owner = this.currentUser.email.toLowerCase();
     const newGroup = {
       id: groupId,
       name: cleanName,
-      owner_email: this.currentUser.email.toLowerCase(),
-      members: [this.currentUser.email.toLowerCase()],
+      owner_email: owner,
+      members: [owner],
+      member_permissions: {
+        [owner]: {
+          can_manage_catalog: true,
+          can_manage_cart: true,
+          can_rate_products: true
+        }
+      },
       created_at: now,
       updated_at: now
     };
@@ -178,7 +187,8 @@ class AuthGroupsService {
 
   /**
    * Invita a una persona al grupo usando EXCLUSIVAMENTE su correo de Gmail
-   * Solo el Admin (owner) puede ejecutar esta acción
+   * Solo el Admin (owner) puede ejecutar esta acción.
+   * Por defecto se configuran todos los permisos activos (incluyendo calificar productos).
    */
   async inviteMember(groupId, emailToInvite) {
     if (!this.currentUser) {
@@ -210,6 +220,15 @@ class AuthGroupsService {
 
     members.push(cleanEmail);
     group.members = members;
+
+    // Inicializar permisos por defecto para el nuevo miembro (votar calidad activo por defecto)
+    group.member_permissions = group.member_permissions || {};
+    group.member_permissions[cleanEmail] = {
+      can_manage_catalog: true,
+      can_manage_cart: true,
+      can_rate_products: true
+    };
+
     group.updated_at = new Date().toISOString();
 
     await window.db.saveGroup(group);
@@ -236,12 +255,132 @@ class AuthGroupsService {
     }
 
     group.members = (group.members || []).filter(m => m.toLowerCase() !== cleanEmail);
+    if (group.member_permissions && group.member_permissions[cleanEmail]) {
+      delete group.member_permissions[cleanEmail];
+    }
     group.updated_at = new Date().toISOString();
 
     await window.db.saveGroup(group);
     await this.refreshUserGroups();
     this.notify();
     return group;
+  }
+
+  // --- Sistema Granular de Permisos por Miembro ---
+
+  /**
+   * Obtiene los permisos vigentes para un miembro dentro de un grupo:
+   * 1. Espacio Personal: siempre tiene todos los permisos (true).
+   * 2. Administrador del grupo: siempre tiene todos los permisos (true) y control total.
+   * 3. Miembros:
+   *    - can_manage_catalog: boolean (default true)
+   *    - can_manage_cart: boolean (default true)
+   *    - can_rate_products: boolean (default true; cualquier miembro puede votar por defecto, pero el admin puede revocarlo)
+   */
+  getMemberPermissions(groupId, memberEmail) {
+    if (!groupId || groupId === 'personal') {
+      return {
+        can_manage_catalog: true,
+        can_manage_cart: true,
+        can_rate_products: true,
+        isAdmin: true
+      };
+    }
+
+    const group = this.groups.find(g => g.id === groupId);
+    const cleanEmail = (memberEmail || '').toLowerCase().trim();
+    const ownerEmail = (group ? group.owner_email : '').toLowerCase().trim();
+
+    if (cleanEmail === ownerEmail) {
+      return {
+        can_manage_catalog: true,
+        can_manage_cart: true,
+        can_rate_products: true,
+        isAdmin: true
+      };
+    }
+
+    const memberPerms = (group && group.member_permissions && group.member_permissions[cleanEmail]) || {};
+    return {
+      can_manage_catalog: memberPerms.can_manage_catalog !== false,
+      can_manage_cart: memberPerms.can_manage_cart !== false,
+      can_rate_products: memberPerms.can_rate_products !== false,
+      isAdmin: false
+    };
+  }
+
+  /**
+   * Actualiza un permiso específico para un miembro del grupo.
+   * Solo el Administrador (owner_email) tiene permisos para modificarlo.
+   */
+  async updateMemberPermission(groupId, memberEmail, permissionKey, value) {
+    if (!this.currentUser) {
+      throw new Error('Debes estar autenticado para modificar permisos.');
+    }
+
+    const group = await window.db.getGroupById(groupId);
+    if (!group) {
+      throw new Error('Grupo no encontrado.');
+    }
+
+    if (group.owner_email.toLowerCase() !== this.currentUser.email.toLowerCase()) {
+      throw new Error('Solo el Administrador del grupo puede modificar los permisos de los miembros.');
+    }
+
+    const cleanEmail = (memberEmail || '').toLowerCase().trim();
+    if (cleanEmail === group.owner_email.toLowerCase()) {
+      throw new Error('No se pueden modificar los permisos del Administrador (posee control total).');
+    }
+
+    const validKeys = ['can_manage_catalog', 'can_manage_cart', 'can_rate_products'];
+    if (!validKeys.includes(permissionKey)) {
+      throw new Error(`Permiso inválido: "${permissionKey}".`);
+    }
+
+    group.member_permissions = group.member_permissions || {};
+    const existing = group.member_permissions[cleanEmail] || {
+      can_manage_catalog: true,
+      can_manage_cart: true,
+      can_rate_products: true
+    };
+
+    existing[permissionKey] = !!value;
+    group.member_permissions[cleanEmail] = existing;
+    group.updated_at = new Date().toISOString();
+
+    await window.db.saveGroup(group);
+    await this.refreshUserGroups();
+
+    // Sincronizar activeWorkspace si es el grupo activo
+    if (this.activeWorkspace && this.activeWorkspace.id === groupId) {
+      this.activeWorkspace.member_permissions = group.member_permissions;
+    }
+
+    this.notify();
+    return group;
+  }
+
+  /**
+   * Valida si el usuario actual tiene un permiso en el espacio de trabajo activo
+   */
+  hasPermission(permissionKey) {
+    if (!this.activeWorkspace || this.activeWorkspace.type === 'PERSONAL') {
+      return true; // En espacio personal siempre tiene todos los permisos
+    }
+
+    if (!this.currentUser) {
+      return false; // Sin usuario no tiene permisos en grupos
+    }
+
+    const userEmail = this.currentUser.email.toLowerCase().trim();
+    const ownerEmail = (this.activeWorkspace.owner_email || '').toLowerCase().trim();
+
+    if (userEmail === ownerEmail) {
+      return true; // Administrador del grupo siempre tiene todos los permisos
+    }
+
+    const perms = this.getMemberPermissions(this.activeWorkspace.id, userEmail);
+    return perms[permissionKey] === true;
   }
 
   // --- MOTOR DE CLONACIÓN: Copiar del Grupo a mi Espacio Personal ---
