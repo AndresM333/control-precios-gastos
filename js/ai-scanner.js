@@ -12,6 +12,40 @@ class AIScannerService {
     return await window.db.setSetting('gemini_api_key', key.trim());
   }
 
+  async removeApiKey() {
+    return await window.db.setSetting('gemini_api_key', '');
+  }
+
+  /**
+   * Prueba una clave API contra el endpoint oficial de Gemini
+   * @param {string|null} customKey - Clave opcional para probar antes de guardar
+   * @returns {Promise<{ok: boolean, model: string}>}
+   */
+  async testApiKey(customKey = null) {
+    const key = (customKey !== null ? customKey : await this.getApiKey() || '').trim();
+    if (!key) {
+      throw new Error('No hay ninguna clave API ingresada para probar.');
+    }
+
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${this.defaultModel}?key=${encodeURIComponent(key)}`;
+    const response = await fetch(endpoint, { method: 'GET' });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      let msg = `Error (${response.status}): Clave no válida o sin permisos`;
+      try {
+        const errObj = JSON.parse(errText);
+        if (errObj.error && errObj.error.message) {
+          msg = errObj.error.message;
+        }
+      } catch (e) {}
+      throw new Error(msg);
+    }
+
+    const data = await response.json();
+    return { ok: true, model: data.displayName || data.name || this.defaultModel };
+  }
+
   /**
    * Deduce el icono temático de producto más apropiado según el nombre y sugerencia
    * @param {string} name 

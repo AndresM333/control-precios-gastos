@@ -77,9 +77,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (viewName === 'stores') renderStores();
     if (viewName === 'products') renderProducts();
     if (viewName === 'planner') loadPlannerProductList();
+    if (viewName === 'scanner') updateApiKeyUI();
     if (viewName === 'accounting') renderAccounting();
     if (viewName === 'invoices') renderInvoicesArchive();
-    if (viewName === 'settings') loadSettingsForm();
+    if (viewName === 'settings') {
+      loadSettingsForm();
+      updateApiKeyUI();
+    }
 
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
@@ -1643,15 +1647,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const apiKey = await window.aiScanner.getApiKey();
     if (!apiKey) {
-      const enteredKey = prompt(
-        'Ingresa tu clave gratuita de Google Gemini (AI Studio).\nPuedes obtenerla gratis en aistudio.google.com/app/apikey:'
-      );
-      if (enteredKey && enteredKey.trim().length > 10) {
-        await window.aiScanner.setApiKey(enteredKey.trim());
-      } else {
-        showToast('Se requiere una clave API para analizar con IA.', 'error');
-        return;
-      }
+      await updateApiKeyUI();
+      openModal('modalGeminiApiKey');
+      showToast('Configura tu clave gratuita de Google Gemini para iniciar el escaneo con IA', 'info');
+      return;
     }
 
     const processBtn = document.getElementById('btnProcessAI');
@@ -2374,11 +2373,209 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  document.getElementById('btnSaveGeminiKey').addEventListener('click', async () => {
-    const key = document.getElementById('inputGeminiApiKey').value.trim();
-    await window.aiScanner.setApiKey(key);
-    showToast('Clave de Gemini guardada correctamente', 'success');
-  });
+  // ----------------------------------------------------
+  // GESTIÓN REACTIVA DE CLAVE API GEMINI & GUÍA
+  // ----------------------------------------------------
+  async function updateApiKeyUI() {
+    const key = (await window.aiScanner.getApiKey() || '').trim();
+    const hasKey = key.length > 5;
+    const masked = hasKey ? `${key.slice(0, 6)}...${key.slice(-4)}` : '';
+
+    // 1. Badge en la vista Escáner
+    const scannerBadge = document.getElementById('scannerApiKeyBadge');
+    if (scannerBadge) {
+      if (hasKey) {
+        scannerBadge.className = 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30';
+        scannerBadge.textContent = `🟢 Activa (${masked})`;
+      } else {
+        scannerBadge.className = 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30';
+        scannerBadge.textContent = '⚠️ No configurada';
+      }
+    }
+
+    // 2. Badge & Preview en la vista Ajustes
+    const settingsBadge = document.getElementById('settingsApiKeyBadge');
+    if (settingsBadge) {
+      if (hasKey) {
+        settingsBadge.className = 'px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30';
+        settingsBadge.textContent = '🟢 Activa';
+      } else {
+        settingsBadge.className = 'px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30';
+        settingsBadge.textContent = '🟠 Sin configurar';
+      }
+    }
+
+    const settingsPreview = document.getElementById('settingsApiKeyPreview');
+    if (settingsPreview) {
+      settingsPreview.textContent = hasKey ? `Configurada (${masked})` : 'Sin configurar';
+    }
+
+    const settingsInput = document.getElementById('inputGeminiApiKey');
+    if (settingsInput) {
+      settingsInput.value = key;
+    }
+
+    // 3. Elementos en el Modal
+    const modalDot = document.getElementById('modalApiKeyStatusDot');
+    const modalText = document.getElementById('modalApiKeyStatusText');
+    const modalBadge = document.getElementById('modalApiKeyStatusBadge');
+    const modalInput = document.getElementById('modalInputGeminiApiKey');
+
+    if (modalDot) modalDot.className = `w-2.5 h-2.5 rounded-full ${hasKey ? 'bg-emerald-400' : 'bg-amber-400'} flex-shrink-0`;
+    if (modalText) modalText.textContent = hasKey ? `Clave Activa: ${masked}` : 'Sin clave configurada';
+    if (modalBadge) {
+      if (hasKey) {
+        modalBadge.className = 'px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex-shrink-0';
+        modalBadge.textContent = '🟢 Lista para Escaneo';
+      } else {
+        modalBadge.className = 'px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 flex-shrink-0';
+        modalBadge.textContent = '🟠 Se requiere clave';
+      }
+    }
+    if (modalInput) {
+      modalInput.value = key;
+    }
+  }
+
+  async function handleSaveApiKey(keyValue) {
+    const cleanKey = (keyValue || '').trim();
+    if (!cleanKey) {
+      showToast('Por favor ingresa una clave API válida de Gemini (inicia con AIzaSy...)', 'error');
+      return;
+    }
+    await window.aiScanner.setApiKey(cleanKey);
+    await updateApiKeyUI();
+    showToast('¡Clave de Google Gemini guardada exitosamente!', 'success');
+  }
+
+  async function handleTestApiKey(keyValue, btnElement) {
+    const key = (keyValue || await window.aiScanner.getApiKey() || '').trim();
+    if (!key) {
+      showToast('Primero ingresa o guarda una clave API para poder probarla', 'error');
+      return;
+    }
+
+    const originalText = btnElement ? btnElement.innerHTML : '';
+    if (btnElement) {
+      btnElement.disabled = true;
+      btnElement.innerHTML = '⏳ Conectando...';
+    }
+
+    try {
+      showToast('Verificando conexión con Google Gemini Flash...', 'info');
+      const testRes = await window.aiScanner.testApiKey(key);
+      showToast(`¡Conexión exitosa! Tu API Key de Gemini (${testRes.model}) es válida y está activa.`, 'success');
+    } catch (err) {
+      console.error(err);
+      showToast('Error de conexión: ' + err.message, 'error');
+    } finally {
+      if (btnElement) {
+        btnElement.disabled = false;
+        btnElement.innerHTML = originalText;
+      }
+    }
+  }
+
+  async function handleRemoveApiKey() {
+    if (confirm('¿Estás seguro de que deseas eliminar la clave API de Gemini guardada? No podrás escanear con IA hasta que agregues una nueva.')) {
+      await window.aiScanner.removeApiKey();
+      await updateApiKeyUI();
+      showToast('Clave API eliminada correctamente', 'info');
+    }
+  }
+
+  // Botones de Abrir Modal de Clave & Guía
+  const btnOpenApiKeyModalScanner = document.getElementById('btnOpenApiKeyModalScanner');
+  if (btnOpenApiKeyModalScanner) {
+    btnOpenApiKeyModalScanner.addEventListener('click', () => {
+      updateApiKeyUI();
+      openModal('modalGeminiApiKey');
+    });
+  }
+
+  const btnOpenApiKeyGuideScanner = document.getElementById('btnOpenApiKeyGuideScanner');
+  if (btnOpenApiKeyGuideScanner) {
+    btnOpenApiKeyGuideScanner.addEventListener('click', () => {
+      updateApiKeyUI();
+      openModal('modalGeminiApiKey');
+    });
+  }
+
+  const btnOpenApiKeyModalSettings = document.getElementById('btnOpenApiKeyModalSettings');
+  if (btnOpenApiKeyModalSettings) {
+    btnOpenApiKeyModalSettings.addEventListener('click', () => {
+      updateApiKeyUI();
+      openModal('modalGeminiApiKey');
+    });
+  }
+
+  // Toggles de visibilidad (Mostrar / Ocultar con ojo)
+  const btnToggleModalApiKeyVis = document.getElementById('btnToggleModalApiKeyVis');
+  if (btnToggleModalApiKeyVis) {
+    btnToggleModalApiKeyVis.addEventListener('click', () => {
+      const input = document.getElementById('modalInputGeminiApiKey');
+      if (input) {
+        input.type = input.type === 'password' ? 'text' : 'password';
+        btnToggleModalApiKeyVis.textContent = input.type === 'password' ? '👁️' : '🙈';
+      }
+    });
+  }
+
+  const btnToggleSettingsApiKeyVis = document.getElementById('btnToggleApiKeyVisibilitySettings');
+  if (btnToggleSettingsApiKeyVis) {
+    btnToggleSettingsApiKeyVis.addEventListener('click', () => {
+      const input = document.getElementById('inputGeminiApiKey');
+      if (input) {
+        input.type = input.type === 'password' ? 'text' : 'password';
+        btnToggleSettingsApiKeyVis.textContent = input.type === 'password' ? '👁️' : '🙈';
+      }
+    });
+  }
+
+  // Botones de Guardar Clave
+  const btnSaveModalApiKey = document.getElementById('btnSaveModalApiKey');
+  if (btnSaveModalApiKey) {
+    btnSaveModalApiKey.addEventListener('click', async () => {
+      const val = document.getElementById('modalInputGeminiApiKey').value;
+      await handleSaveApiKey(val);
+    });
+  }
+
+  const btnSaveSettingsKey = document.getElementById('btnSaveGeminiKey');
+  if (btnSaveSettingsKey) {
+    btnSaveSettingsKey.addEventListener('click', async () => {
+      const val = document.getElementById('inputGeminiApiKey').value;
+      await handleSaveApiKey(val);
+    });
+  }
+
+  // Botones de Probar Conexión
+  const btnTestModalApiKey = document.getElementById('btnTestModalApiKey');
+  if (btnTestModalApiKey) {
+    btnTestModalApiKey.addEventListener('click', () => {
+      const val = document.getElementById('modalInputGeminiApiKey').value;
+      handleTestApiKey(val, btnTestModalApiKey);
+    });
+  }
+
+  const btnTestSettingsKey = document.getElementById('btnTestGeminiKeySettings');
+  if (btnTestSettingsKey) {
+    btnTestSettingsKey.addEventListener('click', () => {
+      const val = document.getElementById('inputGeminiApiKey').value;
+      handleTestApiKey(val, btnTestSettingsKey);
+    });
+  }
+
+  // Botones de Eliminar Clave
+  const btnDeleteModalApiKey = document.getElementById('btnDeleteModalApiKey');
+  if (btnDeleteModalApiKey) {
+    btnDeleteModalApiKey.addEventListener('click', handleRemoveApiKey);
+  }
+
+  const btnRemoveSettingsKey = document.getElementById('btnRemoveGeminiKeySettings');
+  if (btnRemoveSettingsKey) {
+    btnRemoveSettingsKey.addEventListener('click', handleRemoveApiKey);
+  }
 
   const btnDriveConnect = document.getElementById('btnDriveConnectGoogle');
   if (btnDriveConnect) {
@@ -2819,7 +3016,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // REGISTRO DE SERVICE WORKER (PWA)
   // ----------------------------------------------------
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js?v=12').then((reg) => {
+    navigator.serviceWorker.register('./sw.js?v=13').then((reg) => {
       console.log('Service Worker registrado con éxito:', reg.scope);
       reg.update();
     }).catch((err) => {
@@ -2837,6 +3034,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#039;');
   }
+
+  // Inicializar estado de API Key al cargar
+  updateApiKeyUI();
 
   // Soporte para accesos directos de Shortcut Manager / PWA Shortcuts
   const urlParams = new URLSearchParams(window.location.search);

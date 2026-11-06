@@ -12,7 +12,7 @@
   <link rel="manifest" href="./manifest.json">
   <link rel="icon" type="image/svg+xml" href="./icons/icon.svg">
   <link rel="apple-touch-icon" href="./icons/icon.svg">
-  <link rel="stylesheet" href="./css/styles.css?v=12">
+  <link rel="stylesheet" href="./css/styles.css?v=13">
   <!-- Tailwind Utilities (CDN for instant responsive styling) -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -190,6 +190,28 @@
         <div>
           <h2 class="section-title">Escanear con IA</h2>
           <p class="section-desc">Toma una foto a tu factura o lista de precios. La IA extraerá los productos, actualizará precios y registrará el gasto.</p>
+        </div>
+      </div>
+
+      <!-- Quick Status & Config Bar for Gemini API Key -->
+      <div class="max-w-2xl mx-auto mb-5 p-3 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-md">
+        <div class="flex items-center gap-2.5 w-full sm:w-auto">
+          <span class="w-8 h-8 rounded-xl bg-blue-500/10 text-blue-400 flex items-center justify-center flex-shrink-0 font-bold">🔑</span>
+          <div class="min-w-0">
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-bold text-slate-200">Clave API de Gemini</span>
+              <span id="scannerApiKeyBadge" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">Cargando...</span>
+            </div>
+            <p class="text-[11px] text-slate-400 truncate">Requerida para extraer datos con IA (100% gratuita)</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
+          <button type="button" id="btnOpenApiKeyModalScanner" class="btn btn-secondary btn-sm text-xs py-1.5 px-3 flex items-center gap-1.5 w-full sm:w-auto justify-center">
+            <span>⚙️</span> Cambiar Clave
+          </button>
+          <button type="button" id="btnOpenApiKeyGuideScanner" class="btn btn-secondary btn-sm text-xs py-1.5 px-2.5 flex items-center gap-1 flex-shrink-0" title="Ver guía paso a paso para conseguirla gratis">
+            <span>❓</span> Guía
+          </button>
         </div>
       </div>
 
@@ -529,23 +551,48 @@
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <!-- Card 1: IA Google Gemini Flash -->
-        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5">
-          <div class="flex items-center gap-2 mb-3">
-            <span class="text-xl">✨</span>
-            <h3 class="font-bold text-slate-100 text-sm">IA para Facturas (Google Gemini Flash)</h3>
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between mb-3">
+              <div class="flex items-center gap-2">
+                <span class="text-xl">✨</span>
+                <h3 class="font-bold text-slate-100 text-sm">IA de Facturas y Menús (Gemini Flash)</h3>
+              </div>
+              <span id="settingsApiKeyBadge" class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                Verificando...
+              </span>
+            </div>
+            <p class="text-xs text-slate-400 mb-4 leading-relaxed">
+              Google Gemini 2.0 Flash lee tickets arrugados, menús y listas. Es 100% gratuito mediante Google AI Studio y puedes cambiar o actualizar tu clave en cualquier momento.
+            </p>
+            <div class="form-group mb-3">
+              <label class="form-label flex items-center justify-between">
+                <span>Clave API de Gemini:</span>
+                <span id="settingsApiKeyPreview" class="text-[11px] text-slate-400 font-normal">Sin configurar</span>
+              </label>
+              <div class="relative flex items-center">
+                <input type="password" id="inputGeminiApiKey" class="form-input pr-10 font-mono text-xs" placeholder="AIzaSy...">
+                <button type="button" id="btnToggleApiKeyVisibilitySettings" class="absolute right-2.5 p-1 text-slate-400 hover:text-slate-200 transition" title="Mostrar/Ocultar clave">
+                  👁️
+                </button>
+              </div>
+            </div>
+            <div class="flex flex-wrap items-center gap-2 mb-3">
+              <button type="button" id="btnSaveGeminiKey" class="btn btn-primary btn-sm flex-1 sm:flex-none">
+                💾 Guardar Clave
+              </button>
+              <button type="button" id="btnTestGeminiKeySettings" class="btn btn-secondary btn-sm flex-1 sm:flex-none">
+                🧪 Probar Conexión
+              </button>
+              <button type="button" id="btnRemoveGeminiKeySettings" class="btn btn-secondary btn-sm text-red-400 hover:bg-red-500/10 flex-shrink-0" title="Eliminar clave actual">
+                🗑️
+              </button>
+            </div>
           </div>
-          <p class="text-xs text-slate-400 mb-4">
-            Gemini Flash es 100% gratuito vía Google AI Studio. Lee tickets arrugados, tablas y productos de forma limpia.
-          </p>
-          <div class="form-group mb-3">
-            <label class="form-label">Clave API de Gemini:</label>
-            <input type="password" id="inputGeminiApiKey" class="form-input" placeholder="AIzaSy...">
-          </div>
-          <div class="flex items-center justify-between">
-            <a href="https://aistudio.google.com/app/apikey" target="_blank" class="text-xs text-blue-400 hover:underline">
-              Obtener clave gratuita en Google AI Studio ↗
-            </a>
-            <button id="btnSaveGeminiKey" class="btn btn-primary btn-sm">Guardar Clave</button>
+          <div class="pt-3 border-t border-slate-800 flex items-center justify-between">
+            <button type="button" id="btnOpenApiKeyModalSettings" class="text-xs text-blue-400 hover:underline flex items-center gap-1.5 font-semibold">
+              <span>📖</span> Guía Paso a Paso para conseguir la clave gratis ↗
+            </button>
           </div>
         </div>
 
@@ -1147,6 +1194,126 @@
     </div>
   </div>
 
+  <!-- MODAL: GESTIÓN DE CLAVE API GEMINI & GUÍA PASO A PASO -->
+  <div id="modalGeminiApiKey" class="modal-overlay">
+    <div class="modal-content max-w-lg">
+      <div class="modal-header">
+        <div class="flex items-center gap-2">
+          <span class="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-400 flex items-center justify-center font-bold text-base">🔑</span>
+          <div>
+            <h3 class="modal-title text-base sm:text-lg">Clave API de Google Gemini</h3>
+            <p class="text-[11px] text-slate-400">Agrégala o cámbiala en cualquier momento (100% gratuita)</p>
+          </div>
+        </div>
+        <button class="modal-close" data-modal="modalGeminiApiKey">&times;</button>
+      </div>
+
+      <div class="modal-body space-y-4">
+        <!-- Status Banner -->
+        <div id="modalApiKeyStatusBanner" class="p-3 rounded-xl border flex items-center justify-between text-xs bg-slate-800/60 border-slate-700/60">
+          <div class="flex items-center gap-2 truncate">
+            <span id="modalApiKeyStatusDot" class="w-2.5 h-2.5 rounded-full bg-amber-400 flex-shrink-0"></span>
+            <span id="modalApiKeyStatusText" class="font-bold text-slate-200 truncate">Verificando estado...</span>
+          </div>
+          <span id="modalApiKeyStatusBadge" class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 flex-shrink-0">
+            Pendiente
+          </span>
+        </div>
+
+        <!-- Form Input -->
+        <div class="form-group mb-0">
+          <label class="form-label flex items-center justify-between">
+            <span>Tu Clave API de Google Gemini:</span>
+            <span class="text-[11px] text-slate-400 font-normal">Empieza con AIzaSy...</span>
+          </label>
+          <div class="relative flex items-center">
+            <input type="password" id="modalInputGeminiApiKey" class="form-input pr-10 font-mono text-xs" placeholder="Pega aquí tu clave AIzaSy...">
+            <button type="button" id="btnToggleModalApiKeyVis" class="absolute right-2.5 p-1 text-slate-400 hover:text-slate-200 transition" title="Mostrar/Ocultar clave">
+              👁️
+            </button>
+          </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
+          <button type="button" id="btnSaveModalApiKey" class="btn btn-primary btn-sm flex items-center justify-center gap-1.5 font-bold">
+            <span>💾</span> Guardar Clave
+          </button>
+          <button type="button" id="btnTestModalApiKey" class="btn btn-secondary btn-sm flex items-center justify-center gap-1.5">
+            <span>🧪</span> Probar Conexión
+          </button>
+          <button type="button" id="btnDeleteModalApiKey" class="btn btn-secondary btn-sm text-red-400 hover:bg-red-500/10 hover:border-red-500/30 flex items-center justify-center gap-1.5" title="Eliminar clave guardada">
+            <span>🗑️</span> Quitar Clave
+          </button>
+        </div>
+
+        <!-- Guía Paso a Paso para Conseguir la Clave Gratis -->
+        <div class="border-t border-slate-800 pt-3">
+          <div class="flex items-center justify-between mb-2.5">
+            <h4 class="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+              <span>📖</span> Guía: Cómo conseguir tu Clave GRATIS
+            </h4>
+            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+              100% Gratuito
+            </span>
+          </div>
+
+          <!-- Direct Link Button -->
+          <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" class="mb-3 w-full p-2.5 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/40 text-blue-300 font-bold text-xs flex items-center justify-center gap-2 transition shadow-sm">
+            <span>🔗</span> Abrir Google AI Studio (aistudio.google.com/app/apikey) ↗
+          </a>
+
+          <!-- Step Cards -->
+          <div class="space-y-2 text-xs text-slate-300">
+            <div class="p-2.5 rounded-xl bg-slate-800/40 border border-slate-800 flex items-start gap-2.5">
+              <span class="w-5 h-5 rounded-full bg-blue-500/20 text-blue-400 font-bold flex items-center justify-center text-[11px] flex-shrink-0 mt-0.5">1</span>
+              <div>
+                <strong class="text-slate-100 block">Entra con tu cuenta de Google</strong>
+                <p class="text-[11px] text-slate-400">Abre el enlace de Google AI Studio e inicia sesión con cualquier cuenta de Gmail o Google.</p>
+              </div>
+            </div>
+
+            <div class="p-2.5 rounded-xl bg-slate-800/40 border border-slate-800 flex items-start gap-2.5">
+              <span class="w-5 h-5 rounded-full bg-blue-500/20 text-blue-400 font-bold flex items-center justify-center text-[11px] flex-shrink-0 mt-0.5">2</span>
+              <div>
+                <strong class="text-slate-100 block">Haz clic en "Create API key" (Crear clave)</strong>
+                <p class="text-[11px] text-slate-400">En la parte superior verás el botón azul para crear tu clave de API.</p>
+              </div>
+            </div>
+
+            <div class="p-2.5 rounded-xl bg-slate-800/40 border border-slate-800 flex items-start gap-2.5">
+              <span class="w-5 h-5 rounded-full bg-blue-500/20 text-blue-400 font-bold flex items-center justify-center text-[11px] flex-shrink-0 mt-0.5">3</span>
+              <div>
+                <strong class="text-slate-100 block">Elige un proyecto</strong>
+                <p class="text-[11px] text-slate-400">Selecciona la opción <em>"Create API key in new project"</em> (o uno existente) y confirma.</p>
+              </div>
+            </div>
+
+            <div class="p-2.5 rounded-xl bg-slate-800/40 border border-slate-800 flex items-start gap-2.5">
+              <span class="w-5 h-5 rounded-full bg-blue-500/20 text-blue-400 font-bold flex items-center justify-center text-[11px] flex-shrink-0 mt-0.5">4</span>
+              <div>
+                <strong class="text-slate-100 block">Copia la clave generada y pégala aquí</strong>
+                <p class="text-[11px] text-slate-400">Copia el texto que empieza con <code>AIzaSy...</code>, pégalo en el recuadro superior y presiona <strong>Guardar Clave</strong>.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Callout Note -->
+          <div class="mt-3 p-2.5 rounded-xl bg-slate-950/60 border border-slate-800 text-[11px] text-slate-400 flex items-start gap-2">
+            <span class="text-amber-400 mt-0.5 flex-shrink-0">💡</span>
+            <div>
+              <strong class="text-slate-300">Totalmente Gratuito:</strong> Google otorga 15 peticiones por minuto y 1.500 al día gratis con Gemini 2.0 Flash. No requiere ingresar tarjetas de crédito y tu clave se guarda únicamente en tu dispositivo de forma privada.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm w-full sm:w-auto" data-modal="modalGeminiApiKey">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
   <!-- MODAL: LOGIN EXCLUSIVO CON GOOGLE OFICIAL -->
   <div id="modalGoogleLogin" class="modal-overlay">
     <div class="modal-content max-w-sm">
@@ -1321,16 +1488,16 @@
   <div id="toastContainer" class="toast-container"></div>
 
   <!-- Core Scripts -->
-  <script src="./js/db.js?v=12"></script>
-  <script src="./js/icons-library.js?v=12"></script>
-  <script src="./js/bcv.js?v=12"></script>
-  <script src="./js/image-compressor.js?v=12"></script>
-  <script src="./js/ai-scanner.js?v=12"></script>
-  <script src="./js/charts.js?v=12"></script>
-  <script src="./js/grocery-planner.js?v=12"></script>
-  <script src="./js/accounting.js?v=12"></script>
-  <script src="./js/backup-drive.js?v=12"></script>
-  <script src="./js/auth-groups.js?v=12"></script>
-  <script src="./js/app.js?v=12"></script>
+  <script src="./js/db.js?v=13"></script>
+  <script src="./js/icons-library.js?v=13"></script>
+  <script src="./js/bcv.js?v=13"></script>
+  <script src="./js/image-compressor.js?v=13"></script>
+  <script src="./js/ai-scanner.js?v=13"></script>
+  <script src="./js/charts.js?v=13"></script>
+  <script src="./js/grocery-planner.js?v=13"></script>
+  <script src="./js/accounting.js?v=13"></script>
+  <script src="./js/backup-drive.js?v=13"></script>
+  <script src="./js/auth-groups.js?v=13"></script>
+  <script src="./js/app.js?v=13"></script>
 </body>
 </html>
