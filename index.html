@@ -12,7 +12,7 @@
   <link rel="manifest" href="./manifest.json">
   <link rel="icon" type="image/svg+xml" href="./icons/icon.svg">
   <link rel="apple-touch-icon" href="./icons/icon.svg">
-  <link rel="stylesheet" href="./css/styles.css?v=26">
+  <link rel="stylesheet" href="./css/styles.css?v=27">
   <!-- Tailwind Utilities (CDN for instant responsive styling) -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -125,16 +125,17 @@
   </header>
 
   <!-- Banner Informativo de Grupo Activo -->
-  <div id="groupActiveBanner" class="hidden bg-gradient-to-r from-blue-950 via-slate-900 to-indigo-950 border-b border-blue-500/30 px-4 py-2.5 text-xs text-blue-200 flex flex-wrap items-center justify-between gap-2 shadow-inner">
-    <div class="flex items-center gap-2">
-      <span class="text-base">👥</span>
-      <span>Viendo grupo: <strong id="groupBannerName" class="text-white font-bold">Familia</strong> • <span id="groupBannerRole" class="px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300 font-semibold text-[10px]">Miembro</span></span>
+  <div id="groupActiveBanner" class="hidden bg-gradient-to-r from-blue-950 via-slate-900 to-indigo-950 border-b border-blue-500/30 px-3 py-2 text-xs text-blue-200 flex flex-wrap items-center justify-between gap-2 shadow-inner w-full max-w-full overflow-hidden box-border">
+    <div class="flex items-center gap-2 min-w-0">
+      <span class="text-base flex-shrink-0">👥</span>
+      <span class="truncate">Viendo grupo: <strong id="groupBannerName" class="text-white font-bold">Familia</strong> • <span id="groupBannerRole" class="px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300 font-semibold text-[10px]">Miembro</span></span>
     </div>
-    <div class="flex items-center gap-2">
-      <button id="btnBannerCopyAll" class="btn btn-primary btn-sm text-xs py-1 px-3 shadow-md shadow-blue-500/20">
-        📥 Copiar biblioteca del grupo a mi espacio personal
+    <div class="flex items-center gap-1.5 flex-wrap sm:flex-nowrap">
+      <button id="btnBannerCopyAll" class="btn btn-primary btn-sm text-xs py-1 px-2.5 shadow-md shadow-blue-500/20 whitespace-normal text-left">
+        <span class="hidden sm:inline">📥 Copiar biblioteca del grupo a mi espacio personal</span>
+        <span class="inline sm:hidden">📥 Copiar al personal</span>
       </button>
-      <button id="btnBannerManageGroup" class="btn btn-secondary btn-sm text-xs py-1 px-2.5">
+      <button id="btnBannerManageGroup" class="btn btn-secondary btn-sm text-xs py-1 px-2">
         ⚙️ Miembros
       </button>
     </div>
@@ -432,7 +433,7 @@
         </div>
       </div>
 
-      <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 planner-main-grid">
         <!-- Col 1: Catálogo Disponible con botón + (4 cols) -->
         <div class="lg:col-span-4 bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col h-full">
           <div class="flex items-center justify-between mb-3">
@@ -560,7 +561,7 @@
       </div>
 
       <!-- Financial Metric Cards -->
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6 accounting-stats-grid">
         <div class="stat-card">
           <span class="stat-label">Total Gastado (USD)</span>
           <span id="statTotalUSD" class="stat-value text-blue-400">$ 0.00</span>
@@ -612,7 +613,7 @@
         </div>
       </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6 settings-grid">
         <!-- Card 1: IA Google Gemini Flash -->
         <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between">
           <div>
@@ -1720,16 +1721,16 @@
   <div id="toastContainer" class="toast-container"></div>
 
   <!-- Core Scripts -->
-  <script src="./js/db.js?v=26"></script>
-  <script src="./js/icons-library.js?v=26"></script>
-  <script src="./js/bcv.js?v=26"></script>
-  <script src="./js/image-compressor.js?v=26"></script>
-  <script src="./js/ai-scanner.js?v=26"></script>
-  <script src="./js/charts.js?v=26"></script>
-  <script src="./js/grocery-planner.js?v=26"></script>
-  <script src="./js/accounting.js?v=26"></script>
-  <script src="./js/backup-drive.js?v=26"></script>
-  <script src="./js/auth-groups.js?v=26"></script>
-  <script src="./js/app.js?v=26"></script>
+  <script src="./js/db.js?v=27"></script>
+  <script src="./js/icons-library.js?v=27"></script>
+  <script src="./js/bcv.js?v=27"></script>
+  <script src="./js/image-compressor.js?v=27"></script>
+  <script src="./js/ai-scanner.js?v=27"></script>
+  <script src="./js/charts.js?v=27"></script>
+  <script src="./js/grocery-planner.js?v=27"></script>
+  <script src="./js/accounting.js?v=27"></script>
+  <script src="./js/backup-drive.js?v=27"></script>
+  <script src="./js/auth-groups.js?v=27"></script>
+  <script src="./js/app.js?v=27"></script>
 </body>
 </html>

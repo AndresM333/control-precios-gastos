@@ -983,19 +983,19 @@ document.addEventListener('DOMContentLoaded', async () => {
       }).join('');
 
       return `
-        <div class="p-3 bg-slate-900/80 rounded-xl border border-slate-800 flex items-center justify-between gap-3 hover:border-slate-700 transition">
-          <div class="flex items-center gap-3 min-w-0">
+        <div class="p-3 bg-slate-900/80 rounded-xl border border-slate-800 flex items-center justify-between gap-2.5 hover:border-slate-700 transition min-w-0 w-full">
+          <div class="flex items-center gap-2.5 min-w-0 flex-1">
             ${mediaHtml}
-            <div class="truncate">
+            <div class="min-w-0 flex-1 truncate">
               <h4 class="font-bold text-slate-100 text-xs truncate">${escapeHtml(p.name)}</h4>
-              <div class="flex items-center gap-2 mt-0.5">
+              <div class="flex items-center gap-2 mt-0.5 whitespace-nowrap">
                 <span class="text-xs font-black text-slate-200">${priceFormatted.primary}</span>
                 <span class="text-[10px] font-semibold ${priceFormatted.isVes ? 'text-blue-400' : 'text-emerald-400'}">${priceFormatted.secondary}</span>
               </div>
             </div>
           </div>
 
-          <div class="flex items-center gap-2 flex-shrink-0">
+          <div class="flex items-center gap-1.5 flex-shrink-0 ml-auto">
             <div class="star-rating store-modal-stars scale-90">
               ${starsHtml}
             </div>
@@ -1102,12 +1102,12 @@ document.addEventListener('DOMContentLoaded', async () => {
       return `
         <div class="app-card cursor-pointer hover:border-blue-500/60 transition group store-card" data-store-id="${store.id}">
           <div>
-            <div class="card-header items-center gap-3">
-              <div class="flex items-center gap-3 min-w-0">
+            <div class="card-header items-center gap-2.5 min-w-0">
+              <div class="flex items-center gap-2.5 min-w-0 flex-1">
                 ${mediaHtml}
-                <div class="min-w-0">
-                  <h3 class="card-title text-base group-hover:text-blue-400 transition truncate">${escapeHtml(store.name)}</h3>
-                  <span class="card-badge mt-1">${storeProducts.length} productos</span>
+                <div class="min-w-0 flex-1">
+                  <h3 class="card-title text-sm sm:text-base group-hover:text-blue-400 transition truncate">${escapeHtml(store.name)}</h3>
+                  <span class="card-badge mt-0.5 inline-block text-[10px] sm:text-xs">${storeProducts.length} productos</span>
                 </div>
               </div>
             </div>
@@ -1118,22 +1118,22 @@ document.addEventListener('DOMContentLoaded', async () => {
           </div>
           
           <div class="card-footer mt-3" onclick="event.stopPropagation();">
-            <div class="flex items-center gap-1.5 flex-wrap">
-              <a href="${mapsLink}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm text-blue-400" onclick="event.stopPropagation();">
+            <div class="flex items-center gap-1.5 flex-wrap min-w-0">
+              <a href="${mapsLink}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm text-xs py-1 px-2.5 text-blue-400" onclick="event.stopPropagation();">
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                 Maps
               </a>
               ${isGroup ? `
-                <button class="btn btn-primary btn-sm btn-copy-store-personal" data-id="${store.id}" title="Copiar tienda y sus productos a mi espacio personal" onclick="event.stopPropagation();">
+                <button class="btn btn-primary btn-sm text-xs py-1 px-2.5 btn-copy-store-personal" data-id="${store.id}" title="Copiar tienda y sus productos a mi espacio personal" onclick="event.stopPropagation();">
                   📥 A Personal
                 </button>
               ` : ''}
             </div>
-            <div class="flex items-center gap-1.5" onclick="event.stopPropagation();">
-              <button class="btn btn-secondary btn-sm btn-edit-store" data-id="${store.id}" title="Editar tienda" onclick="event.stopPropagation();">
+            <div class="flex items-center gap-1.5 flex-shrink-0 ml-auto" onclick="event.stopPropagation();">
+              <button class="btn btn-secondary btn-sm text-xs py-1 px-2 btn-edit-store" data-id="${store.id}" title="Editar tienda" onclick="event.stopPropagation();">
                 ✏️
               </button>
-              <button class="btn btn-outline-danger btn-sm btn-delete-store" data-id="${store.id}" title="Eliminar tienda" onclick="event.stopPropagation();">
+              <button class="btn btn-outline-danger btn-sm text-xs py-1 px-2 btn-delete-store" data-id="${store.id}" title="Eliminar tienda" onclick="event.stopPropagation();">
                 🗑️
               </button>
             </div>
@@ -1354,18 +1354,18 @@ document.addEventListener('DOMContentLoaded', async () => {
       return `
         <div class="app-card">
           <div>
-            <div class="card-header items-center gap-3">
-              <div class="flex items-center gap-3 min-w-0">
+            <div class="card-header items-center gap-2 min-w-0">
+              <div class="flex items-center gap-2.5 min-w-0 flex-1">
                 ${mediaHtml}
-                <div class="min-w-0">
+                <div class="min-w-0 flex-1">
                   <span class="text-[11px] font-semibold text-blue-400 block truncate">${escapeHtml(store.name)}</span>
-                  <h3 class="card-title text-base mt-0.5 truncate">${escapeHtml(prod.name)}</h3>
+                  <h3 class="card-title text-sm sm:text-base mt-0.5 truncate">${escapeHtml(prod.name)}</h3>
                 </div>
               </div>
               <!-- Price Badge according to selected display currency -->
-              <div class="text-right flex-shrink-0">
-                <span class="text-base font-extrabold text-slate-100 block">${priceFormatted.primary}</span>
-                <span class="text-[11px] font-semibold ${priceFormatted.isVes ? 'text-blue-400' : 'text-emerald-400'}">${priceFormatted.secondary}</span>
+              <div class="text-right flex-shrink-0 pl-1">
+                <span class="text-sm sm:text-base font-extrabold text-slate-100 block whitespace-nowrap">${priceFormatted.primary}</span>
+                <span class="text-[10px] sm:text-[11px] font-semibold whitespace-nowrap ${priceFormatted.isVes ? 'text-blue-400' : 'text-emerald-400'}">${priceFormatted.secondary}</span>
               </div>
             </div>
 
@@ -1381,19 +1381,19 @@ document.addEventListener('DOMContentLoaded', async () => {
           </div>
 
           <div class="card-footer mt-3">
-            <div class="flex items-center gap-1.5 flex-wrap">
-              <button class="btn btn-secondary btn-sm btn-view-chart" data-id="${prod.id}" title="Ver historial de precios y gráfica porcentual">
+            <div class="flex items-center gap-1.5 flex-wrap min-w-0">
+              <button class="btn btn-secondary btn-sm text-xs py-1 px-2.5 btn-view-chart" data-id="${prod.id}" title="Ver historial de precios y gráfica porcentual">
                 📈 Gráfica & %
               </button>
               ${isGroup ? `
-                <button class="btn btn-primary btn-sm btn-copy-prod-personal" data-id="${prod.id}" title="Copiar producto a mi espacio personal">
+                <button class="btn btn-primary btn-sm text-xs py-1 px-2.5 btn-copy-prod-personal" data-id="${prod.id}" title="Copiar producto a mi espacio personal">
                   📥 A Personal
                 </button>
               ` : ''}
             </div>
-            <div class="flex items-center gap-1.5">
-              <button class="btn btn-secondary btn-sm btn-edit-product" data-id="${prod.id}">✏️</button>
-              <button class="btn btn-outline-danger btn-sm btn-delete-product" data-id="${prod.id}">🗑️</button>
+            <div class="flex items-center gap-1.5 flex-shrink-0 ml-auto">
+              <button class="btn btn-secondary btn-sm text-xs py-1 px-2 btn-edit-product" data-id="${prod.id}" title="Editar producto">✏️</button>
+              <button class="btn btn-outline-danger btn-sm text-xs py-1 px-2 btn-delete-product" data-id="${prod.id}" title="Eliminar producto">🗑️</button>
             </div>
           </div>
         </div>
@@ -2300,10 +2300,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         const priceInfo = prod ? formatDisplayPrice(priceUsd) : null;
 
         return `
-          <div class="flex items-center justify-between p-2 rounded-xl bg-slate-800/40 hover:bg-slate-800 border border-slate-800/60 transition gap-2">
-            <div class="flex items-center gap-2.5 min-w-0">
+          <div class="flex items-center justify-between p-2 rounded-xl bg-slate-800/40 hover:bg-slate-800 border border-slate-800/60 transition gap-2 min-w-0 w-full">
+            <div class="flex items-center gap-2.5 min-w-0 flex-1">
               ${mediaHtml}
-              <div class="truncate">
+              <div class="min-w-0 flex-1 truncate">
                 <span class="text-xs font-semibold text-slate-200 block truncate">${escapeHtml(name)}</span>
                 <div class="flex items-center gap-1.5 text-[10px]">
                   ${priceInfo ? `<span class="text-slate-300 font-bold">${priceInfo.primary}</span>` : ''}
@@ -4181,7 +4181,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // REGISTRO DE SERVICE WORKER (PWA)
   // ----------------------------------------------------
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js?v=26').then((reg) => {
+    navigator.serviceWorker.register('./sw.js?v=27').then((reg) => {
       console.log('Service Worker registrado con éxito:', reg.scope);
       reg.update();
     }).catch((err) => {
