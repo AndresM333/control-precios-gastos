@@ -12,7 +12,7 @@
   <link rel="manifest" href="./manifest.json">
   <link rel="icon" type="image/svg+xml" href="./icons/icon.svg">
   <link rel="apple-touch-icon" href="./icons/icon.svg">
-  <link rel="stylesheet" href="./css/styles.css?v=27">
+  <link rel="stylesheet" href="./css/styles.css?v=28">
   <!-- Tailwind Utilities (CDN for instant responsive styling) -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -1032,7 +1032,31 @@
         </div>
         <div class="form-group">
           <label class="form-label">Nombre del Producto *</label>
-          <input type="text" id="inputProductName" class="form-input" required placeholder="Ej: Harina PAN 1kg, Arroz Mary 1kg">
+          <input type="text" id="inputProductName" class="form-input" required placeholder="Ej: Harina PAN, Arroz Mary, Refresco Cola">
+        </div>
+        <!-- Atributos Opcionales: Cantidad / Combo, Peso y Volumen -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+          <div class="form-group">
+            <label class="form-label flex items-center justify-between">
+              <span>⚡ Cantidad / Pack</span>
+              <span class="text-[10px] text-slate-500 font-normal">Opcional</span>
+            </label>
+            <input type="text" id="inputProductQuantity" class="form-input text-xs" placeholder="Ej: 2x, Pack 6, Combo 3x">
+          </div>
+          <div class="form-group">
+            <label class="form-label flex items-center justify-between">
+              <span>⚖️ Peso</span>
+              <span class="text-[10px] text-slate-500 font-normal">Opcional</span>
+            </label>
+            <input type="text" id="inputProductWeight" class="form-input text-xs" placeholder="Ej: 400g, 1kg, 2 lb">
+          </div>
+          <div class="form-group">
+            <label class="form-label flex items-center justify-between">
+              <span>🧴 Volumen</span>
+              <span class="text-[10px] text-slate-500 font-normal">Opcional</span>
+            </label>
+            <input type="text" id="inputProductVolume" class="form-input text-xs" placeholder="Ej: 1.5L, 355ml, 2 L">
+          </div>
         </div>
         <div class="grid grid-cols-2 gap-3">
           <div class="form-group">
@@ -1721,16 +1745,16 @@
   <div id="toastContainer" class="toast-container"></div>
 
   <!-- Core Scripts -->
-  <script src="./js/db.js?v=27"></script>
-  <script src="./js/icons-library.js?v=27"></script>
-  <script src="./js/bcv.js?v=27"></script>
-  <script src="./js/image-compressor.js?v=27"></script>
-  <script src="./js/ai-scanner.js?v=27"></script>
-  <script src="./js/charts.js?v=27"></script>
-  <script src="./js/grocery-planner.js?v=27"></script>
-  <script src="./js/accounting.js?v=27"></script>
-  <script src="./js/backup-drive.js?v=27"></script>
-  <script src="./js/auth-groups.js?v=27"></script>
-  <script src="./js/app.js?v=27"></script>
+  <script src="./js/db.js?v=28"></script>
+  <script src="./js/icons-library.js?v=28"></script>
+  <script src="./js/bcv.js?v=28"></script>
+  <script src="./js/image-compressor.js?v=28"></script>
+  <script src="./js/ai-scanner.js?v=28"></script>
+  <script src="./js/charts.js?v=28"></script>
+  <script src="./js/grocery-planner.js?v=28"></script>
+  <script src="./js/accounting.js?v=28"></script>
+  <script src="./js/backup-drive.js?v=28"></script>
+  <script src="./js/auth-groups.js?v=28"></script>
+  <script src="./js/app.js?v=28"></script>
 </body>
 </html>

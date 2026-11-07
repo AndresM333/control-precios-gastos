@@ -34,6 +34,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     await window.db.seedInitialDataIfEmpty(window.bcvService.rate);
   }
 
+  // Migración y normalización automática de atributos (peso, volumen, combos) en productos existentes
+  await migrateExistingProductAttributes();
+
   // Inicializar Gráfica Global
   const chartContainer = document.getElementById('productChartContainer');
   window.activePriceChart = new ProductPriceChart(chartContainer);
@@ -982,15 +985,19 @@ document.addEventListener('DOMContentLoaded', async () => {
         return `<span class="star ${isFilled ? 'filled' : ''}" data-prod-id="${p.id}" data-rating="${starNum}" title="Calificar con ${starNum} estrellas">★</span>`;
       }).join('');
 
+      const titleHtml = window.ProductUtils ? window.ProductUtils.formatTitleWithQuantity(p) : escapeHtml(p.name);
+      const specsHtml = window.ProductUtils ? window.ProductUtils.formatSpecsBadge(p) : '';
+
       return `
         <div class="p-3 bg-slate-900/80 rounded-xl border border-slate-800 flex items-center justify-between gap-2.5 hover:border-slate-700 transition min-w-0 w-full">
           <div class="flex items-center gap-2.5 min-w-0 flex-1">
             ${mediaHtml}
             <div class="min-w-0 flex-1 truncate">
-              <h4 class="font-bold text-slate-100 text-xs truncate">${escapeHtml(p.name)}</h4>
+              <h4 class="font-bold text-slate-100 text-xs truncate flex items-center">${titleHtml}</h4>
               <div class="flex items-center gap-2 mt-0.5 whitespace-nowrap">
                 <span class="text-xs font-black text-slate-200">${priceFormatted.primary}</span>
                 <span class="text-[10px] font-semibold ${priceFormatted.isVes ? 'text-blue-400' : 'text-emerald-400'}">${priceFormatted.secondary}</span>
+                ${specsHtml ? `<span>•</span> ${specsHtml}` : ''}
               </div>
             </div>
           </div>
@@ -1061,6 +1068,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('modalProductTitle').textContent = 'Nuevo Producto';
     document.getElementById('formProduct').reset();
     document.getElementById('inputProductId').value = '';
+    if (document.getElementById('inputProductQuantity')) document.getElementById('inputProductQuantity').value = '';
+    if (document.getElementById('inputProductWeight')) document.getElementById('inputProductWeight').value = '';
+    if (document.getElementById('inputProductVolume')) document.getElementById('inputProductVolume').value = '';
     document.getElementById('inputProductCurrency').value = 'USD';
     setProductMedia('icon', 'grain');
     setModalRatingStars(0);
@@ -1351,6 +1361,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         return `<span class="star ${isFilled ? 'filled' : ''}" data-prod-id="${prod.id}" data-rating="${starNum}" title="Calificar con ${starNum} estrellas">★</span>`;
       }).join('');
 
+      const titleHtml = window.ProductUtils ? window.ProductUtils.formatTitleWithQuantity(prod) : escapeHtml(prod.name);
+      const specsHtml = window.ProductUtils ? window.ProductUtils.formatSpecsBadge(prod) : '';
+
       return `
         <div class="app-card">
           <div>
@@ -1359,7 +1372,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 ${mediaHtml}
                 <div class="min-w-0 flex-1">
                   <span class="text-[11px] font-semibold text-blue-400 block truncate">${escapeHtml(store.name)}</span>
-                  <h3 class="card-title text-sm sm:text-base mt-0.5 truncate">${escapeHtml(prod.name)}</h3>
+                  <h3 class="card-title text-sm sm:text-base mt-0.5 truncate flex items-center min-w-0">${titleHtml}</h3>
+                  ${specsHtml ? `<div class="mt-0.5">${specsHtml}</div>` : ''}
                 </div>
               </div>
               <!-- Price Badge according to selected display currency -->
@@ -1478,6 +1492,9 @@ document.addEventListener('DOMContentLoaded', async () => {
           document.getElementById('modalProductTitle').textContent = 'Editar Producto';
           document.getElementById('inputProductId').value = prod.id;
           document.getElementById('inputProductName').value = prod.name;
+          if (document.getElementById('inputProductQuantity')) document.getElementById('inputProductQuantity').value = prod.quantity || '';
+          if (document.getElementById('inputProductWeight')) document.getElementById('inputProductWeight').value = prod.weight || '';
+          if (document.getElementById('inputProductVolume')) document.getElementById('inputProductVolume').value = prod.volume || '';
           document.getElementById('inputProductPrice').value = prod.current_price;
           document.getElementById('inputProductCurrency').value = 'USD';
           document.getElementById('inputProductDesc').value = prod.description || '';
@@ -1593,6 +1610,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('modalProductTitle').textContent = 'Nuevo Producto';
     document.getElementById('formProduct').reset();
     document.getElementById('inputProductId').value = '';
+    if (document.getElementById('inputProductQuantity')) document.getElementById('inputProductQuantity').value = '';
+    if (document.getElementById('inputProductWeight')) document.getElementById('inputProductWeight').value = '';
+    if (document.getElementById('inputProductVolume')) document.getElementById('inputProductVolume').value = '';
     document.getElementById('inputProductCurrency').value = 'USD';
     setProductMedia('icon', 'grain');
     setModalRatingStars(0);
@@ -1609,7 +1629,17 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
       const idVal = document.getElementById('inputProductId').value.trim();
       const storeId = parseInt(document.getElementById('inputProductStoreId').value, 10);
-      const name = document.getElementById('inputProductName').value.trim();
+      const rawName = document.getElementById('inputProductName').value.trim();
+      const rawQty = document.getElementById('inputProductQuantity') ? document.getElementById('inputProductQuantity').value.trim() : '';
+      const rawWeight = document.getElementById('inputProductWeight') ? document.getElementById('inputProductWeight').value.trim() : '';
+      const rawVolume = document.getElementById('inputProductVolume') ? document.getElementById('inputProductVolume').value.trim() : '';
+
+      const sanitized = window.ProductUtils ? window.ProductUtils.sanitizeProductAttributes(rawName, rawWeight, rawVolume, rawQty) : { name: rawName, weight: rawWeight, volume: rawVolume, quantity: rawQty };
+      const name = sanitized.name;
+      const quantity = sanitized.quantity || null;
+      const weight = sanitized.weight || null;
+      const volume = sanitized.volume || null;
+
       const price = parseFloat(document.getElementById('inputProductPrice').value);
       const currency = document.getElementById('inputProductCurrency').value;
       const ratingVal = parseInt(document.getElementById('inputProductRating').value, 10) || null;
@@ -1642,6 +1672,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       const prodPayload = {
         store_id: storeId,
         name,
+        quantity,
+        weight,
+        volume,
         current_price: priceInUsd,
         original_currency: 'USD',
         rating: ratingVal,
@@ -1898,8 +1931,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             <div id="scan-icon-box-${index}" class="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style="background: ${iconDef.bg}; color: ${iconDef.color};" title="Categoría: ${iconDef.name}">
               <div class="w-5 h-5">${iconDef.svg}</div>
             </div>
-            <div class="flex-1 min-w-0">
-              <input type="text" class="scan-item-name form-input w-full text-xs py-1.5 px-2 font-medium" data-index="${index}" value="${escapeHtml(item.name)}" placeholder="Nombre del producto o plato">
+            <div class="flex-1 min-w-0 space-y-1">
+              <input type="text" class="scan-item-name form-input w-full text-xs py-1.5 px-2 font-medium" data-index="${index}" value="${escapeHtml(item.name)}" placeholder="Nombre limpio del producto">
+              <div class="grid grid-cols-3 gap-1 text-[10px]">
+                <input type="text" class="scan-item-qty form-input text-[10px] py-0.5 px-1.5 text-amber-300 font-semibold" data-index="${index}" value="${escapeHtml(item.quantity && item.quantity !== '1' && item.quantity !== '1.0' ? item.quantity : '')}" placeholder="⚡ Cant: 2x">
+                <input type="text" class="scan-item-weight form-input text-[10px] py-0.5 px-1.5 text-slate-300" data-index="${index}" value="${escapeHtml(item.weight || '')}" placeholder="⚖️ Peso: 400g">
+                <input type="text" class="scan-item-volume form-input text-[10px] py-0.5 px-1.5 text-slate-300" data-index="${index}" value="${escapeHtml(item.volume || '')}" placeholder="🧴 Vol: 1.5L">
+              </div>
             </div>
           </div>
           <div class="flex items-center justify-between sm:justify-end gap-2 pl-6 sm:pl-0 flex-shrink-0">
@@ -1971,6 +2009,36 @@ document.addEventListener('DOMContentLoaded', async () => {
       });
     });
 
+    // Listeners de edición de cantidad (combo/pack)
+    container.querySelectorAll('.scan-item-qty').forEach(inp => {
+      inp.addEventListener('input', (e) => {
+        const idx = parseInt(e.target.dataset.index, 10);
+        if (scannedItems[idx]) {
+          scannedItems[idx].quantity = e.target.value.trim() || null;
+        }
+      });
+    });
+
+    // Listeners de edición de peso
+    container.querySelectorAll('.scan-item-weight').forEach(inp => {
+      inp.addEventListener('input', (e) => {
+        const idx = parseInt(e.target.dataset.index, 10);
+        if (scannedItems[idx]) {
+          scannedItems[idx].weight = e.target.value.trim() || null;
+        }
+      });
+    });
+
+    // Listeners de edición de volumen
+    container.querySelectorAll('.scan-item-volume').forEach(inp => {
+      inp.addEventListener('input', (e) => {
+        const idx = parseInt(e.target.dataset.index, 10);
+        if (scannedItems[idx]) {
+          scannedItems[idx].volume = e.target.value.trim() || null;
+        }
+      });
+    });
+
     // Listeners para eliminar producto
     container.querySelectorAll('.scan-item-delete').forEach(btn => {
       btn.addEventListener('click', (e) => {
@@ -2006,7 +2074,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       scannedItems.push({
         name: 'Producto ' + (scannedItems.length + 1),
         price: 0.0,
-        quantity: 1.0,
+        quantity: null,
+        weight: null,
+        volume: null,
+        invoiceQty: 1.0,
         selected: true,
         icon: 'general',
         isExisting: false
@@ -2122,11 +2193,23 @@ document.addEventListener('DOMContentLoaded', async () => {
       // 4. Mapear ítems detectados
       const rawItems = Array.isArray(result.items) ? result.items : [];
       scannedItems = rawItems.map(item => {
-        const cleanName = (item.name || '').trim();
+        const rawName = (item.name || '').trim();
+        const rawWeight = (item.weight || '').trim();
+        const rawVolume = (item.volume || '').trim();
+        const rawQty = (item.quantity !== undefined && item.quantity !== null) ? String(item.quantity).trim() : '';
+
+        const sanitized = window.ProductUtils
+          ? window.ProductUtils.sanitizeProductAttributes(rawName, rawWeight, rawVolume, rawQty)
+          : { name: rawName, weight: rawWeight || null, volume: rawVolume || null, quantity: rawQty || null };
+
+        const cleanName = sanitized.name;
         return {
           name: cleanName,
+          weight: sanitized.weight,
+          volume: sanitized.volume,
+          quantity: sanitized.quantity,
+          invoiceQty: parseFloat(item.quantity) || 1,
           price: parseFloat(item.price) || 0,
-          quantity: parseFloat(item.quantity) || 1,
           selected: true,
           icon: window.aiScanner.guessProductIcon(cleanName, item.category_hint),
           category_hint: item.category_hint || '',
@@ -2298,15 +2381,18 @@ document.addEventListener('DOMContentLoaded', async () => {
           priceUsd = currentRate > 0 ? priceUsd / currentRate : 0;
         }
         const priceInfo = prod ? formatDisplayPrice(priceUsd) : null;
+        const titleHtml = window.ProductUtils ? window.ProductUtils.formatTitleWithQuantity(prod || { name }) : escapeHtml(name);
+        const specsHtml = window.ProductUtils ? window.ProductUtils.formatSpecsBadge(prod || {}) : '';
 
         return `
           <div class="flex items-center justify-between p-2 rounded-xl bg-slate-800/40 hover:bg-slate-800 border border-slate-800/60 transition gap-2 min-w-0 w-full">
             <div class="flex items-center gap-2.5 min-w-0 flex-1">
               ${mediaHtml}
               <div class="min-w-0 flex-1 truncate">
-                <span class="text-xs font-semibold text-slate-200 block truncate">${escapeHtml(name)}</span>
+                <span class="text-xs font-semibold text-slate-200 truncate flex items-center">${titleHtml}</span>
                 <div class="flex items-center gap-1.5 text-[10px]">
                   ${priceInfo ? `<span class="text-slate-300 font-bold">${priceInfo.primary}</span>` : ''}
+                  ${specsHtml ? `<span>•</span> ${specsHtml}` : ''}
                   ${inCartQty > 0 ? `<span class="text-emerald-400 font-bold">• ${inCartQty} en canasta</span>` : '<span class="text-slate-500">• Disponible</span>'}
                 </div>
               </div>
@@ -2403,14 +2489,19 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (prod.original_currency === 'VES') itemUsd = currentRate > 0 ? itemUsd / currentRate : 0;
       const subtotalFormatted = formatDisplayPrice(itemUsd * qty);
       const mediaHtml = window.AppIcons ? window.AppIcons.renderProductMedia(prod, 'w-8 h-8') : '🛒';
+      const titleHtml = window.ProductUtils ? window.ProductUtils.formatTitleWithQuantity(prod) : escapeHtml(name);
+      const specsHtml = window.ProductUtils ? window.ProductUtils.formatSpecsBadge(prod) : '';
 
       return `
         <div class="flex items-center justify-between p-2 rounded-xl bg-slate-800/80 border border-slate-700/70 gap-2">
           <div class="flex items-center gap-2.5 min-w-0">
             ${mediaHtml}
             <div class="truncate">
-              <span class="text-xs font-bold text-slate-100 block truncate">${escapeHtml(name)}</span>
-              <span class="text-[10px] text-slate-400 font-semibold block">${subtotalFormatted.primary}</span>
+              <span class="text-xs font-bold text-slate-100 block truncate flex items-center">${titleHtml}</span>
+              <div class="flex items-center gap-1.5 text-[10px] text-slate-400 font-semibold">
+                <span>${subtotalFormatted.primary}</span>
+                ${specsHtml ? `<span>•</span> ${specsHtml}` : ''}
+              </div>
             </div>
           </div>
 
@@ -4181,12 +4272,58 @@ document.addEventListener('DOMContentLoaded', async () => {
   // REGISTRO DE SERVICE WORKER (PWA)
   // ----------------------------------------------------
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js?v=27').then((reg) => {
+    navigator.serviceWorker.register('./sw.js?v=28').then((reg) => {
       console.log('Service Worker registrado con éxito:', reg.scope);
       reg.update();
     }).catch((err) => {
       console.warn('Registro de Service Worker falló:', err);
     });
+  }
+
+  // Helper para normalizar y limpiar atributos en productos previamente guardados
+  async function migrateExistingProductAttributes() {
+    try {
+      if (!window.ProductUtils || !window.db || typeof window.db.getAll !== 'function') return;
+      const allProds = await window.db.getAll('products');
+      if (!allProds || allProds.length === 0) return;
+
+      let updatedCount = 0;
+      for (const prod of allProds) {
+        if (!prod || !prod.name) continue;
+        const sanitized = window.ProductUtils.sanitizeProductAttributes(
+          prod.name,
+          prod.weight,
+          prod.volume,
+          prod.quantity
+        );
+        let changed = false;
+        if (sanitized.name && sanitized.name !== prod.name) {
+          prod.name = sanitized.name;
+          changed = true;
+        }
+        if (sanitized.weight && prod.weight !== sanitized.weight) {
+          prod.weight = sanitized.weight;
+          changed = true;
+        }
+        if (sanitized.volume && prod.volume !== sanitized.volume) {
+          prod.volume = sanitized.volume;
+          changed = true;
+        }
+        if (sanitized.quantity && prod.quantity !== sanitized.quantity) {
+          prod.quantity = sanitized.quantity;
+          changed = true;
+        }
+        if (changed) {
+          await window.db.put('products', prod);
+          updatedCount++;
+        }
+      }
+      if (updatedCount > 0) {
+        console.log(`[ProductUtils] Migración automática: ${updatedCount} productos normalizados con peso/volumen/cantidad.`);
+      }
+    } catch (err) {
+      console.warn('Error en migrateExistingProductAttributes:', err);
+    }
   }
 
   // Helper para escapar HTML en strings dinámicos

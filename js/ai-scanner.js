@@ -1,3 +1,88 @@
+// ====================================================
+// UTILIDADES GLOBALES PARA ATRIBUTOS DE PRODUCTOS
+// (Separación de Nombre, Cantidad/Combo, Peso y Volumen)
+// ====================================================
+function escapeProductHtml(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+window.ProductUtils = {
+  sanitizeProductAttributes(rawName, existingWeight = null, existingVolume = null, existingQuantity = null) {
+    let name = (rawName || '').trim();
+    let weight = (existingWeight !== null && existingWeight !== undefined && String(existingWeight).trim()) ? String(existingWeight).trim() : null;
+    let volume = (existingVolume !== null && existingVolume !== undefined && String(existingVolume).trim()) ? String(existingVolume).trim() : null;
+    let quantity = (existingQuantity !== null && existingQuantity !== undefined && String(existingQuantity).trim()) ? String(existingQuantity).trim() : null;
+
+    if (quantity === '1' || quantity === '1.0' || quantity === '1.00') {
+      quantity = null;
+    }
+
+    // 1. Detectar combos o cantidades en el nombre (ej: '2x', 'Combo 2x', 'Pack de 6', 'Pack 6', '6 pack', '3 unid', '12 unidades')
+    const qtyRegex = /(?:\bcombo\s*)?(?:(\d+\s*x|\bpack\s*(?:de\s*)?\d+|\d+\s*(?:pack|unid(?:ades)?|piezas?|pzas?|u))\b)/i;
+    const qtyMatch = name.match(qtyRegex);
+    if (qtyMatch && !quantity) {
+      quantity = qtyMatch[0].trim();
+      name = name.replace(qtyMatch[0], ' ');
+    }
+
+    // 2. Detectar volumen (ej: '1.5L', '1,5 L', '355ml', '500 cc', '2 litros', '1 gal')
+    const volRegex = /\b(\d+(?:[\.,]\d+)?\s*(?:litros?|lts?|l\b|ml|cc|galones?|gal\b))\b/i;
+    const volMatch = name.match(volRegex);
+    if (volMatch && !volume) {
+      volume = volMatch[0].trim();
+      name = name.replace(volMatch[0], ' ');
+    }
+
+    // 3. Detectar peso (ej: '400g', '400 gr', '1kg', '1.5 kg', '2 lb', '16 oz', '1/2 kg')
+    const weightRegex = /\b(\d+(?:[\.,]\d+)?\s*(?:kilos?|kg|gr(?:amos|s)?|g\b|libras?|lbs?|lb\b|onzas?|oz\b)|\d+\/\d+\s*(?:kg|kilos?|g|gr))\b/i;
+    const weightMatch = name.match(weightRegex);
+    if (weightMatch && !weight) {
+      weight = weightMatch[0].trim();
+      name = name.replace(weightMatch[0], ' ');
+    }
+
+    // Limpiar separadores sobrantes al inicio/final o paréntesis vacíos
+    name = name.replace(/[\(\)\[\]]/g, ' ')
+      .replace(/\s*[-–—\/•,]+\s*$/g, '')
+      .replace(/^\s*[-–—\/•,]+\s*/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    return {
+      name: name || rawName,
+      weight: weight || null,
+      volume: volume || null,
+      quantity: quantity || null
+    };
+  },
+
+  formatTitleWithQuantity(prod, extraClass = '') {
+    if (!prod) return '';
+    const name = prod.name || '';
+    const rawQty = prod.quantity ? String(prod.quantity).trim() : '';
+    const hasSpecialQty = rawQty && rawQty !== '1' && rawQty !== '1.0';
+    const qtyBadge = hasSpecialQty
+      ? `<span class="inline-flex items-center px-1.5 py-0.5 mr-1.5 rounded-md bg-amber-500/20 text-amber-300 font-black text-[10px] sm:text-xs border border-amber-500/40 uppercase tracking-tight shadow-sm align-middle flex-shrink-0">⚡ ${escapeProductHtml(rawQty)}</span>`
+      : '';
+    return `${qtyBadge}<span class="align-middle ${extraClass}">${escapeProductHtml(name)}</span>`;
+  },
+
+  formatSpecsBadge(prod) {
+    if (!prod) return '';
+    const specs = [];
+    if (prod.weight && String(prod.weight).trim()) specs.push(`⚖️ ${escapeProductHtml(String(prod.weight).trim())}`);
+    if (prod.volume && String(prod.volume).trim()) specs.push(`🧴 ${escapeProductHtml(String(prod.volume).trim())}`);
+    if (specs.length === 0) return '';
+    return `<span class="text-[10px] text-slate-400 font-medium inline-flex items-center gap-1">${specs.join(' <span class="text-slate-600">•</span> ')}</span>`;
+  }
+};
+
 // Servicio de Escaneo Inteligente con IA (Google Gemini Flash & Gemini Pro)
 class AIScannerService {
   constructor() {
@@ -331,9 +416,11 @@ Devuelve EXCLUSIVAMENTE los siguientes campos en formato JSON estricto:
   "total": 0.00,
   "items": [
     {
-      "name": "Nombre descriptivo y limpio del producto o plato (Ej: Hamburguesa Especial, Pizza Mediana, Harina PAN 1kg, Refresco 1.5L, Café con Leche)",
+      "name": "Nombre limpio del producto o plato SIN peso ni volumen (Ej: 'Hamburguesa Especial', 'Pizza Mediana', 'Harina PAN', 'Refresco Coca Cola', 'Café con Leche', 'Maiz para Cotufas Mary')",
+      "weight": "Peso del producto si se indica en el empaque o texto (Ej: '400g', '1kg', '500 gr', '2 lb', '1/2 kg'). Si no tiene peso, usa null",
+      "volume": "Volumen si se indica en el empaque o texto (Ej: '1.5L', '355ml', '2 Litros', '1 gal'). Si no tiene volumen, usa null",
+      "quantity": "Cantidad en combo, pack o multipack si se indica (Ej: '2x', 'Pack de 6', 'Combo 3x', '12 unid'). Si es compra o plato individual normal, usa 1.0 o null",
       "price": 0.00,
-      "quantity": 1.0,
       "total": 0.00,
       "category_hint": "restaurant | bakery | coffee | meat | dairy | produce | grain | canned | snack | cleaning | hygiene | pharmacy | general"
     }
@@ -341,8 +428,18 @@ Devuelve EXCLUSIVAMENTE los siguientes campos en formato JSON estricto:
 }
 
 REGLAS CRÍTICAS:
-1. "items": Registra cada producto o plato individual que posea un precio legible. Limpia el nombre de códigos irrelevantes o símbolos extraños.
-2. "category_hint": Elige de la lista la categoría/icono que mejor corresponda al producto o plato:
+1. "name" - LIMPIEZA ABSOLUTA DE PESO Y VOLUMEN:
+   El campo "name" NUNCA debe contener el peso (g, gr, kg, lb) ni el volumen (ml, cc, L, litros).
+   - INCORRECTO: "Maiz para Cotufas Mary 400g" -> CORRECTO: name: "Maiz para Cotufas Mary", weight: "400g".
+   - INCORRECTO: "Refresco Pepsi 1.5L" -> CORRECTO: name: "Refresco Pepsi", volume: "1.5L".
+   - INCORRECTO: "Harina PAN 1 Kg" -> CORRECTO: name: "Harina PAN", weight: "1kg".
+   - INCORRECTO: "Pack 6 Cerveza 355ml" -> CORRECTO: name: "Cerveza", quantity: "Pack de 6", volume: "355ml".
+   - INCORRECTO: "Combo 2x Hamburguesas" -> CORRECTO: name: "Hamburguesas", quantity: "Combo 2x".
+2. "weight": Texto del peso identificado (ej: '400g', '1kg', '250 g', '2 lb'). Si no aplica o no se menciona, usa null.
+3. "volume": Texto del volumen identificado (ej: '1.5L', '355ml', '2 L'). Si no aplica o no se menciona, usa null.
+4. "quantity": Si es un combo, oferta multipack o paquete, indica el texto correspondiente (ej: '2x', 'Pack de 6', 'Combo 2x'). En compras estándar de facturas donde se facturaron N unidades individuales, puedes colocar la cantidad numérica.
+5. "items": Registra cada producto o plato individual que posea un precio legible. Limpia el nombre de códigos irrelevantes o símbolos extraños (#, %, barras).
+6. "category_hint": Elige de la lista la categoría/icono que mejor corresponda al producto o plato:
    - "restaurant": Comida rápida, platos preparados, pizzas, hamburguesas, sushi, combos, arepas, empanadas, etc.
    - "bakery": Panes, dulces, galletas, ponqués, tortas, bollería.
    - "coffee": Café, té, refrescos, maltas, cervezas, licores, jugos, bebidas.
@@ -356,12 +453,11 @@ REGLAS CRÍTICAS:
    - "hygiene": Champú, jabón, pasta dental, desodorante, aseo personal.
    - "pharmacy": Medicinas, pastillas, jarabes, salud.
    - "general": Otros artículos.
-3. "price": Precio unitario en formato número flotante/decimal sin símbolos ni letras (Ejemplo: 4.50, 15.00, 180.25).
-4. "quantity": En menús, listas de precios o carteleras coloca 1.0 por defecto. En facturas donde se compró más de 1 unidad, coloca la cantidad indicada.
-5. "total": En facturas es el total general del documento. En menús o listas donde no hay un total global de compra, calcula la suma de los ítems o 0.00.
-6. "currency": Si la mayoría de precios usan $, ref o dólares -> "USD". Si usan Bs, bolívares -> "VES".
-7. REGLA ESTRICTA DE SEGURIDAD: NO intentes calificar el producto, NO agregues estrellas, NO inventes valoraciones de calidad. Las calificaciones son exclusivas del usuario.
-8. Devuelve SOLO el objeto JSON puro sin bloques markdown (\`\`\`json) ni explicaciones adicionales.
+7. "price": Precio unitario en formato número flotante/decimal sin símbolos ni letras (Ejemplo: 4.50, 15.00, 180.25).
+8. "total": En facturas es el total general del documento. En menús o listas donde no hay un total global de compra, calcula la suma de los ítems o 0.00.
+9. "currency": Si la mayoría de precios usan $, ref o dólares -> "USD". Si usan Bs, bolívares -> "VES".
+10. REGLA ESTRICTA DE SEGURIDAD: NO intentes calificar el producto, NO agregues estrellas, NO inventes valoraciones de calidad. Las calificaciones son exclusivas del usuario.
+11. Devuelve SOLO el objeto JSON puro sin bloques markdown (\`\`\`json) ni explicaciones adicionales.
 `;
 
     const requestBody = {
@@ -439,6 +535,18 @@ REGLAS CRÍTICAS:
         if (!parsedResult.items || !Array.isArray(parsedResult.items)) {
           parsedResult.items = [];
         }
+
+        // Sanitizar y separar atributos (nombre limpio, peso, volumen, cantidad/combo) en cada producto
+        parsedResult.items = parsedResult.items.map(item => {
+          const sanitized = window.ProductUtils.sanitizeProductAttributes(item.name, item.weight, item.volume, item.quantity);
+          return {
+            ...item,
+            name: sanitized.name,
+            weight: sanitized.weight,
+            volume: sanitized.volume,
+            quantity: sanitized.quantity
+          };
+        });
 
         // Si tuvo éxito, recordar este modelo como el preferido
         this.defaultModel = modelName;
@@ -528,10 +636,14 @@ REGLAS CRÍTICAS:
     for (const item of itemsToProcess) {
       if (!item.name || item.price === undefined || isNaN(parseFloat(item.price))) continue;
 
-      const cleanName = item.name.trim();
+      const sanitized = window.ProductUtils.sanitizeProductAttributes(item.name, item.weight, item.volume, item.quantity);
+      const cleanName = sanitized.name;
+      const weight = sanitized.weight || null;
+      const volume = sanitized.volume || null;
+      const quantity = sanitized.quantity || null;
       const unitPrice = parseFloat(item.price);
-      const quantity = parseFloat(item.quantity) || 1;
-      const totalItem = parseFloat(item.total) || (unitPrice * quantity);
+      const invoiceQty = parseFloat(item.invoiceQty || item.quantity) || 1;
+      const totalItem = parseFloat(item.total) || (unitPrice * invoiceQty);
 
       // Regla: Si el documento/menú escaneado estaba en bolívares (VES),
       // convertir el precio unitario a dólares usando la tasa BCV del día.
@@ -548,11 +660,18 @@ REGLAS CRÍTICAS:
         existingProduct.current_price = unitPriceUsd;
         existingProduct.original_currency = 'USD';
         existingProduct.updated_at = new Date().toISOString();
+        if (weight) existingProduct.weight = weight;
+        if (volume) existingProduct.volume = volume;
+        if (quantity) existingProduct.quantity = quantity;
 
         await window.db.saveProduct(existingProduct, docType, currentBcvRate);
         updatedProductsCount++;
         processedItems.push({
           ...item,
+          name: cleanName,
+          weight,
+          volume,
+          quantity,
           productId: existingProduct.id,
           status: 'actualizado',
           rating: existingProduct.rating
@@ -565,6 +684,9 @@ REGLAS CRÍTICAS:
           workspace_id: activeWs,
           store_id: store.id,
           name: cleanName,
+          weight: weight,
+          volume: volume,
+          quantity: quantity,
           current_price: unitPriceUsd,
           original_currency: 'USD',
           image_type: 'icon',
@@ -577,6 +699,10 @@ REGLAS CRÍTICAS:
         newProductsCount++;
         processedItems.push({
           ...item,
+          name: cleanName,
+          weight,
+          volume,
+          quantity,
           productId: savedProd.id,
           status: 'nuevo',
           rating: savedProd.rating || null

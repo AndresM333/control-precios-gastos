@@ -483,6 +483,9 @@ class AuthGroupsService {
         // Actualizar precio más reciente, conservar la valoración de estrellas personal
         existingPersonalProd.current_price = product.current_price;
         existingPersonalProd.original_currency = product.original_currency || 'USD';
+        if (product.quantity) existingPersonalProd.quantity = product.quantity;
+        if (product.weight) existingPersonalProd.weight = product.weight;
+        if (product.volume) existingPersonalProd.volume = product.volume;
         existingPersonalProd.updated_at = new Date().toISOString();
         await window.db.saveProduct(existingPersonalProd, 'COPIA_GRUPO', currentRate);
         return { action: 'updated', product: existingPersonalProd };
@@ -494,10 +497,15 @@ class AuthGroupsService {
         workspace_id: 'personal',
         store_id: personalStore.id,
         name: product.name,
+        quantity: product.quantity || null,
+        weight: product.weight || null,
+        volume: product.volume || null,
         current_price: product.current_price,
         original_currency: product.original_currency || 'USD',
         rating: null, // Regla: no sobreescribe estrellas, el usuario califica a su criterio
-        description: product.description || ''
+        description: product.description || '',
+        image_type: product.image_type || 'icon',
+        image_data: product.image_data || 'general'
       };
 
       const saved = await window.db.saveProduct(newPersonalProd, 'COPIA_GRUPO', currentRate);
