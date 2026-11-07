@@ -2449,11 +2449,48 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   // ----------------------------------------------------
-  // 4. PROGRAMAR MERCADO (CANASTA CON + Y -)
+  // 4. PROGRAMAR MERCADO (CANASTA CON + Y - Y MODO GRUPOS)
   // ----------------------------------------------------
-  const plannerCart = new Map(); // productName -> quantity
+  const plannerCart = new Map(); // productNameOrGroupName -> quantity
+  let plannerCatalogMode = localStorage.getItem('app_planner_catalog_mode') || 'individual';
+  let currentDetailGroup = null;
+
+  function updatePlannerModeUI() {
+    const btnInd = document.getElementById('btnPlannerModeIndividual');
+    const btnGrp = document.getElementById('btnPlannerModeGroups');
+    const btnCreateGrp = document.getElementById('btnOpenCreateGroupModal');
+    const searchInput = document.getElementById('plannerSearchInput');
+
+    if (plannerCatalogMode === 'groups') {
+      if (btnGrp) {
+        btnGrp.className = 'flex-1 py-1 px-2 rounded-lg text-[11px] font-bold transition bg-blue-600 text-white shadow';
+      }
+      if (btnInd) {
+        btnInd.className = 'flex-1 py-1 px-2 rounded-lg text-[11px] font-bold transition text-slate-400 hover:text-slate-200';
+      }
+      if (btnCreateGrp) btnCreateGrp.classList.remove('hidden');
+      if (searchInput) searchInput.placeholder = 'Buscar grupo o producto en grupos...';
+    } else {
+      if (btnInd) {
+        btnInd.className = 'flex-1 py-1 px-2 rounded-lg text-[11px] font-bold transition bg-blue-600 text-white shadow';
+      }
+      if (btnGrp) {
+        btnGrp.className = 'flex-1 py-1 px-2 rounded-lg text-[11px] font-bold transition text-slate-400 hover:text-slate-200';
+      }
+      if (btnCreateGrp) btnCreateGrp.classList.add('hidden');
+      if (searchInput) searchInput.placeholder = 'Buscar en catálogo...';
+    }
+  }
 
   async function loadPlannerProductList() {
+    updatePlannerModeUI();
+    if (plannerCatalogMode === 'groups') {
+      return await loadPlannerGroupsList();
+    }
+    return await loadPlannerIndividualList();
+  }
+
+  async function loadPlannerIndividualList() {
     const catalogContainer = document.getElementById('plannerCatalogList');
     if (!catalogContainer) return;
 
@@ -2542,6 +2579,237 @@ document.addEventListener('DOMContentLoaded', async () => {
     renderPlannerCart();
   }
 
+  async function loadPlannerGroupsList() {
+    const catalogContainer = document.getElementById('plannerCatalogList');
+    if (!catalogContainer) return;
+
+    const searchFilter = (document.getElementById('plannerSearchInput').value || '').toLowerCase().trim();
+    const products = await window.db.getProducts();
+    const stores = await window.db.getStores();
+    const storesById = new Map();
+    stores.forEach(s => storesById.set(s.id, s));
+
+    const currentRate = (window.bcvService && window.bcvService.rate > 0) ? window.bcvService.rate : 45.0;
+    const savedGroups = window.productGroupingService ? await window.productGroupingService.getSavedGroups() : [];
+    const builtGroups = window.productGroupingService ? window.productGroupingService.buildGroups(products, savedGroups, currentRate, activeDisplayCurrency) : [];
+
+    // Filtrar grupos por nombre de grupo o por nombre de los productos contenidos
+    const filtered = builtGroups.filter(g => {
+      if (!searchFilter) return true;
+      if (g.name.toLowerCase().includes(searchFilter)) return true;
+      return g.products.some(p => p.name.toLowerCase().includes(searchFilter));
+    });
+
+    const totalEl = document.getElementById('plannerCatalogTotal');
+    if (totalEl) totalEl.textContent = `${filtered.length} grupos (${products.length} prods)`;
+
+    if (filtered.length === 0) {
+      catalogContainer.innerHTML = `
+        <div class="text-center py-8 text-slate-500">
+          <p class="text-2xl mb-1">📦</p>
+          <p class="text-xs">No se encontraron grupos de productos</p>
+          <p class="text-[11px] text-slate-500 mt-1">Crea un grupo con "+ Nuevo Grupo" o agrega productos al catálogo</p>
+        </div>
+      `;
+    } else {
+      catalogContainer.innerHTML = filtered.map(g => {
+        const inCartQty = plannerCart.get(g.name) || 0;
+        const specsParts = [g.weightStr, g.volumeStr, g.quantityStr].filter(Boolean);
+        const specsSummary = specsParts.length > 0 ? specsParts.join(' • ') : '';
+
+        return `
+          <div class="group-planner-card flex items-center justify-between p-2.5 rounded-xl bg-slate-800/40 hover:bg-slate-800 border border-slate-700/60 hover:border-blue-500/50 transition gap-2.5 min-w-0 w-full cursor-pointer" data-group-name="${escapeHtml(g.name)}" title="Toca para ver o editar los productos de este grupo">
+            <div class="flex items-center gap-2.5 min-w-0 flex-1">
+              <div class="w-9 h-9 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center text-lg flex-shrink-0 shadow-inner">
+                📦
+              </div>
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-1.5 mb-0.5">
+                  <span class="text-xs font-bold text-slate-100 truncate">${escapeHtml(g.name)}</span>
+                  ${g.isManual ? '<span class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-blue-500/20 text-blue-300 border border-blue-500/30">Manual</span>' : ''}
+                </div>
+                <div class="flex items-center gap-2 text-[11px] font-bold text-emerald-400 truncate">
+                  <span>${g.priceStr}</span>
+                  ${specsSummary ? `<span class="text-[10px] font-medium text-slate-400">• ${escapeHtml(specsSummary)}</span>` : ''}
+                </div>
+                <div class="flex items-center gap-1.5 text-[10px] text-slate-400 mt-0.5">
+                  <span>${g.productCount} ${g.productCount === 1 ? 'opción' : 'opciones'}</span>
+                  <span>•</span>
+                  <span>${g.storeCount} ${g.storeCount === 1 ? 'tienda' : 'tiendas'}</span>
+                  ${inCartQty > 0 ? `<span class="text-emerald-400 font-bold">• ${inCartQty} en canasta</span>` : '<span class="text-slate-500">• Toca para editar</span>'}
+                </div>
+              </div>
+            </div>
+            <button type="button" class="btn-planner-add-group w-8 h-8 rounded-full bg-emerald-500/20 hover:bg-emerald-500 text-emerald-400 hover:text-white font-bold flex items-center justify-center flex-shrink-0 transition shadow" data-name="${escapeHtml(g.name)}" title="Añadir grupo a la canasta (+1)">
+              <svg class="w-4 h-4 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+            </button>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // Attach listeners on groups
+    catalogContainer.querySelectorAll('.group-planner-card').forEach(card => {
+      card.addEventListener('click', (e) => {
+        const addBtn = e.target.closest('.btn-planner-add-group');
+        if (addBtn) {
+          // Agregar grupo al carro
+          e.stopPropagation();
+          if (!window.authGroups.hasPermission('can_manage_cart')) {
+            showToast('⚠️ No tienes permiso para agregar productos al carro de compras en este grupo.', 'error');
+            return;
+          }
+          const name = addBtn.dataset.name;
+          const current = plannerCart.get(name) || 0;
+          plannerCart.set(name, current + 1);
+          renderPlannerCart();
+          loadPlannerProductList();
+          showToast(`+1 Grupo "${name}" en la canasta`, 'info');
+          return;
+        }
+
+        // Clic en la tarjeta: abrir modal de detalle y edición del grupo
+        const gName = card.dataset.groupName;
+        const targetGroup = builtGroups.find(g => g.name === gName);
+        if (targetGroup) {
+          openGroupDetailModal(targetGroup);
+        }
+      });
+    });
+
+    renderPlannerCart();
+  }
+
+  async function openGroupDetailModal(group) {
+    currentDetailGroup = group;
+    const titleEl = document.getElementById('groupDetailTitle');
+    const badgeEl = document.getElementById('groupDetailBadge');
+    const priceRangeEl = document.getElementById('groupDetailPriceRange');
+    const specsRangeEl = document.getElementById('groupDetailSpecsRange');
+    const productsListEl = document.getElementById('groupDetailProductsList');
+    const addSelectEl = document.getElementById('groupDetailAddProductSelect');
+
+    if (titleEl) titleEl.textContent = group.name;
+    if (badgeEl) {
+      badgeEl.textContent = `${group.productCount} productos • ${group.storeCount} tiendas ${group.isManual ? '• Grupo Manual' : '• Grupo Automático'}`;
+    }
+    if (priceRangeEl) priceRangeEl.textContent = group.priceStr;
+    const specsParts = [group.weightStr, group.volumeStr, group.quantityStr].filter(Boolean);
+    if (specsRangeEl) {
+      specsRangeEl.textContent = specsParts.length > 0 ? specsParts.join(' • ') : 'Sin medidas registradas';
+    }
+
+    const stores = await window.db.getStores();
+    const storesById = new Map();
+    stores.forEach(s => storesById.set(s.id, s));
+    const currentRate = (window.bcvService && window.bcvService.rate > 0) ? window.bcvService.rate : 45.0;
+
+    // Render list of products in this group
+    if (productsListEl) {
+      if (!group.products || group.products.length === 0) {
+        productsListEl.innerHTML = '<p class="text-xs text-slate-500 py-4 text-center">Este grupo no tiene productos asignados actualmente.</p>';
+      } else {
+        productsListEl.innerHTML = group.products.map(p => {
+          const store = p.store_id ? storesById.get(p.store_id) : null;
+          const storeBadgeHtml = window.ProductUtils ? window.ProductUtils.formatStoreBadge(store, 14) : '';
+          const mediaHtml = window.AppIcons ? window.AppIcons.renderProductMedia(p, 'w-8 h-8') : '🏷️';
+          let pUsd = parseFloat(p.current_price) || 0;
+          if (p.original_currency === 'VES') pUsd = currentRate > 0 ? pUsd / currentRate : 0;
+          const priceInfo = formatDisplayPrice(pUsd);
+          const titleHtml = window.ProductUtils ? window.ProductUtils.formatTitleWithQuantity(p) : escapeHtml(p.name);
+          const specsHtml = window.ProductUtils ? window.ProductUtils.formatSpecsBadge(p) : '';
+
+          return `
+            <div class="flex items-center justify-between p-2 rounded-xl bg-slate-900 border border-slate-800 gap-2">
+              <div class="flex items-center gap-2.5 min-w-0 flex-1">
+                ${mediaHtml}
+                <div class="min-w-0 flex-1 truncate">
+                  ${storeBadgeHtml ? `<div class="mb-0.5">${storeBadgeHtml}</div>` : ''}
+                  <span class="text-xs font-semibold text-slate-200 truncate block">${titleHtml}</span>
+                  <div class="flex items-center gap-1.5 text-[10px] text-slate-400 mt-0.5">
+                    <span class="text-emerald-400 font-bold">${priceInfo.primary}</span>
+                    ${specsHtml ? `<span>•</span> ${specsHtml}` : ''}
+                  </div>
+                </div>
+              </div>
+              <div class="flex items-center gap-1 flex-shrink-0">
+                <button type="button" class="btn-group-add-cart p-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500 text-emerald-400 hover:text-white transition text-xs font-bold" data-product-name="${escapeHtml(p.name)}" title="Añadir producto específico a la canasta (+1)">
+                  🛒 +1
+                </button>
+                <button type="button" class="btn-group-remove-prod p-1.5 rounded-lg bg-red-500/20 hover:bg-red-500 text-red-400 hover:text-white transition text-xs font-bold" data-product-id="${p.id}" title="Quitar este producto del grupo">
+                  ❌
+                </button>
+              </div>
+            </div>
+          `;
+        }).join('');
+
+        // Listeners inside product item
+        productsListEl.querySelectorAll('.btn-group-add-cart').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (!window.authGroups.hasPermission('can_manage_cart')) {
+              showToast('⚠️ No tienes permiso para agregar productos al carro de compras en este grupo.', 'error');
+              return;
+            }
+            const pName = btn.dataset.productName;
+            plannerCart.set(pName, (plannerCart.get(pName) || 0) + 1);
+            renderPlannerCart();
+            loadPlannerProductList();
+            showToast(`+1 "${pName}" en la canasta`, 'info');
+          });
+        });
+
+        productsListEl.querySelectorAll('.btn-group-remove-prod').forEach(btn => {
+          btn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const pid = parseInt(btn.dataset.productId, 10);
+            await window.productGroupingService.removeProductFromGroup(
+              currentDetailGroup.id,
+              pid,
+              currentDetailGroup.products.map(p => p.id)
+            );
+            showToast('Producto quitado del grupo', 'info');
+            await refreshCurrentGroupDetail();
+            await loadPlannerProductList();
+          });
+        });
+      }
+    }
+
+    // Populate dropdown with catalog products that aren't in this group
+    if (addSelectEl) {
+      const allProducts = await window.db.getProducts();
+      const existingIds = new Set((group.products || []).map(p => p.id));
+      const availableProds = allProducts.filter(p => !existingIds.has(p.id));
+      availableProds.sort((a, b) => a.name.localeCompare(b.name, 'es', { sensitivity: 'base' }));
+
+      addSelectEl.innerHTML = '<option value="">Selecciona un producto para agregarlo...</option>' +
+        availableProds.map(p => {
+          const s = storesById.get(p.store_id);
+          const sName = s ? s.name : 'Tienda';
+          return `<option value="${p.id}">${escapeHtml(p.name)} (${escapeHtml(sName)} - $${parseFloat(p.current_price || 0).toFixed(2)})</option>`;
+        }).join('');
+    }
+
+    openModal('modalProductGroupDetail');
+  }
+
+  async function refreshCurrentGroupDetail() {
+    if (!currentDetailGroup) return;
+    const products = await window.db.getProducts();
+    const currentRate = (window.bcvService && window.bcvService.rate > 0) ? window.bcvService.rate : 45.0;
+    const savedGroups = window.productGroupingService ? await window.productGroupingService.getSavedGroups() : [];
+    const builtGroups = window.productGroupingService ? window.productGroupingService.buildGroups(products, savedGroups, currentRate, activeDisplayCurrency) : [];
+
+    const refreshed = builtGroups.find(g => g.id === currentDetailGroup.id || g.name.toLowerCase() === currentDetailGroup.name.toLowerCase());
+    if (refreshed) {
+      openGroupDetailModal(refreshed);
+    } else {
+      closeModal('modalProductGroupDetail');
+    }
+  }
+
   async function renderPlannerCart() {
     const cartContainer = document.getElementById('plannerCartList');
     const summaryEl = document.getElementById('plannerCartSummary');
@@ -2562,15 +2830,23 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (!productsByName.has(trimmed)) productsByName.set(trimmed, p);
     });
 
+    const currentRate = (window.bcvService && window.bcvService.rate > 0) ? window.bcvService.rate : 45.0;
+    const savedGroups = window.productGroupingService ? await window.productGroupingService.getSavedGroups() : [];
+    const builtGroups = window.productGroupingService ? window.productGroupingService.buildGroups(products, savedGroups, currentRate, activeDisplayCurrency) : [];
+    const groupsByName = new Map();
+    builtGroups.forEach(g => {
+      groupsByName.set(g.name.trim().toLowerCase(), g);
+    });
+
     if (plannerCart.size === 0) {
       cartContainer.innerHTML = `
         <div class="text-center py-10 text-slate-500">
           <p class="text-3xl mb-2">🛒</p>
           <p class="font-semibold text-slate-300 text-xs">Tu canasta está vacía</p>
-          <p class="text-[11px] text-slate-500 mt-1 max-w-[220px] mx-auto">Toca el botón <span class="text-emerald-400 font-bold">+</span> en cualquier producto del catálogo para agregarlo.</p>
+          <p class="text-[11px] text-slate-500 mt-1 max-w-[220px] mx-auto">Toca el botón <span class="text-emerald-400 font-bold">+</span> en cualquier producto o grupo del catálogo para agregarlo.</p>
         </div>
       `;
-      if (summaryEl) summaryEl.textContent = '0 unidades (0 productos)';
+      if (summaryEl) summaryEl.textContent = '0 unidades (0 items)';
       if (clearBtn) clearBtn.classList.add('hidden');
       if (notifyBtn) notifyBtn.classList.add('hidden');
       return;
@@ -2583,15 +2859,20 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     let totalUnits = 0;
     let totalUsdCost = 0;
-    const currentRate = (window.bcvService && window.bcvService.rate > 0) ? window.bcvService.rate : 45.0;
 
     plannerCart.forEach((qty, name) => {
       totalUnits += qty;
-      const prod = productsByName.get(name);
-      if (prod && prod.current_price) {
-        let pUsd = parseFloat(prod.current_price) || 0;
-        if (prod.original_currency === 'VES') pUsd = currentRate > 0 ? pUsd / currentRate : 0;
-        totalUsdCost += (pUsd * qty);
+      const nameClean = name.trim().toLowerCase();
+      const group = groupsByName.get(nameClean);
+      if (group) {
+        totalUsdCost += ((group.minUsd || 0) * qty);
+      } else {
+        const prod = productsByName.get(name);
+        if (prod && prod.current_price) {
+          let pUsd = parseFloat(prod.current_price) || 0;
+          if (prod.original_currency === 'VES') pUsd = currentRate > 0 ? pUsd / currentRate : 0;
+          totalUsdCost += (pUsd * qty);
+        }
       }
     });
 
@@ -2599,13 +2880,55 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (summaryEl) {
       summaryEl.innerHTML = `
-        <span>${totalUnits} und (${plannerCart.size} prod)</span>
+        <span>${totalUnits} und (${plannerCart.size} items)</span>
         <span class="text-emerald-400 font-extrabold ml-1.5">${totalCostFormatted.primary}</span>
       `;
     }
 
     const cartEntries = Array.from(plannerCart.entries());
     cartContainer.innerHTML = cartEntries.map(([name, qty]) => {
+      const nameClean = name.trim().toLowerCase();
+      const group = groupsByName.get(nameClean);
+
+      if (group) {
+        const itemSubtotalUsd = (group.minUsd || 0) * qty;
+        const subtotalFormatted = formatDisplayPrice(itemSubtotalUsd);
+        const specs = [group.weightStr, group.volumeStr, group.quantityStr].filter(Boolean).join(' • ');
+
+        return `
+          <div class="flex items-center justify-between p-2 rounded-xl bg-slate-800/80 border border-blue-500/30 gap-2">
+            <div class="flex items-center gap-2.5 min-w-0 flex-1">
+              <div class="w-8 h-8 rounded-lg bg-blue-500/20 text-blue-300 flex items-center justify-center text-sm font-bold flex-shrink-0">
+                📦
+              </div>
+              <div class="truncate min-w-0 flex-1">
+                <div class="mb-0.5 truncate">
+                  <span class="px-1.5 py-0.2 rounded text-[10px] font-bold bg-blue-500/20 text-blue-300 border border-blue-500/30">📦 GRUPO (${group.productCount} opciones • ${group.storeCount} tiendas)</span>
+                </div>
+                <span class="text-xs font-bold text-slate-100 block truncate flex items-center">${escapeHtml(group.name)}</span>
+                <div class="flex items-center gap-1.5 text-[10px] text-slate-400 font-semibold mt-0.5 whitespace-nowrap overflow-hidden">
+                  <span class="text-emerald-400 font-bold">${subtotalFormatted.primary}</span>
+                  ${specs ? `<span>•</span> <span>${escapeHtml(specs)}</span>` : ''}
+                </div>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-1.5 flex-shrink-0">
+              <button class="btn-cart-minus w-7 h-7 rounded-lg bg-slate-700 hover:bg-red-500/30 text-slate-200 hover:text-red-400 font-black flex items-center justify-center transition" data-name="${escapeHtml(name)}" title="Restar 1 unidad">
+                <svg class="w-3.5 h-3.5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M20 12H4"/></svg>
+              </button>
+              <span class="px-2 py-0.5 rounded-md bg-slate-900 border border-slate-700 text-xs font-black text-blue-400 min-w-[28px] text-center">
+                x${qty}
+              </span>
+              <button class="btn-cart-plus w-7 h-7 rounded-lg bg-slate-700 hover:bg-emerald-500/30 text-slate-200 hover:text-emerald-400 font-black flex items-center justify-center transition" data-name="${escapeHtml(name)}" title="Añadir 1 unidad más">
+                <svg class="w-3.5 h-3.5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+              </button>
+            </div>
+          </div>
+        `;
+      }
+
+      // Individual product in cart
       const prod = productsByName.get(name) || { name };
       const store = prod && prod.store_id ? storesById.get(prod.store_id) : null;
       let itemUsd = parseFloat(prod.current_price) || 0;
@@ -2854,6 +3177,183 @@ document.addEventListener('DOMContentLoaded', async () => {
     const plan = await window.groceryPlanner.planMarket(items);
     renderPlannerOptimizationCards(plan, totalSelectedCount);
   });
+
+  // Selectores de Modo Catálogo (Individual vs Grupos)
+  const btnPlannerModeInd = document.getElementById('btnPlannerModeIndividual');
+  if (btnPlannerModeInd) {
+    btnPlannerModeInd.addEventListener('click', () => {
+      plannerCatalogMode = 'individual';
+      localStorage.setItem('app_planner_catalog_mode', 'individual');
+      updatePlannerModeUI();
+      loadPlannerProductList();
+    });
+  }
+
+  const btnPlannerModeGrp = document.getElementById('btnPlannerModeGroups');
+  if (btnPlannerModeGrp) {
+    btnPlannerModeGrp.addEventListener('click', () => {
+      plannerCatalogMode = 'groups';
+      localStorage.setItem('app_planner_catalog_mode', 'groups');
+      updatePlannerModeUI();
+      loadPlannerProductList();
+    });
+  }
+
+  // Modal de Detalle de Grupo: Agregar producto al grupo
+  const btnGroupDetailAddSubmit = document.getElementById('btnGroupDetailAddProductSubmit');
+  if (btnGroupDetailAddSubmit) {
+    btnGroupDetailAddSubmit.addEventListener('click', async () => {
+      if (!currentDetailGroup) return;
+      const addSelect = document.getElementById('groupDetailAddProductSelect');
+      const pid = addSelect ? addSelect.value : '';
+      if (!pid) {
+        showToast('Selecciona un producto para agregarlo al grupo', 'error');
+        return;
+      }
+      try {
+        await window.productGroupingService.addProductToGroup(currentDetailGroup.id, pid);
+        showToast('Producto añadido al grupo con éxito', 'success');
+        await refreshCurrentGroupDetail();
+        await loadPlannerProductList();
+      } catch (err) {
+        showToast('Error al añadir producto: ' + err.message, 'error');
+      }
+    });
+  }
+
+  // Modal de Detalle de Grupo: Renombrar grupo
+  const btnGroupDetailRename = document.getElementById('btnGroupDetailRename');
+  if (btnGroupDetailRename) {
+    btnGroupDetailRename.addEventListener('click', async () => {
+      if (!currentDetailGroup) return;
+      const newName = prompt('Ingresa el nuevo nombre para este grupo:', currentDetailGroup.name);
+      if (newName && newName.trim() && newName.trim() !== currentDetailGroup.name) {
+        try {
+          await window.productGroupingService.renameGroup(currentDetailGroup.id, newName.trim());
+          showToast(`Grupo renombrado a "${newName.trim()}"`, 'success');
+          await loadPlannerProductList();
+          const allProds = await window.db.getProducts();
+          const sGroups = await window.productGroupingService.getSavedGroups();
+          const currentRate = (window.bcvService && window.bcvService.rate > 0) ? window.bcvService.rate : 45.0;
+          const built = window.productGroupingService.buildGroups(allProds, sGroups, currentRate, activeDisplayCurrency);
+          const updated = built.find(g => g.name.toLowerCase() === newName.trim().toLowerCase());
+          if (updated) openGroupDetailModal(updated);
+          else closeModal('modalProductGroupDetail');
+        } catch (err) {
+          showToast('Error al renombrar grupo: ' + err.message, 'error');
+        }
+      }
+    });
+  }
+
+  // Modal de Detalle de Grupo: Eliminar grupo
+  const btnGroupDetailDelete = document.getElementById('btnGroupDetailDelete');
+  if (btnGroupDetailDelete) {
+    btnGroupDetailDelete.addEventListener('click', async () => {
+      if (!currentDetailGroup) return;
+      const ok = confirm(`¿Deseas eliminar el grupo "${currentDetailGroup.name}"? Los productos seguirán en el catálogo individual normalmente.`);
+      if (!ok) return;
+      try {
+        await window.productGroupingService.deleteGroup(currentDetailGroup.id);
+        closeModal('modalProductGroupDetail');
+        showToast(`Grupo "${currentDetailGroup.name}" eliminado`, 'info');
+        await loadPlannerProductList();
+      } catch (err) {
+        showToast('Error al eliminar grupo: ' + err.message, 'error');
+      }
+    });
+  }
+
+  // Abrir modal de creación manual de grupo
+  const btnOpenCreateGroup = document.getElementById('btnOpenCreateGroupModal');
+  if (btnOpenCreateGroup) {
+    btnOpenCreateGroup.addEventListener('click', async () => {
+      document.getElementById('inputNewGroupName').value = '';
+      document.getElementById('inputNewGroupKeywords').value = '';
+      const filterInput = document.getElementById('createGroupFilterInput');
+      if (filterInput) filterInput.value = '';
+      const countEl = document.getElementById('createGroupSelectionCount');
+      if (countEl) countEl.textContent = '0 seleccionados';
+
+      const products = await window.db.getProducts();
+      const stores = await window.db.getStores();
+      const storesById = new Map();
+      stores.forEach(s => storesById.set(s.id, s));
+      products.sort((a, b) => a.name.localeCompare(b.name, 'es', { sensitivity: 'base' }));
+
+      const checklist = document.getElementById('createGroupProductsChecklist');
+      if (checklist) {
+        checklist.innerHTML = products.map(p => {
+          const s = p.store_id ? storesById.get(p.store_id) : null;
+          const sName = s ? s.name : 'Tienda';
+          return `
+            <label class="group-create-item flex items-center justify-between p-1.5 rounded-lg hover:bg-slate-800 text-xs text-slate-200 cursor-pointer" data-filter="${escapeHtml((p.name + ' ' + sName).toLowerCase())}">
+              <div class="flex items-center gap-2 truncate flex-1 min-w-0">
+                <input type="checkbox" value="${p.id}" class="chk-new-group-prod rounded border-slate-700 text-blue-500 focus:ring-0">
+                <span class="truncate">${escapeHtml(p.name)}</span>
+              </div>
+              <span class="text-[10px] text-slate-400 font-normal ml-2 flex-shrink-0">${escapeHtml(sName)} • $${parseFloat(p.current_price || 0).toFixed(2)}</span>
+            </label>
+          `;
+        }).join('');
+
+        checklist.querySelectorAll('.chk-new-group-prod').forEach(chk => {
+          chk.addEventListener('change', () => {
+            const selectedCount = checklist.querySelectorAll('.chk-new-group-prod:checked').length;
+            if (countEl) countEl.textContent = `${selectedCount} seleccionados`;
+          });
+        });
+      }
+
+      openModal('modalCreateProductGroup');
+    });
+  }
+
+  // Filtrado en tiempo real dentro del checklist del modal de nuevo grupo
+  const inputCreateGroupFilter = document.getElementById('createGroupFilterInput');
+  if (inputCreateGroupFilter) {
+    inputCreateGroupFilter.addEventListener('input', (e) => {
+      const q = (e.target.value || '').toLowerCase().trim();
+      const checklist = document.getElementById('createGroupProductsChecklist');
+      if (!checklist) return;
+      checklist.querySelectorAll('.group-create-item').forEach(item => {
+        const f = item.dataset.filter || '';
+        item.style.display = (!q || f.includes(q)) ? 'flex' : 'none';
+      });
+    });
+  }
+
+  // Guardar nuevo grupo manual
+  const formCreateProductGroup = document.getElementById('formCreateProductGroup');
+  if (formCreateProductGroup) {
+    formCreateProductGroup.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const name = (document.getElementById('inputNewGroupName').value || '').trim();
+      const keywords = (document.getElementById('inputNewGroupKeywords').value || '').trim();
+      if (!name) {
+        showToast('Ingresa un nombre para el grupo', 'error');
+        return;
+      }
+
+      const checklist = document.getElementById('createGroupProductsChecklist');
+      const checkedIds = checklist
+        ? Array.from(checklist.querySelectorAll('.chk-new-group-prod:checked')).map(c => parseInt(c.value, 10))
+        : [];
+
+      try {
+        await window.productGroupingService.createManualGroup({
+          name,
+          keywords,
+          productIds: checkedIds
+        });
+        closeModal('modalCreateProductGroup');
+        showToast(`Grupo manual "${name}" guardado exitosamente`, 'success');
+        await loadPlannerProductList();
+      } catch (err) {
+        showToast('Error al crear grupo: ' + err.message, 'error');
+      }
+    });
+  }
 
   // ----------------------------------------------------
   // 5. CONTABILIDAD (EXPENSES)
@@ -4397,7 +4897,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // REGISTRO DE SERVICE WORKER (PWA)
   // ----------------------------------------------------
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js?v=30').then((reg) => {
+    navigator.serviceWorker.register('./sw.js?v=31').then((reg) => {
       console.log('Service Worker registrado con éxito:', reg.scope);
       reg.update();
     }).catch((err) => {

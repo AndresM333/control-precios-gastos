@@ -76,6 +76,20 @@ class GroceryPlannerService {
     const userLoc = await this.getUserLocation();
     const currentRate = window.bcvService.rate;
 
+    // Mapa de grupos de productos para optimización inteligente de canastas por grupos
+    const groupsMap = new Map();
+    if (window.productGroupingService) {
+      try {
+        const savedGroups = await window.productGroupingService.getSavedGroups();
+        const builtGroups = window.productGroupingService.buildGroups(allProducts, savedGroups, currentRate);
+        builtGroups.forEach(g => {
+          groupsMap.set(g.name.trim().toLowerCase(), new Set(g.products.map(p => p.id)));
+        });
+      } catch (errG) {
+        console.warn('Error al mapear grupos para el optimizador:', errG);
+      }
+    }
+
     const storeAnalysis = [];
 
     for (const store of stores) {
@@ -92,11 +106,22 @@ class GroceryPlannerService {
         const qty = itemsMap[targetName] || 1;
         const targetClean = targetName.trim().toLowerCase();
 
-        // Buscar coincidencia en los productos de la tienda
-        const found = storeProducts.find(p => {
+        // Buscar coincidencia en los productos de la tienda (por nombre exacto, subcadena o grupo)
+        let found = storeProducts.find(p => {
           const pClean = p.name.trim().toLowerCase();
           return pClean === targetClean || pClean.includes(targetClean) || targetClean.includes(pClean);
         });
+
+        // Si no se encontró por coincidencia directa de texto, verificar por grupo de productos
+        if (!found && groupsMap.has(targetClean)) {
+          const groupProductIds = groupsMap.get(targetClean);
+          const storeGroupCandidates = storeProducts.filter(p => groupProductIds.has(p.id));
+          if (storeGroupCandidates.length > 0) {
+            // Seleccionar la opción más económica de ese grupo en esta tienda
+            storeGroupCandidates.sort((a, b) => (parseFloat(a.current_price) || 0) - (parseFloat(b.current_price) || 0));
+            found = storeGroupCandidates[0];
+          }
+        }
 
         if (found) {
           let priceUsd = parseFloat(found.current_price);

@@ -1,6 +1,6 @@
 // IndexedDB Engine for "Control de Precios y Gastos"
 const DB_NAME = 'ControlPreciosGastosDB';
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 
 class AppDB {
   constructor() {
@@ -69,6 +69,13 @@ class AppDB {
           notifOS.createIndex('group_id', 'group_id', { unique: false });
           notifOS.createIndex('created_at', 'created_at', { unique: false });
           notifOS.createIndex('read', 'read', { unique: false });
+        }
+
+        // Product Groups (Agrupación de productos similares o genéricos)
+        if (!db.objectStoreNames.contains('product_groups')) {
+          const pgOS = db.createObjectStore('product_groups', { keyPath: 'id', autoIncrement: true });
+          pgOS.createIndex('name', 'name', { unique: false });
+          pgOS.createIndex('workspace_id', 'workspace_id', { unique: false });
         }
       };
 
@@ -412,6 +419,49 @@ class AppDB {
     return this.delete('groups', id);
   }
 
+  // --- Product Groups (Grupos de Productos Similares / Genéricos) ---
+  async getProductGroups(workspaceId = null) {
+    const all = await this.getAll('product_groups');
+    if (workspaceId === 'ALL') return all;
+    const targetWs = workspaceId || (window.authGroups ? window.authGroups.getActiveWorkspaceId() : 'personal');
+    return all.filter(g => (g.workspace_id || 'personal') === targetWs);
+  }
+
+  async getProductGroupById(id) {
+    return this.getById('product_groups', parseInt(id, 10));
+  }
+
+  async saveProductGroup(groupData) {
+    if (!groupData.workspace_id) {
+      groupData.workspace_id = window.authGroups ? window.authGroups.getActiveWorkspaceId() : 'personal';
+    }
+    const now = new Date().toISOString();
+    groupData.updated_at = now;
+    if (!groupData.created_at) groupData.created_at = now;
+
+    if (groupData.id === undefined || groupData.id === null || groupData.id === '' || isNaN(groupData.id)) {
+      delete groupData.id;
+      const newId = await this.add('product_groups', groupData);
+      groupData.id = newId;
+      return groupData;
+    } else {
+      groupData.id = parseInt(groupData.id, 10);
+      await this.put('product_groups', groupData);
+      return groupData;
+    }
+  }
+
+  async deleteProductGroup(groupId) {
+    const id = parseInt(groupId, 10);
+    return this.delete('product_groups', id);
+  }
+
+  async findProductGroupByName(name, workspaceId = null) {
+    const groups = await this.getProductGroups(workspaceId);
+    const clean = (name || '').trim().toLowerCase();
+    return groups.find(g => (g.name || '').trim().toLowerCase() === clean);
+  }
+
   async deleteProduct(productId) {
     // Delete product and its price history
     const history = await this.getPriceHistory(productId);
@@ -564,6 +614,9 @@ class AppDB {
     await this.clear('expenses');
     await this.clear('invoices');
     await this.clear('notifications');
+    if (this.db && this.db.objectStoreNames.contains('product_groups')) {
+      await this.clear('product_groups');
+    }
     await this.setSetting('app_clean_install', true);
     console.log('Base de datos reseteada a instalación limpia (0 datos preestablecidos).');
     return true;

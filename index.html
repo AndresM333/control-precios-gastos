@@ -12,7 +12,7 @@
   <link rel="manifest" href="./manifest.json">
   <link rel="icon" type="image/svg+xml" href="./icons/icon.svg">
   <link rel="apple-touch-icon" href="./icons/icon.svg">
-  <link rel="stylesheet" href="./css/styles.css?v=30">
+  <link rel="stylesheet" href="./css/styles.css?v=31">
   <!-- Tailwind Utilities (CDN for instant responsive styling) -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -436,11 +436,26 @@
       <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 planner-main-grid">
         <!-- Col 1: Catálogo Disponible con botón + (4 cols) -->
         <div class="lg:col-span-4 bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col h-full">
-          <div class="flex items-center justify-between mb-3">
+          <div class="flex items-center justify-between mb-2">
             <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
               <span>🏷️</span> 1. Catálogo Disponible
             </h3>
             <span id="plannerCatalogTotal" class="text-[11px] font-semibold text-slate-400">0 productos</span>
+          </div>
+
+          <!-- Selector de Modo de Vista en Catálogo (Individual vs Grupos de Nombres Similares) -->
+          <div class="flex items-center justify-between gap-2 mb-2.5">
+            <div class="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800 flex-1 max-w-[210px]">
+              <button type="button" id="btnPlannerModeIndividual" class="flex-1 py-1 px-2 rounded-lg text-[11px] font-bold transition bg-blue-600 text-white shadow" title="Ver productos de forma individual">
+                🏷️ Individual
+              </button>
+              <button type="button" id="btnPlannerModeGroups" class="flex-1 py-1 px-2 rounded-lg text-[11px] font-bold transition text-slate-400 hover:text-slate-200" title="Ver productos agrupados por nombre similar / marcas">
+                📦 Grupos
+              </button>
+            </div>
+            <button type="button" id="btnOpenCreateGroupModal" class="btn btn-secondary btn-sm text-[11px] py-1 px-2.5 hidden flex items-center gap-1 text-blue-400 hover:text-blue-300 font-bold" title="Crear un nuevo grupo de productos manualmente">
+              <span>➕</span> Nuevo Grupo
+            </button>
           </div>
 
           <input type="text" id="plannerSearchInput" class="form-input w-full text-xs mb-3" placeholder="Buscar en catálogo...">
@@ -1344,6 +1359,120 @@
     </div>
   </div>
 
+  <!-- MODAL: DETALLE Y EDICIÓN DE GRUPO DE PRODUCTOS -->
+  <div id="modalProductGroupDetail" class="modal-overlay">
+    <div class="modal-content max-w-lg">
+      <div class="modal-header">
+        <div class="flex items-center gap-2.5 min-w-0">
+          <span class="text-2xl flex-shrink-0">📦</span>
+          <div class="min-w-0 flex-1">
+            <h3 id="groupDetailTitle" class="modal-title truncate">Detalle del Grupo</h3>
+            <span id="groupDetailBadge" class="text-[11px] font-semibold text-slate-400">0 productos</span>
+          </div>
+        </div>
+        <button class="modal-close" data-modal="modalProductGroupDetail">&times;</button>
+      </div>
+
+      <div class="modal-body space-y-3.5">
+        <!-- Tarjeta de Resumen con Rangos de Precio y Medidas -->
+        <div class="p-3 rounded-xl bg-slate-900 border border-slate-800 space-y-2">
+          <div class="flex items-center justify-between text-xs">
+            <span class="text-slate-400">Rango de Precio:</span>
+            <span id="groupDetailPriceRange" class="font-bold text-emerald-400">$ 0.00</span>
+          </div>
+          <div id="groupDetailSpecsRow" class="flex items-center justify-between text-xs pt-2 border-t border-slate-800/80">
+            <span class="text-slate-400">Rango de Medidas:</span>
+            <span id="groupDetailSpecsRange" class="font-medium text-slate-200">--</span>
+          </div>
+        </div>
+
+        <!-- Acciones Rápidas: Renombrar o Desarmar -->
+        <div class="flex items-center justify-between gap-2">
+          <button type="button" id="btnGroupDetailRename" class="btn btn-secondary btn-sm text-xs py-1 px-2.5 flex items-center gap-1.5 text-slate-300">
+            <span>✏️</span> Renombrar Grupo
+          </button>
+          <button type="button" id="btnGroupDetailDelete" class="btn btn-secondary btn-sm text-xs py-1 px-2.5 text-red-400 hover:text-red-300 hover:bg-red-500/10 border-red-500/20 flex items-center gap-1.5">
+            <span>🗑️</span> Desarmar Grupo
+          </button>
+        </div>
+
+        <!-- Sección: Lista de Productos en este Grupo -->
+        <div>
+          <div class="flex items-center justify-between mb-2">
+            <h4 class="text-xs font-bold uppercase tracking-wider text-slate-300">Productos en este grupo</h4>
+            <span id="groupDetailCount" class="text-[11px] text-slate-400 font-semibold">0</span>
+          </div>
+          <div id="groupDetailProductsList" class="space-y-2 max-h-[36vh] overflow-y-auto pr-1">
+            <!-- Rendered dynamically -->
+          </div>
+        </div>
+
+        <!-- Sección: Agregar otro producto existente a este grupo -->
+        <div class="pt-3 border-t border-slate-800 space-y-2">
+          <label class="text-xs font-bold text-slate-300 block">➕ Añadir otro producto a este grupo</label>
+          <div class="flex items-center gap-2">
+            <select id="groupDetailAddProductSelect" class="form-select text-xs flex-1">
+              <option value="">Selecciona un producto para agregarlo...</option>
+            </select>
+            <button type="button" id="btnGroupDetailAddProductSubmit" class="btn btn-primary btn-sm text-xs py-2 px-3 font-bold whitespace-nowrap">
+              Agregar
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-modal="modalProductGroupDetail">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: CREAR GRUPO MANUAL DE PRODUCTOS -->
+  <div id="modalCreateProductGroup" class="modal-overlay">
+    <div class="modal-content max-w-md">
+      <div class="modal-header">
+        <div class="flex items-center gap-2">
+          <span class="text-xl">✨📦</span>
+          <h3 class="modal-title">Nuevo Grupo Manual</h3>
+        </div>
+        <button class="modal-close" data-modal="modalCreateProductGroup">&times;</button>
+      </div>
+
+      <form id="formCreateProductGroup" class="modal-body space-y-3.5">
+        <div class="form-group">
+          <label class="form-label">Nombre del Grupo *</label>
+          <input type="text" id="inputNewGroupName" class="form-input text-xs" required placeholder="Ej: Jugo de Manzana, Arroz Blanco, Harina de Maíz">
+          <p class="text-[11px] text-slate-400 mt-1">El sistema usará este nombre para agrupar productos similares futuros sin confundirse.</p>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label flex items-center justify-between">
+            <span>Palabras clave o alias</span>
+            <span class="text-[10px] text-slate-500 font-normal">Opcional</span>
+          </label>
+          <input type="text" id="inputNewGroupKeywords" class="form-input text-xs" placeholder="Ej: manzana, zumo de manzana, apple juice">
+          <p class="text-[10px] text-slate-500 mt-1">Términos separados por coma para que productos futuros se unan automáticamente.</p>
+        </div>
+
+        <div class="form-group">
+          <div class="flex items-center justify-between mb-1.5">
+            <label class="form-label mb-0">Seleccionar productos iniciales</label>
+            <span id="createGroupSelectionCount" class="text-[11px] text-blue-400 font-semibold">0 seleccionados</span>
+          </div>
+          <input type="text" id="createGroupFilterInput" class="form-input text-xs w-full mb-2" placeholder="Filtrar productos disponibles...">
+          <div id="createGroupProductsChecklist" class="space-y-1.5 max-h-44 overflow-y-auto p-2 bg-slate-900/60 rounded-xl border border-slate-800">
+            <!-- Dynamic checkboxes -->
+          </div>
+        </div>
+
+        <div class="modal-footer pt-3">
+          <button type="button" class="btn btn-secondary" data-modal="modalCreateProductGroup">Cancelar</button>
+          <button type="submit" class="btn btn-primary font-bold shadow-lg shadow-blue-500/20">Guardar Grupo</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- MODAL: AVISO DE UBICACIÓN DESACTIVADA -->
   <div id="modalLocationDenied" class="modal-overlay">
     <div class="modal-content max-w-md">
@@ -1764,16 +1893,17 @@
   <div id="toastContainer" class="toast-container"></div>
 
   <!-- Core Scripts -->
-  <script src="./js/db.js?v=30"></script>
-  <script src="./js/icons-library.js?v=30"></script>
-  <script src="./js/bcv.js?v=30"></script>
-  <script src="./js/image-compressor.js?v=30"></script>
-  <script src="./js/ai-scanner.js?v=30"></script>
-  <script src="./js/charts.js?v=30"></script>
-  <script src="./js/grocery-planner.js?v=30"></script>
-  <script src="./js/accounting.js?v=30"></script>
-  <script src="./js/backup-drive.js?v=30"></script>
-  <script src="./js/auth-groups.js?v=30"></script>
-  <script src="./js/app.js?v=30"></script>
+  <script src="./js/db.js?v=31"></script>
+  <script src="./js/icons-library.js?v=31"></script>
+  <script src="./js/bcv.js?v=31"></script>
+  <script src="./js/image-compressor.js?v=31"></script>
+  <script src="./js/ai-scanner.js?v=31"></script>
+  <script src="./js/charts.js?v=31"></script>
+  <script src="./js/grocery-planner.js?v=31"></script>
+  <script src="./js/product-groups.js?v=31"></script>
+  <script src="./js/accounting.js?v=31"></script>
+  <script src="./js/backup-drive.js?v=31"></script>
+  <script src="./js/auth-groups.js?v=31"></script>
+  <script src="./js/app.js?v=31"></script>
 </body>
 </html>
