@@ -29,6 +29,7 @@ class BackupDriveService {
     let priceHistory = includeHistory ? await window.db.getAll('price_history') : [];
     let invoices = includeInvoices ? await window.db.getInvoices() : [];
     let expenses = includeExpenses ? await window.db.getExpenses() : [];
+    let groups = (window.db && window.db.getGroups) ? await window.db.getGroups() : [];
 
     // 1. Filtrar Tiendas
     if (storeIds !== 'ALL' && Array.isArray(storeIds)) {
@@ -67,6 +68,7 @@ class BackupDriveService {
         price_history_count: priceHistory.length,
         invoices_count: invoices.length,
         expenses_count: expenses.length,
+        groups_count: (groups || []).length,
         has_numeric_suffix: appendNumericSuffix
       },
       data: {
@@ -74,7 +76,8 @@ class BackupDriveService {
         products,
         price_history: priceHistory,
         invoices,
-        expenses
+        expenses,
+        groups: groups || []
       }
     };
 
@@ -159,7 +162,10 @@ class BackupDriveService {
    */
   async executeImport(rawPayload, selectedStoreOldIds, conflictStrategy = 'RENAME_WITH_NUMBER') {
     const currentRate = window.bcvService.rate;
-    const storesToImport = (rawPayload.data.stores || []).filter(s => selectedStoreOldIds.includes(s.id));
+    const storeIdList = (selectedStoreOldIds === 'ALL' || !Array.isArray(selectedStoreOldIds))
+      ? (rawPayload.data.stores || []).map(s => s.id)
+      : (selectedStoreOldIds || []);
+    const storesToImport = (rawPayload.data.stores || []).filter(s => storeIdList.includes(s.id));
     const allProducts = rawPayload.data.products || [];
     const allHistory = rawPayload.data.price_history || [];
     const allExpenses = rawPayload.data.expenses || [];
@@ -258,6 +264,20 @@ class BackupDriveService {
       }
     }
 
+    // Importar grupos compartidos si vienen en el paquete
+    if (rawPayload.data && Array.isArray(rawPayload.data.groups)) {
+      for (const grp of rawPayload.data.groups) {
+        if (!grp || !grp.id) continue;
+        const existingGrp = await window.db.getById('groups', grp.id);
+        if (!existingGrp) {
+          await window.db.saveGroup(grp);
+        }
+      }
+      if (window.authGroups) {
+        await window.authGroups.refreshUserGroups();
+      }
+    }
+
     return {
       importedStoresCount,
       importedProductsCount,
@@ -276,16 +296,97 @@ class BackupDriveService {
   }
 
   /**
-   * Realiza un respaldo instantáneo a Google Drive con la cuenta de Google activa
+   * Obtiene un token de acceso OAuth2 de Google con alcance drive.file
    */
-  async syncToGoogleDrive() {
-    const user = window.authGroups ? window.authGroups.getCurrentUser() : null;
-    if (!user || !user.email) {
-      throw new Error('Debes iniciar sesión con tu cuenta de Google para respaldar en Google Drive.');
+  async getDriveAccessToken() {
+    return new Promise(async (resolve, reject) => {
+      const user = window.authGroups ? window.authGroups.getCurrentUser() : null;
+      if (!user || !user.email) {
+        return reject(new Error('Debes iniciar sesión con tu cuenta de Google.'));
+      }
+
+      // 1. Revisar token en caché de sesión
+      const cachedToken = sessionStorage.getItem('gdrive_access_token');
+      const cachedExpiry = sessionStorage.getItem('gdrive_token_expires_at');
+      if (cachedToken && cachedExpiry && Date.now() < parseInt(cachedExpiry, 10)) {
+        return resolve(cachedToken);
+      }
+
+      // 2. Verificar que Google GIS esté disponible
+      if (!window.google || !window.google.accounts || !window.google.accounts.oauth2) {
+        return reject(new Error('La librería Google Identity Services no está lista aún. Reintenta en unos segundos.'));
+      }
+
+      const clientId = (typeof GOOGLE_CLIENT_ID_CONFIG !== 'undefined' && GOOGLE_CLIENT_ID_CONFIG) 
+        ? GOOGLE_CLIENT_ID_CONFIG.trim() 
+        : (await window.db.getSetting('google_client_id') || '');
+
+      if (!clientId) {
+        return reject(new Error('No se ha configurado el Client ID de Google OAuth.'));
+      }
+
+      try {
+        const tokenClient = window.google.accounts.oauth2.initTokenClient({
+          client_id: clientId,
+          scope: 'https://www.googleapis.com/auth/drive.file',
+          hint: user.email,
+          prompt: '',
+          callback: (response) => {
+            if (response.error) {
+              return reject(new Error(`Permiso de Google Drive no otorgado: ${response.error}`));
+            }
+            if (response.access_token) {
+              const expiresInMs = (parseInt(response.expires_in, 10) || 3500) * 1000;
+              sessionStorage.setItem('gdrive_access_token', response.access_token);
+              sessionStorage.setItem('gdrive_token_expires_at', String(Date.now() + expiresInMs - 60000));
+              return resolve(response.access_token);
+            }
+            reject(new Error('No se recibió el token de acceso de Google Drive.'));
+          }
+        });
+
+        tokenClient.requestAccessToken({ prompt: '' });
+      } catch (err) {
+        reject(err);
+      }
+    });
+  }
+
+  /**
+   * Busca si ya existe el archivo de respaldo en Google Drive
+   */
+  async findDriveBackupFile(accessToken) {
+    const query = encodeURIComponent("name = 'control_precios_gastos_backup.json' and trashed = false");
+    const url = `https://www.googleapis.com/drive/v3/files?q=${query}&fields=files(id,name,modifiedTime,size)&spaces=drive`;
+    
+    const response = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`
+      }
+    });
+
+    if (!response.ok) {
+      const errData = await response.json().catch(() => ({}));
+      const msg = errData.error?.message || '';
+      if (response.status === 403 && (msg.includes('Google Drive API has not been used') || msg.includes('disabled'))) {
+        const apiError = new Error('GOOGLE_DRIVE_API_DISABLED');
+        apiError.details = msg;
+        throw apiError;
+      }
+      throw new Error(msg || `Error ${response.status} al consultar Google Drive`);
     }
 
-    if (!this.syncEnabled) {
-      throw new Error('La sincronización con Google Drive está desactivada en Ajustes.');
+    const data = await response.json();
+    return (data.files && data.files.length > 0) ? data.files[0] : null;
+  }
+
+  /**
+   * Sube o actualiza el archivo de respaldo en Google Drive
+   */
+  async uploadToGoogleDrive() {
+    const user = window.authGroups ? window.authGroups.getCurrentUser() : null;
+    if (!user || !user.email) {
+      throw new Error('Debes iniciar sesión con tu cuenta de Google.');
     }
 
     this.isSyncing = true;
@@ -293,7 +394,6 @@ class BackupDriveService {
     await window.db.setSetting('drive_user_email', user.email);
 
     try {
-      // 1. Generar payload completo
       const payload = await this.generateExportPackage({
         storeIds: 'ALL',
         productIds: 'ALL',
@@ -303,16 +403,68 @@ class BackupDriveService {
         appendNumericSuffix: false
       });
 
-      // Metadatos de la cuenta oficial de Google asociada
       payload.metadata.user_email = user.email;
       payload.metadata.user_name = user.displayName || user.email;
       payload.metadata.synced_at = new Date().toISOString();
 
-      // Guardar en Storage local indexado por la cuenta de Google
       const jsonStr = JSON.stringify(payload);
       localStorage.setItem(`drive_backup_${user.email}`, jsonStr);
       localStorage.setItem('last_drive_sync_payload', jsonStr);
-      
+
+      const token = await this.getDriveAccessToken();
+      const existingFile = await this.findDriveBackupFile(token);
+
+      if (existingFile && existingFile.id) {
+        // Actualizar archivo existente (PATCH media)
+        const updateUrl = `https://www.googleapis.com/upload/drive/v3/files/${existingFile.id}?uploadType=media`;
+        const patchRes = await fetch(updateUrl, {
+          method: 'PATCH',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: jsonStr
+        });
+
+        if (!patchRes.ok) {
+          const errData = await patchRes.json().catch(() => ({}));
+          throw new Error(errData.error?.message || `Error ${patchRes.status} al actualizar respaldo en Google Drive`);
+        }
+      } else {
+        // Crear nuevo archivo con multipart upload
+        const metadata = {
+          name: 'control_precios_gastos_backup.json',
+          mimeType: 'application/json',
+          description: `Respaldo sincronizado de Control de Precios y Gastos (${user.email})`
+        };
+
+        const boundary = '-------PGDriveBoundary' + Date.now();
+        const delimiter = "\r\n--" + boundary + "\r\n";
+        const closeDelim = "\r\n--" + boundary + "--";
+
+        const multipartBody = delimiter +
+          'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
+          JSON.stringify(metadata) +
+          delimiter +
+          'Content-Type: application/json\r\n\r\n' +
+          jsonStr +
+          closeDelim;
+
+        const createRes = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': `multipart/related; boundary="${boundary}"`
+          },
+          body: multipartBody
+        });
+
+        if (!createRes.ok) {
+          const errData = await createRes.json().catch(() => ({}));
+          throw new Error(errData.error?.message || `Error ${createRes.status} al crear archivo en Google Drive`);
+        }
+      }
+
       this.lastSync = new Date().toISOString();
       await window.db.setSetting('drive_last_sync', this.lastSync);
 
@@ -320,11 +472,59 @@ class BackupDriveService {
         success: true,
         userEmail: user.email,
         syncedAt: this.lastSync,
-        recordsCount: payload.metadata.stores_count + payload.metadata.products_count
+        storesCount: payload.metadata.stores_count,
+        productsCount: payload.metadata.products_count
       };
     } finally {
       this.isSyncing = false;
     }
+  }
+
+  /**
+   * Descarga el archivo de respaldo desde Google Drive
+   */
+  async downloadFromGoogleDrive() {
+    const user = window.authGroups ? window.authGroups.getCurrentUser() : null;
+    if (!user || !user.email) {
+      throw new Error('Debes iniciar sesión con tu cuenta de Google.');
+    }
+
+    const token = await this.getDriveAccessToken();
+    const file = await this.findDriveBackupFile(token);
+
+    if (!file || !file.id) {
+      throw new Error('No se encontró ningún archivo de respaldo en tu Google Drive. Pulsa primero "Subir a Drive" en el otro dispositivo.');
+    }
+
+    const downloadUrl = `https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`;
+    const res = await fetch(downloadUrl, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.error?.message || `Error ${res.status} al descargar archivo desde Google Drive`);
+    }
+
+    const payload = await res.json();
+    if (!payload.data || !Array.isArray(payload.data.stores)) {
+      throw new Error('El archivo guardado en Google Drive no tiene un formato válido de Precios & Gastos.');
+    }
+
+    return {
+      fileId: file.id,
+      modifiedTime: file.modifiedTime,
+      payload: payload
+    };
+  }
+
+  /**
+   * Realiza un respaldo instantáneo a Google Drive con la cuenta de Google activa
+   */
+  async syncToGoogleDrive() {
+    return this.uploadToGoogleDrive();
   }
 }
 

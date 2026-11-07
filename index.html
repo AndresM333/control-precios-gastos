@@ -12,7 +12,7 @@
   <link rel="manifest" href="./manifest.json">
   <link rel="icon" type="image/svg+xml" href="./icons/icon.svg">
   <link rel="apple-touch-icon" href="./icons/icon.svg">
-  <link rel="stylesheet" href="./css/styles.css?v=24">
+  <link rel="stylesheet" href="./css/styles.css?v=25">
   <!-- Tailwind Utilities (CDN for instant responsive styling) -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -677,7 +677,7 @@
             <h3 class="font-bold text-slate-100 text-sm">Sincronización con Google Drive</h3>
           </div>
           <p class="text-xs text-slate-400 mb-3 leading-relaxed">
-            Respalda automáticamente tu biblioteca de tiendas y precios en la nube de Google vinculada a tu cuenta oficial.
+            Sincroniza y comparte tus tiendas, precios y grupos entre tu computadora y teléfono celular usando tu misma cuenta oficial de Google.
           </p>
 
           <!-- Banner de Cuenta de Google Vinculada -->
@@ -696,7 +696,7 @@
 
           <div class="flex items-center justify-between p-3 bg-slate-800/60 rounded-xl border border-slate-700/60 mb-3">
             <div>
-              <span class="text-xs font-bold text-slate-200 block">Sincronización en Drive</span>
+              <span class="text-xs font-bold text-slate-200 block">Sincronización Automática</span>
               <span id="driveStatusDesc" class="text-[11px] text-slate-400">Requiere iniciar sesión con Google</span>
             </div>
             <label class="relative inline-flex items-center cursor-pointer">
@@ -704,9 +704,32 @@
               <div class="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:width-5 after:transition-all peer-checked:bg-emerald-600"></div>
             </label>
           </div>
-          <button id="btnManualDriveSync" class="btn btn-secondary btn-sm w-full flex items-center justify-center gap-2">
-            <span>🔄</span> Sincronizar Ahora con Drive
-          </button>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
+            <button id="btnManualDriveSync" class="btn btn-primary btn-sm w-full flex items-center justify-center gap-1.5 py-2" title="Sube las tiendas y productos de este equipo a tu Google Drive">
+              <span>⬆️</span> Subir a Drive
+            </button>
+            <button id="btnRestoreDriveSync" class="btn btn-secondary btn-sm w-full flex items-center justify-center gap-1.5 py-2" title="Descarga y restaura en este dispositivo los datos guardados en Drive">
+              <span>⬇️</span> Descargar de Drive
+            </button>
+          </div>
+
+          <!-- Info de Estado de Sincronización -->
+          <div id="driveLastSyncBox" class="p-2.5 bg-slate-950/70 border border-slate-800 rounded-xl text-[11px] text-slate-400 flex items-center justify-between mb-2">
+            <span>Última sincronización:</span>
+            <span id="driveLastSyncTime" class="font-semibold text-slate-300">Nunca</span>
+          </div>
+
+          <!-- Aviso en caso de requerir habilitar API en GCP -->
+          <div id="driveApiDisabledNotice" class="hidden p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-xs text-amber-200 space-y-1.5">
+            <span class="block font-semibold">⚠️ Habilitar Google Drive API en Google Cloud:</span>
+            <span class="block text-[11px] text-slate-300">
+              Para sincronizar directamente en la nube, debes activar la API de Google Drive en tu proyecto "Mercado":
+            </span>
+            <a href="https://console.cloud.google.com/apis/library/drive.googleapis.com?project=920432502731" target="_blank" class="text-blue-400 underline font-bold block text-xs">
+              👉 Activar Google Drive API en Google Cloud (1 Clic) ↗
+            </a>
+          </div>
         </div>
 
         <!-- Card 3: Respaldo Selectivo y Compartir -->
@@ -849,6 +872,10 @@
     <button class="mobile-nav-item" data-view="accounting">
       <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
       <span>Gastos</span>
+    </button>
+    <button class="mobile-nav-item" data-view="settings">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+      <span>Ajustes</span>
     </button>
   </nav>
 
@@ -1531,6 +1558,28 @@
             <span class="font-bold text-slate-300 block">Grupos Accesibles:</span>
             <div id="userGroupsCount" class="text-slate-400">0 grupos vinculados</div>
           </div>
+
+          <!-- Acciones de Sincronización y Ajustes desde la Cuenta -->
+          <div class="p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl text-left space-y-2">
+            <div class="flex items-center justify-between text-xs font-bold text-blue-300">
+              <span class="flex items-center gap-1.5">
+                <span>☁️</span> Google Drive Sync
+              </span>
+              <span id="googleModalDriveStatusBadge" class="text-[10px] px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 font-semibold">Listo</span>
+            </div>
+            <p class="text-[11px] text-slate-400 leading-normal">
+              Comparte y sincroniza tus tiendas y precios entre tu computadora y tu teléfono con esta cuenta.
+            </p>
+            <div class="grid grid-cols-2 gap-2 pt-1">
+              <button type="button" id="btnGoogleModalSyncDrive" class="btn btn-primary btn-sm text-xs py-1.5">
+                🔄 Sincronizar
+              </button>
+              <button type="button" id="btnGoogleModalGoSettings" class="btn btn-secondary btn-sm text-xs py-1.5">
+                ⚙️ Ajustes
+              </button>
+            </div>
+          </div>
+
           <button id="btnSignOutGoogle" class="btn btn-outline-danger btn-sm w-full">
             Cerrar Sesión de Google
           </button>
@@ -1671,16 +1720,16 @@
   <div id="toastContainer" class="toast-container"></div>
 
   <!-- Core Scripts -->
-  <script src="./js/db.js?v=24"></script>
-  <script src="./js/icons-library.js?v=24"></script>
-  <script src="./js/bcv.js?v=24"></script>
-  <script src="./js/image-compressor.js?v=24"></script>
-  <script src="./js/ai-scanner.js?v=24"></script>
-  <script src="./js/charts.js?v=24"></script>
-  <script src="./js/grocery-planner.js?v=24"></script>
-  <script src="./js/accounting.js?v=24"></script>
-  <script src="./js/backup-drive.js?v=24"></script>
-  <script src="./js/auth-groups.js?v=24"></script>
-  <script src="./js/app.js?v=24"></script>
+  <script src="./js/db.js?v=25"></script>
+  <script src="./js/icons-library.js?v=25"></script>
+  <script src="./js/bcv.js?v=25"></script>
+  <script src="./js/image-compressor.js?v=25"></script>
+  <script src="./js/ai-scanner.js?v=25"></script>
+  <script src="./js/charts.js?v=25"></script>
+  <script src="./js/grocery-planner.js?v=25"></script>
+  <script src="./js/accounting.js?v=25"></script>
+  <script src="./js/backup-drive.js?v=25"></script>
+  <script src="./js/auth-groups.js?v=25"></script>
+  <script src="./js/app.js?v=25"></script>
 </body>
 </html>

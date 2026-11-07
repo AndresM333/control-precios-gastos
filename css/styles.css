@@ -297,6 +297,7 @@ body {
   align-items: center;
   justify-content: center;
   flex: 1;
+  min-width: 0;
   height: 100%;
   color: var(--text-dim);
   text-decoration: none;
@@ -306,12 +307,22 @@ body {
   background: transparent;
   cursor: pointer;
   gap: 3px;
+  padding: 0 2px;
   transition: color 0.15s;
+}
+
+.mobile-nav-item span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  font-size: 0.65rem;
 }
 
 .mobile-nav-item svg {
   width: 20px;
   height: 20px;
+  flex-shrink: 0;
 }
 
 .mobile-nav-item.active {
