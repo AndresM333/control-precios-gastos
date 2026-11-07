@@ -2452,7 +2452,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // 4. PROGRAMAR MERCADO (CANASTA CON + Y - Y MODO GRUPOS)
   // ----------------------------------------------------
   const plannerCart = new Map(); // productNameOrGroupName -> quantity
-  let plannerCatalogMode = localStorage.getItem('app_planner_catalog_mode') || 'individual';
+  let plannerCatalogMode = localStorage.getItem('app_planner_catalog_mode') || 'groups';
   let currentDetailGroup = null;
 
   function updatePlannerModeUI() {
@@ -4897,7 +4897,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // REGISTRO DE SERVICE WORKER (PWA)
   // ----------------------------------------------------
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js?v=31').then((reg) => {
+    navigator.serviceWorker.register('./sw.js?v=32').then((reg) => {
       console.log('Service Worker registrado con éxito:', reg.scope);
       reg.update();
     }).catch((err) => {

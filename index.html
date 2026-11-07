@@ -12,7 +12,7 @@
   <link rel="manifest" href="./manifest.json">
   <link rel="icon" type="image/svg+xml" href="./icons/icon.svg">
   <link rel="apple-touch-icon" href="./icons/icon.svg">
-  <link rel="stylesheet" href="./css/styles.css?v=31">
+  <link rel="stylesheet" href="./css/styles.css?v=32">
   <!-- Tailwind Utilities (CDN for instant responsive styling) -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -443,17 +443,17 @@
             <span id="plannerCatalogTotal" class="text-[11px] font-semibold text-slate-400">0 productos</span>
           </div>
 
-          <!-- Selector de Modo de Vista en Catálogo (Individual vs Grupos de Nombres Similares) -->
+          <!-- Selector de Modo de Vista en Catálogo (Grupos vs Individual) -->
           <div class="flex items-center justify-between gap-2 mb-2.5">
             <div class="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800 flex-1 max-w-[210px]">
-              <button type="button" id="btnPlannerModeIndividual" class="flex-1 py-1 px-2 rounded-lg text-[11px] font-bold transition bg-blue-600 text-white shadow" title="Ver productos de forma individual">
-                🏷️ Individual
-              </button>
-              <button type="button" id="btnPlannerModeGroups" class="flex-1 py-1 px-2 rounded-lg text-[11px] font-bold transition text-slate-400 hover:text-slate-200" title="Ver productos agrupados por nombre similar / marcas">
+              <button type="button" id="btnPlannerModeGroups" class="flex-1 py-1 px-2 rounded-lg text-[11px] font-bold transition bg-blue-600 text-white shadow" title="Ver productos agrupados por nombre similar / marcas">
                 📦 Grupos
               </button>
+              <button type="button" id="btnPlannerModeIndividual" class="flex-1 py-1 px-2 rounded-lg text-[11px] font-bold transition text-slate-400 hover:text-slate-200" title="Ver productos de forma individual">
+                🏷️ Individual
+              </button>
             </div>
-            <button type="button" id="btnOpenCreateGroupModal" class="btn btn-secondary btn-sm text-[11px] py-1 px-2.5 hidden flex items-center gap-1 text-blue-400 hover:text-blue-300 font-bold" title="Crear un nuevo grupo de productos manualmente">
+            <button type="button" id="btnOpenCreateGroupModal" class="btn btn-secondary btn-sm text-[11px] py-1 px-2.5 flex items-center gap-1 text-blue-400 hover:text-blue-300 font-bold" title="Crear un nuevo grupo de productos manualmente">
               <span>➕</span> Nuevo Grupo
             </button>
           </div>
@@ -1893,17 +1893,17 @@
   <div id="toastContainer" class="toast-container"></div>
 
   <!-- Core Scripts -->
-  <script src="./js/db.js?v=31"></script>
-  <script src="./js/icons-library.js?v=31"></script>
-  <script src="./js/bcv.js?v=31"></script>
-  <script src="./js/image-compressor.js?v=31"></script>
-  <script src="./js/ai-scanner.js?v=31"></script>
-  <script src="./js/charts.js?v=31"></script>
-  <script src="./js/grocery-planner.js?v=31"></script>
-  <script src="./js/product-groups.js?v=31"></script>
-  <script src="./js/accounting.js?v=31"></script>
-  <script src="./js/backup-drive.js?v=31"></script>
-  <script src="./js/auth-groups.js?v=31"></script>
-  <script src="./js/app.js?v=31"></script>
+  <script src="./js/db.js?v=32"></script>
+  <script src="./js/icons-library.js?v=32"></script>
+  <script src="./js/bcv.js?v=32"></script>
+  <script src="./js/image-compressor.js?v=32"></script>
+  <script src="./js/ai-scanner.js?v=32"></script>
+  <script src="./js/charts.js?v=32"></script>
+  <script src="./js/grocery-planner.js?v=32"></script>
+  <script src="./js/product-groups.js?v=32"></script>
+  <script src="./js/accounting.js?v=32"></script>
+  <script src="./js/backup-drive.js?v=32"></script>
+  <script src="./js/auth-groups.js?v=32"></script>
+  <script src="./js/app.js?v=32"></script>
 </body>
 </html>
