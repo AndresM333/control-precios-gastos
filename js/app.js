@@ -3018,22 +3018,27 @@ document.addEventListener('DOMContentLoaded', async () => {
     const cardCheapest = document.getElementById('cardBestCheapest');
     if (plan.bestCheapest) {
       cardCheapest.querySelector('.store-name').textContent = plan.bestCheapest.store.name;
-      cardCheapest.querySelector('.store-summary').textContent = `${plan.bestCheapest.available.length}/${totalSelectedCount} productos disponibles`;
+      cardCheapest.querySelector('.store-summary').textContent = `${plan.bestCheapest.available.length}/${totalSelectedCount} productos disponibles (${plan.bestCheapest.coveragePercent}%)`;
       cardCheapest.querySelector('.store-price').textContent = isVes
         ? `Bs. ${plan.bestCheapest.totalCostVES.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
         : `$ ${plan.bestCheapest.totalCostUSD.toFixed(2)}`;
     } else {
       cardCheapest.querySelector('.store-name').textContent = 'No disponible';
+      cardCheapest.querySelector('.store-summary').textContent = 'Ninguna tienda tiene los productos';
+      cardCheapest.querySelector('.store-price').textContent = '$ 0.00';
     }
 
     // 2. Tarjeta La Más Cercana
     const cardClosest = document.getElementById('cardBestClosest');
     if (plan.bestClosest) {
       cardClosest.querySelector('.store-name').textContent = plan.bestClosest.store.name;
-      cardClosest.querySelector('.store-summary').textContent = `${plan.bestClosest.available.length}/${totalSelectedCount} productos`;
-      cardClosest.querySelector('.store-distance').textContent = plan.bestClosest.distanceKm ? `${plan.bestClosest.distanceKm.toFixed(1)} km` : 'Ver en mapa';
+      cardClosest.querySelector('.store-summary').textContent = `${plan.bestClosest.available.length}/${totalSelectedCount} productos (${plan.bestClosest.coveragePercent}%)`;
+      cardClosest.querySelector('.store-distance').textContent = plan.bestClosest.distanceKm !== null
+        ? `${plan.bestClosest.distanceKm.toFixed(1)} km`
+        : 'Ver en mapa';
     } else {
       cardClosest.querySelector('.store-name').textContent = 'Ubicación requerida';
+      cardClosest.querySelector('.store-summary').textContent = 'GPS no disponible';
       cardClosest.querySelector('.store-distance').textContent = '📍 Desactivada';
     }
 
@@ -3045,11 +3050,24 @@ document.addEventListener('DOMContentLoaded', async () => {
       cardRated.querySelector('.store-rating').textContent = `⭐ ${plan.bestRated.avgRating.toFixed(1)} / 5`;
     } else {
       cardRated.querySelector('.store-name').textContent = 'Sin calificaciones';
+      cardRated.querySelector('.store-summary').textContent = 'Calidad de productos...';
       cardRated.querySelector('.store-rating').textContent = '⭐ --';
     }
 
-    // Lista comparativa detallada
+    // Lista comparativa detallada de TODOS los mercados por separado
     const listContainer = document.getElementById('plannerResultsList');
+    if (!listContainer) return;
+
+    if (!plan.recommendations || plan.recommendations.length === 0) {
+      listContainer.innerHTML = '<p class="text-xs text-slate-500 py-4 text-center">No hay tiendas registradas para comparar.</p>';
+      return;
+    }
+
+    const badgeStoresCount = document.getElementById('plannerStoresCountBadge');
+    if (badgeStoresCount) {
+      badgeStoresCount.textContent = `${plan.recommendations.length} ${plan.recommendations.length === 1 ? 'tienda' : 'tiendas'}`;
+    }
+
     listContainer.innerHTML = plan.recommendations.map(r => {
       const missingTags = r.missing.map(m => `
         <span class="text-[10px] bg-red-500/10 text-red-400 border border-red-500/20 px-1.5 py-0.5 rounded">Falta: ${escapeHtml(m.name || m)}</span>
@@ -3074,33 +3092,101 @@ document.addEventListener('DOMContentLoaded', async () => {
         ? `$ ${r.totalCostUSD.toFixed(2)} USD`
         : `Bs. ${r.totalCostVES.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
+      // 3. Distancia que hay del mercado con el usuario
+      let distanceHtml = '';
+      if (r.distanceKm !== null && !isNaN(r.distanceKm)) {
+        distanceHtml = `
+          <div class="flex items-center gap-1 text-blue-400 font-semibold" title="Distancia aproximada por GPS">
+            <span>📍</span>
+            <span>${r.distanceKm.toFixed(1)} km</span>
+          </div>
+        `;
+      } else {
+        distanceHtml = `
+          <div class="flex items-center gap-1 text-slate-500" title="Ubicación GPS no disponible o no configurada">
+            <span>📍</span>
+            <span>Sin GPS</span>
+          </div>
+        `;
+      }
+
+      // 4. Promedio de valoración
+      let ratingHtml = '';
+      if (r.avgRating !== null && !isNaN(r.avgRating)) {
+        ratingHtml = `
+          <div class="flex items-center gap-1 text-amber-400 font-bold" title="Promedio de calidad de productos en esta tienda">
+            <span>⭐</span>
+            <span>${r.avgRating.toFixed(1)} / 5</span>
+          </div>
+        `;
+      } else {
+        ratingHtml = `
+          <div class="flex items-center gap-1 text-slate-500" title="Aún no has calificado productos en esta tienda">
+            <span>⭐</span>
+            <span>Sin calificar</span>
+          </div>
+        `;
+      }
+
+      // 2. Porcentaje de cobertura de productos
+      let coverageBadge = '';
+      if (r.coveragePercent === 100) {
+        coverageBadge = `bg-emerald-500/20 text-emerald-400 border border-emerald-500/30`;
+      } else if (r.coveragePercent > 0) {
+        coverageBadge = `bg-amber-500/20 text-amber-400 border border-amber-500/30`;
+      } else {
+        coverageBadge = `bg-red-500/10 text-red-400 border border-red-500/20`;
+      }
+
+      // Enlace a Google Maps
+      const mapUrl = r.store.maps_url || (r.store.lat && r.store.lng
+        ? `https://www.google.com/maps/search/?api=1&query=${r.store.lat},${r.store.lng}`
+        : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(r.store.name + (r.store.address ? ' ' + r.store.address : ''))}`);
+
       return `
-        <div class="p-3 bg-slate-800/60 border border-slate-700/60 rounded-xl flex flex-col gap-2 text-xs">
-          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <div>
-              <div class="flex items-center gap-2">
-                <span class="font-bold text-slate-100 text-sm">${escapeHtml(r.store.name)}</span>
-                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${r.coveragePercent === 100 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'}">
-                  ${r.available.length}/${totalSelectedCount} encontrados (${r.coveragePercent}%)
+        <div class="p-3 bg-slate-800/60 border border-slate-700/60 rounded-xl flex flex-col gap-2.5 text-xs shadow-sm">
+          <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-2.5">
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center gap-2 flex-wrap mb-1">
+                <span class="font-bold text-slate-100 text-sm truncate flex items-center gap-1">
+                  <span>🏪</span> ${escapeHtml(r.store.name)}
                 </span>
+                <!-- 2. Porcentaje de los productos que hay en esa tienda -->
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold ${coverageBadge}">
+                  ${r.coveragePercent}% (${r.available.length}/${totalSelectedCount} prods)
+                </span>
+              </div>
+              <!-- 3. Distancia y 4. Promedio de valoración -->
+              <div class="flex items-center gap-3 text-[11px] mt-1 flex-wrap">
+                ${distanceHtml}
+                <span class="text-slate-600">•</span>
+                ${ratingHtml}
               </div>
             </div>
 
-            <div class="flex items-center gap-4 text-right">
+            <!-- 1. Cuánto costaría el mercado en esa tienda -->
+            <div class="flex items-center sm:items-end flex-row sm:flex-col justify-between sm:justify-start gap-2 text-right flex-shrink-0">
               <div>
-                <span class="text-sm font-extrabold text-emerald-400 block">${mainCost}</span>
-                <span class="text-[10px] text-slate-400">${subCost}</span>
+                ${r.available.length > 0 ? `
+                  <span class="text-sm font-extrabold text-emerald-400 block">${mainCost}</span>
+                  <span class="text-[10px] text-slate-400">${subCost}</span>
+                ` : `
+                  <span class="text-xs font-bold text-slate-500 block">No disponible</span>
+                  <span class="text-[10px] text-slate-500">0 del carro</span>
+                `}
               </div>
-              <a href="${r.store.maps_url || '#'}" target="_blank" class="btn btn-secondary btn-sm">
-                📍 Ir
+              <a href="${mapUrl}" target="_blank" class="btn btn-secondary btn-sm py-1 px-2.5 text-[11px] font-bold flex items-center gap-1 hover:text-blue-400">
+                <span>📍</span> Ir
               </a>
             </div>
           </div>
 
-          <div class="flex flex-wrap gap-1 pt-1 border-t border-slate-800/60">
-            ${availableItemsSummary}
-          </div>
-          ${r.missing.length > 0 ? `<div class="flex flex-wrap gap-1">${missingTags}</div>` : ''}
+          ${(availableItemsSummary || missingTags) ? `
+            <div class="pt-2 border-t border-slate-800/60 space-y-1.5">
+              ${availableItemsSummary ? `<div class="flex flex-wrap gap-1">${availableItemsSummary}</div>` : ''}
+              ${missingTags ? `<div class="flex flex-wrap gap-1">${missingTags}</div>` : ''}
+            </div>
+          ` : ''}
         </div>
       `;
     }).join('');
@@ -4897,7 +4983,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // REGISTRO DE SERVICE WORKER (PWA)
   // ----------------------------------------------------
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js?v=32').then((reg) => {
+    navigator.serviceWorker.register('./sw.js?v=33').then((reg) => {
       console.log('Service Worker registrado con éxito:', reg.scope);
       reg.update();
     }).catch((err) => {

@@ -12,7 +12,7 @@
   <link rel="manifest" href="./manifest.json">
   <link rel="icon" type="image/svg+xml" href="./icons/icon.svg">
   <link rel="apple-touch-icon" href="./icons/icon.svg">
-  <link rel="stylesheet" href="./css/styles.css?v=32">
+  <link rel="stylesheet" href="./css/styles.css?v=33">
   <!-- Tailwind Utilities (CDN for instant responsive styling) -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -545,7 +545,12 @@
 
           <!-- All Stores Comparison Details -->
           <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4">
-            <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2.5">Comparativa de Tiendas</h4>
+            <div class="flex items-center justify-between mb-3">
+              <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                <span>🏪</span> Comparativa de Todos los Mercados
+              </h4>
+              <span id="plannerStoresCountBadge" class="text-[11px] font-semibold text-blue-400"></span>
+            </div>
             <div id="plannerResultsList" class="space-y-2.5">
               <p class="text-xs text-slate-500 py-4 text-center">Agrega productos a tu canasta con + y presiona "Optimizar Compras".</p>
             </div>
@@ -1893,17 +1898,17 @@
   <div id="toastContainer" class="toast-container"></div>
 
   <!-- Core Scripts -->
-  <script src="./js/db.js?v=32"></script>
-  <script src="./js/icons-library.js?v=32"></script>
-  <script src="./js/bcv.js?v=32"></script>
-  <script src="./js/image-compressor.js?v=32"></script>
-  <script src="./js/ai-scanner.js?v=32"></script>
-  <script src="./js/charts.js?v=32"></script>
-  <script src="./js/grocery-planner.js?v=32"></script>
-  <script src="./js/product-groups.js?v=32"></script>
-  <script src="./js/accounting.js?v=32"></script>
-  <script src="./js/backup-drive.js?v=32"></script>
-  <script src="./js/auth-groups.js?v=32"></script>
-  <script src="./js/app.js?v=32"></script>
+  <script src="./js/db.js?v=33"></script>
+  <script src="./js/icons-library.js?v=33"></script>
+  <script src="./js/bcv.js?v=33"></script>
+  <script src="./js/image-compressor.js?v=33"></script>
+  <script src="./js/ai-scanner.js?v=33"></script>
+  <script src="./js/charts.js?v=33"></script>
+  <script src="./js/grocery-planner.js?v=33"></script>
+  <script src="./js/product-groups.js?v=33"></script>
+  <script src="./js/accounting.js?v=33"></script>
+  <script src="./js/backup-drive.js?v=33"></script>
+  <script src="./js/auth-groups.js?v=33"></script>
+  <script src="./js/app.js?v=33"></script>
 </body>
 </html>

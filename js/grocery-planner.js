@@ -162,22 +162,34 @@ class GroceryPlannerService {
         distanceKm = this.calculateDistanceKm(userLoc.lat, userLoc.lng, store.lat, store.lng);
       }
 
-      const avgRating = ratingsCount > 0 ? (ratingsSum / ratingsCount) : null;
-      const coverage = (available.length / selectedProductNames.length) * 100;
-
-      if (available.length > 0) {
-        storeAnalysis.push({
-          store,
-          available,
-          missing,
-          coveragePercent: Math.round(coverage),
-          totalCostUSD,
-          totalCostVES,
-          distanceKm,
-          avgRating,
-          ratingsCount
-        });
+      // Promedio de valoración: primero de los productos encontrados en el carro
+      let avgRating = ratingsCount > 0 ? (ratingsSum / ratingsCount) : null;
+      // Si ninguno en el carro tiene estrellas, obtener el promedio general de productos calificados de la tienda
+      if (avgRating === null) {
+        const allStoreRated = storeProducts.filter(p => p.rating && !isNaN(p.rating) && p.rating > 0);
+        if (allStoreRated.length > 0) {
+          const sumAll = allStoreRated.reduce((acc, p) => acc + parseInt(p.rating, 10), 0);
+          avgRating = sumAll / allStoreRated.length;
+          ratingsCount = allStoreRated.length;
+        }
       }
+
+      const coverage = selectedProductNames.length > 0
+        ? (available.length / selectedProductNames.length) * 100
+        : 0;
+
+      // Incluir todos los mercados por separado para comparación completa
+      storeAnalysis.push({
+        store,
+        available,
+        missing,
+        coveragePercent: Math.round(coverage),
+        totalCostUSD,
+        totalCostVES,
+        distanceKm,
+        avgRating,
+        ratingsCount
+      });
     }
 
     if (storeAnalysis.length === 0) {
@@ -190,39 +202,49 @@ class GroceryPlannerService {
       };
     }
 
-    // 1. Filtrar las que tienen mejor cobertura de productos (priorizar tiendas completas)
-    const maxItemsAvailable = Math.max(...storeAnalysis.map(s => s.available.length));
-    const topCoverageStores = storeAnalysis.filter(s => s.available.length === maxItemsAvailable);
+    // 1. Filtrar las que tienen mejor cobertura de productos (priorizar tiendas completas con >0 productos)
+    const maxItemsAvailable = Math.max(...storeAnalysis.map(s => s.available.length), 0);
+    const topCoverageStores = maxItemsAvailable > 0
+      ? storeAnalysis.filter(s => s.available.length === maxItemsAvailable)
+      : [];
 
     // 2. Opción A: La tienda más barata (de las que tienen mayor cobertura)
     const sortedByPrice = [...topCoverageStores].sort((a, b) => a.totalCostUSD - b.totalCostUSD);
     const bestCheapest = sortedByPrice[0] || null;
 
-    // 3. Opción B: La tienda más cercana
-    const storesWithDistance = storeAnalysis.filter(s => s.distanceKm !== null);
+    // 3. Opción B: La tienda más cercana (con productos disponibles si es posible)
+    const storesWithDistanceAndProds = storeAnalysis.filter(s => s.distanceKm !== null && s.available.length > 0);
+    const storesWithDistanceAny = storeAnalysis.filter(s => s.distanceKm !== null);
     let bestClosest = null;
-    if (storesWithDistance.length > 0) {
-      bestClosest = [...storesWithDistance].sort((a, b) => a.distanceKm - b.distanceKm)[0];
+    if (storesWithDistanceAndProds.length > 0) {
+      bestClosest = [...storesWithDistanceAndProds].sort((a, b) => a.distanceKm - b.distanceKm)[0];
+    } else if (storesWithDistanceAny.length > 0) {
+      bestClosest = [...storesWithDistanceAny].sort((a, b) => a.distanceKm - b.distanceKm)[0];
     } else {
-      // Si no hay GPS activo, tomar la primera de mejor cobertura
-      bestClosest = topCoverageStores[0] || null;
+      bestClosest = topCoverageStores[0] || storeAnalysis[0] || null;
     }
 
     // 4. Opción C: La tienda mejor valorada (según estrellas personales del usuario)
-    const storesWithRating = storeAnalysis.filter(s => s.avgRating !== null);
+    const storesWithRatingAndProds = storeAnalysis.filter(s => s.avgRating !== null && s.available.length > 0);
+    const storesWithRatingAny = storeAnalysis.filter(s => s.avgRating !== null);
     let bestRated = null;
-    if (storesWithRating.length > 0) {
-      bestRated = [...storesWithRating].sort((a, b) => b.avgRating - a.avgRating)[0];
+    if (storesWithRatingAndProds.length > 0) {
+      bestRated = [...storesWithRatingAndProds].sort((a, b) => b.avgRating - a.avgRating)[0];
+    } else if (storesWithRatingAny.length > 0) {
+      bestRated = [...storesWithRatingAny].sort((a, b) => b.avgRating - a.avgRating)[0];
     } else {
-      bestRated = topCoverageStores[0] || null;
+      bestRated = topCoverageStores[0] || storeAnalysis[0] || null;
     }
 
-    // Lista general ordenada por cobertura (primero las que tienen todo) y luego por precio
+    // Lista general de todos los mercados ordenada por cobertura y luego precio
     const allSorted = [...storeAnalysis].sort((a, b) => {
       if (b.available.length !== a.available.length) {
         return b.available.length - a.available.length;
       }
-      return a.totalCostUSD - b.totalCostUSD;
+      if (a.available.length > 0 && b.available.length > 0) {
+        return a.totalCostUSD - b.totalCostUSD;
+      }
+      return a.store.name.localeCompare(b.store.name, 'es', { sensitivity: 'base' });
     });
 
     return {
