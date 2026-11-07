@@ -1068,6 +1068,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('modalProductTitle').textContent = 'Nuevo Producto';
     document.getElementById('formProduct').reset();
     document.getElementById('inputProductId').value = '';
+    const grpInputA = document.getElementById('inputProductGroupName');
+    if (grpInputA) grpInputA.value = '';
+    userManuallyEditedProductGroup = false;
+    const sListA = document.getElementById('productGroupSuggestionsList');
+    if (sListA) sListA.classList.add('hidden');
+    const gHintA = document.getElementById('productGroupStatusHint');
+    if (gHintA) gHintA.textContent = 'Automático';
+    const gIconA = document.getElementById('productGroupMatchIcon');
+    if (gIconA) gIconA.textContent = '📦';
     if (document.getElementById('inputProductQuantity')) document.getElementById('inputProductQuantity').value = '';
     if (document.getElementById('inputProductWeight')) document.getElementById('inputProductWeight').value = '';
     if (document.getElementById('inputProductVolume')) document.getElementById('inputProductVolume').value = '';
@@ -1504,6 +1513,30 @@ document.addEventListener('DOMContentLoaded', async () => {
           setModalRatingStars(prod.rating || 0);
           updateProductPriceHint();
           if (typeof validateProductNameSpecs === 'function') validateProductNameSpecs();
+
+          userManuallyEditedProductGroup = false;
+          const sListC = document.getElementById('productGroupSuggestionsList');
+          if (sListC) sListC.classList.add('hidden');
+          const grpInputC = document.getElementById('inputProductGroupName');
+          const gHintC = document.getElementById('productGroupStatusHint');
+          const gIconC = document.getElementById('productGroupMatchIcon');
+          if (grpInputC && window.productGroupingService) {
+            const allProds = await window.db.getProducts();
+            const savedGroups = await window.productGroupingService.getSavedGroups();
+            const currentRate = (window.bcvService && window.bcvService.rate > 0) ? window.bcvService.rate : 45.0;
+            const built = window.productGroupingService.buildGroups(allProds, savedGroups, currentRate, activeDisplayCurrency);
+            const currentGroup = built.find(g => g.products.some(p => p.id === prod.id));
+            if (currentGroup) {
+              grpInputC.value = currentGroup.name;
+              if (gHintC) gHintC.textContent = 'Grupo actual';
+              if (gIconC) gIconC.textContent = '✅';
+            } else {
+              grpInputC.value = prod.name;
+              if (gHintC) gHintC.textContent = 'Sugerido';
+              if (gIconC) gIconC.textContent = '✨';
+            }
+          }
+
           openModal('modalProduct');
         }
       });
@@ -1613,6 +1646,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('modalProductTitle').textContent = 'Nuevo Producto';
     document.getElementById('formProduct').reset();
     document.getElementById('inputProductId').value = '';
+    const grpInputA = document.getElementById('inputProductGroupName');
+    if (grpInputA) grpInputA.value = '';
+    userManuallyEditedProductGroup = false;
+    const sListA = document.getElementById('productGroupSuggestionsList');
+    if (sListA) sListA.classList.add('hidden');
+    const gHintA = document.getElementById('productGroupStatusHint');
+    if (gHintA) gHintA.textContent = 'Automático';
+    const gIconA = document.getElementById('productGroupMatchIcon');
+    if (gIconA) gIconA.textContent = '📦';
     if (document.getElementById('inputProductQuantity')) document.getElementById('inputProductQuantity').value = '';
     if (document.getElementById('inputProductWeight')) document.getElementById('inputProductWeight').value = '';
     if (document.getElementById('inputProductVolume')) document.getElementById('inputProductVolume').value = '';
@@ -1716,6 +1758,49 @@ document.addEventListener('DOMContentLoaded', async () => {
         await window.db.updateProductRatingShared(saved.id, ratingVal);
       }
 
+      // ----------------------------------------------------
+      // VINCULACIÓN AL GRUPO DE PRODUCTO
+      // ----------------------------------------------------
+      const grpInput = document.getElementById('inputProductGroupName');
+      const targetGroupName = grpInput ? grpInput.value.trim() : '';
+      if (targetGroupName && saved && saved.id && window.productGroupingService) {
+        try {
+          const normTarget = window.productGroupingService.normalize(targetGroupName);
+          const savedGroups = await window.productGroupingService.getSavedGroups();
+          const existingGroup = savedGroups.find(g => window.productGroupingService.normalize(g.name) === normTarget);
+
+          // Si el producto estaba editándose y pertenecía antes a otro grupo manual, desvincularlo del anterior
+          if (idVal) {
+            const pid = parseInt(idVal, 10);
+            for (const sg of savedGroups) {
+              if (existingGroup && sg.id === existingGroup.id) continue;
+              if (sg.assigned_product_ids && sg.assigned_product_ids.includes(pid)) {
+                await window.productGroupingService.removeProductFromGroup(sg.id, pid, sg.assigned_product_ids);
+              }
+            }
+          }
+
+          if (existingGroup) {
+            // El grupo ya existe: vincular este producto al grupo existente
+            await window.productGroupingService.addProductToGroup(existingGroup.id, saved.id);
+          } else {
+            // No existe: crear el nuevo grupo manual y vincular el producto
+            await window.productGroupingService.createManualGroup({
+              name: window.productGroupingService.toTitleCase(targetGroupName) || targetGroupName,
+              keywords: [targetGroupName],
+              productIds: [saved.id]
+            });
+          }
+        } catch (errG) {
+          console.warn('Error al vincular producto al grupo:', errG);
+        }
+      }
+
+      // Si el planificador está activo, refrescar catálogo y grupos
+      if (typeof loadPlannerProductList === 'function') {
+        loadPlannerProductList();
+      }
+
       const toastMsg = (currency === 'VES')
         ? `Producto guardado en USD ($ ${priceInUsd.toFixed(2)}) convertido de Bs. ${price.toFixed(2)}`
         : 'Producto guardado con éxito ($ USD)';
@@ -1800,9 +1885,197 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const inputProductNameEl = document.getElementById('inputProductName');
   if (inputProductNameEl) {
-    inputProductNameEl.addEventListener('input', () => validateProductNameSpecs());
-    inputProductNameEl.addEventListener('blur', () => validateProductNameSpecs());
+    inputProductNameEl.addEventListener('input', () => {
+      validateProductNameSpecs();
+      autoPredictProductGroup();
+    });
+    inputProductNameEl.addEventListener('blur', () => {
+      validateProductNameSpecs();
+      autoPredictProductGroup();
+    });
   }
+
+  // ----------------------------------------------------
+  // GESTIÓN Y AUTO-SUGERENCIA DE GRUPO EN MODAL PRODUCTO
+  // ----------------------------------------------------
+  let userManuallyEditedProductGroup = false;
+
+  async function autoPredictProductGroup() {
+    if (userManuallyEditedProductGroup) return;
+
+    const nameInput = document.getElementById('inputProductName');
+    const groupInput = document.getElementById('inputProductGroupName');
+    const hintEl = document.getElementById('productGroupStatusHint');
+    const iconEl = document.getElementById('productGroupMatchIcon');
+    const suggestionsList = document.getElementById('productGroupSuggestionsList');
+    if (!nameInput || !groupInput) return;
+
+    const rawName = nameInput.value.trim();
+    if (!rawName) {
+      groupInput.value = '';
+      if (hintEl) hintEl.textContent = 'Automático';
+      if (iconEl) iconEl.textContent = '📦';
+      if (suggestionsList) suggestionsList.classList.add('hidden');
+      return;
+    }
+
+    let cleanName = rawName;
+    if (window.ProductUtils && typeof window.ProductUtils.sanitizeProductAttributes === 'function') {
+      const sanitized = window.ProductUtils.sanitizeProductAttributes(rawName);
+      if (sanitized && sanitized.name) cleanName = sanitized.name;
+    }
+
+    if (!window.productGroupingService) {
+      groupInput.value = cleanName;
+      return;
+    }
+
+    const allProducts = await window.db.getProducts();
+    const savedGroups = await window.productGroupingService.getSavedGroups();
+    const currentRate = (window.bcvService && window.bcvService.rate > 0) ? window.bcvService.rate : 45.0;
+    const builtGroups = window.productGroupingService.buildGroups(allProducts, savedGroups, currentRate, activeDisplayCurrency);
+
+    const normProduct = window.productGroupingService.normalize(cleanName);
+    const prodTokens = window.productGroupingService.tokenize(cleanName);
+
+    // 1. Coincidencia exacta por nombre normalizado
+    let matchedGroup = builtGroups.find(g => window.productGroupingService.normalize(g.name) === normProduct);
+
+    // 2. Coincidencia si el nombre de grupo es prefijo o subfrase
+    if (!matchedGroup) {
+      matchedGroup = builtGroups.find(g => {
+        const gNorm = window.productGroupingService.normalize(g.name);
+        return normProduct.startsWith(gNorm + ' ') || gNorm.startsWith(normProduct + ' ') || normProduct.includes(gNorm) || gNorm.includes(normProduct);
+      });
+    }
+
+    // 3. Coincidencia por prefijo común de 2 o más palabras (ej: "jugo de manzana")
+    if (!matchedGroup) {
+      matchedGroup = builtGroups.find(g => {
+        const gTokens = window.productGroupingService.tokenize(g.name);
+        const common = window.productGroupingService.getCommonPrefixTokens(prodTokens, gTokens);
+        return common.length >= 2;
+      });
+    }
+
+    if (matchedGroup) {
+      groupInput.value = matchedGroup.name;
+      if (hintEl) hintEl.textContent = 'Grupo existente encontrado';
+      if (iconEl) iconEl.textContent = '✅';
+    } else {
+      const proposed = window.productGroupingService.toTitleCase(cleanName) || cleanName;
+      groupInput.value = proposed;
+      if (hintEl) hintEl.textContent = 'Nuevo grupo sugerido';
+      if (iconEl) iconEl.textContent = '✨';
+    }
+  }
+
+  async function renderGroupSuggestions(query = '') {
+    const groupInput = document.getElementById('inputProductGroupName');
+    const suggestionsList = document.getElementById('productGroupSuggestionsList');
+    const hintEl = document.getElementById('productGroupStatusHint');
+    const iconEl = document.getElementById('productGroupMatchIcon');
+    if (!groupInput || !suggestionsList || !window.productGroupingService) return;
+
+    const allProducts = await window.db.getProducts();
+    const savedGroups = await window.productGroupingService.getSavedGroups();
+    const currentRate = (window.bcvService && window.bcvService.rate > 0) ? window.bcvService.rate : 45.0;
+    const builtGroups = window.productGroupingService.buildGroups(allProducts, savedGroups, currentRate, activeDisplayCurrency);
+
+    const normQ = window.productGroupingService.normalize(query);
+    let matched = [];
+
+    if (!normQ) {
+      matched = [...builtGroups];
+    } else {
+      matched = builtGroups.filter(g => {
+        const gNorm = window.productGroupingService.normalize(g.name);
+        return gNorm.includes(normQ) || normQ.includes(gNorm);
+      });
+      matched.sort((a, b) => {
+        const aNorm = window.productGroupingService.normalize(a.name);
+        const bNorm = window.productGroupingService.normalize(b.name);
+        const aStarts = aNorm.startsWith(normQ);
+        const bStarts = bNorm.startsWith(normQ);
+        if (aStarts && !bStarts) return -1;
+        if (!aStarts && bStarts) return 1;
+        return a.name.localeCompare(b.name, 'es', { sensitivity: 'base' });
+      });
+    }
+
+    let itemsHtml = matched.map(g => `
+      <div class="product-group-suggestion-item flex items-center justify-between p-2 rounded-lg hover:bg-slate-800 text-xs cursor-pointer transition select-none" data-group-name="${escapeHtml(g.name)}">
+        <div class="flex items-center gap-2 truncate min-w-0">
+          <span class="text-blue-400 flex-shrink-0">📦</span>
+          <span class="font-bold text-slate-200 truncate">${escapeHtml(g.name)}</span>
+          ${g.isManual ? '<span class="px-1 py-0.2 rounded text-[8px] font-bold bg-blue-500/20 text-blue-300">Manual</span>' : ''}
+        </div>
+        <span class="text-[10px] text-slate-400 flex-shrink-0 ml-2 font-medium">${g.productCount} ${g.productCount === 1 ? 'prod' : 'prods'}</span>
+      </div>
+    `).join('');
+
+    const exactMatch = matched.find(g => window.productGroupingService.normalize(g.name) === normQ);
+    if (query && !exactMatch) {
+      const proposedTitle = window.productGroupingService.toTitleCase(query);
+      itemsHtml += `
+        <div class="product-group-suggestion-item flex items-center gap-2 p-2 rounded-lg hover:bg-slate-800 text-xs cursor-pointer text-blue-300 font-semibold border-t border-slate-800/80 transition select-none" data-group-name="${escapeHtml(proposedTitle)}">
+          <span>✨</span>
+          <span class="truncate">Crear nuevo grupo: "${escapeHtml(proposedTitle)}"</span>
+        </div>
+      `;
+    }
+
+    if (!itemsHtml) {
+      suggestionsList.classList.add('hidden');
+      return;
+    }
+
+    suggestionsList.innerHTML = itemsHtml;
+    suggestionsList.classList.remove('hidden');
+
+    suggestionsList.querySelectorAll('.product-group-suggestion-item').forEach(item => {
+      item.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        const chosen = item.dataset.groupName;
+        groupInput.value = chosen;
+        const exists = builtGroups.some(g => window.productGroupingService.normalize(g.name) === window.productGroupingService.normalize(chosen));
+        if (hintEl) hintEl.textContent = exists ? 'Grupo existente seleccionado' : 'Nuevo grupo';
+        if (iconEl) iconEl.textContent = exists ? '✅' : '✨';
+        suggestionsList.classList.add('hidden');
+      });
+    });
+  }
+
+  const inputGroupEl = document.getElementById('inputProductGroupName');
+  if (inputGroupEl) {
+    inputGroupEl.addEventListener('focus', () => {
+      userManuallyEditedProductGroup = true;
+      renderGroupSuggestions(inputGroupEl.value.trim());
+    });
+    inputGroupEl.addEventListener('input', () => {
+      userManuallyEditedProductGroup = true;
+      const val = inputGroupEl.value.trim();
+      renderGroupSuggestions(val);
+      const hintEl = document.getElementById('productGroupStatusHint');
+      const iconEl = document.getElementById('productGroupMatchIcon');
+      if (hintEl) hintEl.textContent = val ? 'Personalizado' : 'Automático';
+      if (iconEl) iconEl.textContent = val ? '✏️' : '📦';
+    });
+    inputGroupEl.addEventListener('blur', () => {
+      setTimeout(() => {
+        const sList = document.getElementById('productGroupSuggestionsList');
+        if (sList) sList.classList.add('hidden');
+      }, 200);
+    });
+  }
+
+  document.addEventListener('click', (e) => {
+    const formField = document.getElementById('productGroupFormField');
+    const sList = document.getElementById('productGroupSuggestionsList');
+    if (formField && sList && !formField.contains(e.target)) {
+      sList.classList.add('hidden');
+    }
+  });
 
   const btnAutoSeparateSpecsEl = document.getElementById('btnAutoSeparateProductSpecs');
   if (btnAutoSeparateSpecsEl) {
@@ -1837,6 +2110,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
 
       validateProductNameSpecs();
+      autoPredictProductGroup();
       showToast('✨ Datos separados en sus campos correspondientes. ¡Listo para guardar!', 'success');
     });
   }
@@ -4983,7 +5257,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // REGISTRO DE SERVICE WORKER (PWA)
   // ----------------------------------------------------
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js?v=33').then((reg) => {
+    navigator.serviceWorker.register('./sw.js?v=34').then((reg) => {
       console.log('Service Worker registrado con éxito:', reg.scope);
       reg.update();
     }).catch((err) => {

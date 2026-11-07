@@ -12,7 +12,7 @@
   <link rel="manifest" href="./manifest.json">
   <link rel="icon" type="image/svg+xml" href="./icons/icon.svg">
   <link rel="apple-touch-icon" href="./icons/icon.svg">
-  <link rel="stylesheet" href="./css/styles.css?v=33">
+  <link rel="stylesheet" href="./css/styles.css?v=34">
   <!-- Tailwind Utilities (CDN for instant responsive styling) -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -1073,6 +1073,29 @@
             </div>
           </div>
         </div>
+
+        <!-- Grupo del Producto (Indicar a qué grupo pertenece, auto-sugerido o nuevo) -->
+        <div class="form-group relative" id="productGroupFormField">
+          <label class="form-label flex items-center justify-between">
+            <span class="flex items-center gap-1.5">
+              <span>📦</span> Grupo del Producto
+            </span>
+            <span id="productGroupStatusHint" class="text-[10px] text-blue-400 font-semibold">Automático</span>
+          </label>
+          <div class="relative">
+            <input type="text" id="inputProductGroupName" class="form-input text-xs pr-8" placeholder="Ej: Manzana, Jugo de Manzana, Harina de Maíz..." autocomplete="off">
+            <span id="productGroupMatchIcon" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-sm pointer-events-none text-slate-400">📦</span>
+          </div>
+
+          <!-- Lista desplegable flotante de opciones (máximo 3 visibles a la vez con scrollbar para desplazar arriba/abajo) -->
+          <div id="productGroupSuggestionsList" class="hidden absolute left-0 right-0 top-full mt-1 bg-slate-900 border border-slate-700/80 rounded-xl shadow-2xl z-50 overflow-y-auto max-h-[114px] p-1 divide-y divide-slate-800/60">
+            <!-- Sugerencias dinámicas -->
+          </div>
+          <p class="text-[10px] text-slate-400 mt-1">
+            Si no existe, se creará el grupo al guardar. Toca para ver opciones similares.
+          </p>
+        </div>
+
         <!-- Atributos Opcionales: Cantidad / Combo, Peso y Volumen -->
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
           <div class="form-group">
@@ -1898,17 +1921,17 @@
   <div id="toastContainer" class="toast-container"></div>
 
   <!-- Core Scripts -->
-  <script src="./js/db.js?v=33"></script>
-  <script src="./js/icons-library.js?v=33"></script>
-  <script src="./js/bcv.js?v=33"></script>
-  <script src="./js/image-compressor.js?v=33"></script>
-  <script src="./js/ai-scanner.js?v=33"></script>
-  <script src="./js/charts.js?v=33"></script>
-  <script src="./js/grocery-planner.js?v=33"></script>
-  <script src="./js/product-groups.js?v=33"></script>
-  <script src="./js/accounting.js?v=33"></script>
-  <script src="./js/backup-drive.js?v=33"></script>
-  <script src="./js/auth-groups.js?v=33"></script>
-  <script src="./js/app.js?v=33"></script>
+  <script src="./js/db.js?v=34"></script>
+  <script src="./js/icons-library.js?v=34"></script>
+  <script src="./js/bcv.js?v=34"></script>
+  <script src="./js/image-compressor.js?v=34"></script>
+  <script src="./js/ai-scanner.js?v=34"></script>
+  <script src="./js/charts.js?v=34"></script>
+  <script src="./js/grocery-planner.js?v=34"></script>
+  <script src="./js/product-groups.js?v=34"></script>
+  <script src="./js/accounting.js?v=34"></script>
+  <script src="./js/backup-drive.js?v=34"></script>
+  <script src="./js/auth-groups.js?v=34"></script>
+  <script src="./js/app.js?v=34"></script>
 </body>
 </html>
