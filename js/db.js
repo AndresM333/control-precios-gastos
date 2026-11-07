@@ -74,8 +74,16 @@ class AppDB {
 
       request.onsuccess = (event) => {
         this.db = event.target.result;
+        this.db.onversionchange = () => {
+          this.db.close();
+          console.warn('Conexión IndexedDB cerrada debido a un cambio de versión.');
+        };
         resolve(this.db);
         setTimeout(() => this.migrateVesProductsToUsd(), 300);
+      };
+
+      request.onblocked = (event) => {
+        console.warn('Actualización de IndexedDB bloqueada por otra pestaña abierta.');
       };
 
       request.onerror = (event) => {
@@ -178,6 +186,14 @@ class AppDB {
     }
     if (!storeData.image_type) storeData.image_type = 'icon';
     if (!storeData.image_data) storeData.image_data = 'supermarket';
+
+    // Limpiar id si no es un número válido existente (evita DataError en IndexedDB autoIncrement)
+    if (storeData.id === undefined || storeData.id === null || storeData.id === '' || isNaN(storeData.id)) {
+      delete storeData.id;
+    } else {
+      storeData.id = parseInt(storeData.id, 10);
+    }
+
     if (storeData.id) {
       storeData.updated_at = now;
       await this.put('stores', storeData);
@@ -185,7 +201,9 @@ class AppDB {
     } else {
       storeData.created_at = now;
       storeData.updated_at = now;
-      return this.add('stores', storeData);
+      const newId = await this.add('stores', storeData);
+      storeData.id = newId;
+      return newId;
     }
   }
 
@@ -251,6 +269,13 @@ class AppDB {
     } else {
       productData.original_currency = 'USD';
       productData.current_price = parseFloat(productData.current_price) || 0;
+    }
+
+    // Limpiar id si no es un número válido existente (evita DataError en IndexedDB autoIncrement)
+    if (productData.id === undefined || productData.id === null || productData.id === '' || isNaN(productData.id)) {
+      delete productData.id;
+    } else {
+      productData.id = parseInt(productData.id, 10);
     }
 
     let productId = productData.id;
@@ -444,6 +469,11 @@ class AppDB {
     const now = new Date().toISOString();
     if (!expenseData.workspace_id) {
       expenseData.workspace_id = window.authGroups ? window.authGroups.getActiveWorkspaceId() : 'personal';
+    }
+    if (expenseData.id === undefined || expenseData.id === null || expenseData.id === '' || isNaN(expenseData.id)) {
+      delete expenseData.id;
+    } else {
+      expenseData.id = parseInt(expenseData.id, 10);
     }
     if (expenseData.id) {
       expenseData.updated_at = now;

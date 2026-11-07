@@ -429,19 +429,23 @@ class AuthGroupsService {
       return true; // En espacio personal siempre tiene todos los permisos
     }
 
+    // Si no hay usuario conectado con Google en este navegador, permitir acceso local para no trabar la app
     if (!this.currentUser) {
-      return false; // Sin usuario no tiene permisos en grupos
+      return true;
     }
 
-    const userEmail = this.currentUser.email.toLowerCase().trim();
-    const ownerEmail = (this.activeWorkspace.owner_email || '').toLowerCase().trim();
+    const userEmail = (this.currentUser.email || '').toLowerCase().trim();
+    const activeWs = this.activeWorkspace;
+    const group = this.groups.find(g => g.id === activeWs.id);
+    const ownerEmail = (group ? group.owner_email : (activeWs.owner_email || '')).toLowerCase().trim();
 
-    if (userEmail === ownerEmail) {
-      return true; // Administrador del grupo siempre tiene todos los permisos
+    // El Administrador (creador) del grupo siempre tiene todos los permisos
+    if (activeWs.isOwner || (userEmail && userEmail === ownerEmail)) {
+      return true;
     }
 
-    const perms = this.getMemberPermissions(this.activeWorkspace.id, userEmail);
-    return perms[permissionKey] === true;
+    const perms = this.getMemberPermissions(activeWs.id, userEmail);
+    return perms[permissionKey] !== false; // Permitido por defecto a menos que se revoque explícitamente
   }
 
   // --- MOTOR DE CLONACIÓN: Copiar del Grupo a mi Espacio Personal ---

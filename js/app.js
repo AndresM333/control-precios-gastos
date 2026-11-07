@@ -1226,37 +1226,74 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   document.getElementById('formStore').addEventListener('submit', async (e) => {
     e.preventDefault();
-    if (!window.authGroups.hasPermission('can_manage_catalog')) {
-      showToast('⚠️ No tienes permiso para agregar o editar tiendas en este grupo.', 'error');
-      return;
+    try {
+      if (!window.authGroups.hasPermission('can_manage_catalog')) {
+        showToast('⚠️ No tienes permiso para agregar o editar tiendas en este grupo.', 'error');
+        return;
+      }
+      const idVal = document.getElementById('inputStoreId').value.trim();
+      const name = document.getElementById('inputStoreName').value.trim();
+      let mapsUrl = document.getElementById('inputStoreMapsUrl').value.trim();
+      const lat = parseFloat(document.getElementById('inputStoreLat').value) || null;
+      const lng = parseFloat(document.getElementById('inputStoreLng').value) || null;
+      const desc = document.getElementById('inputStoreDesc').value.trim();
+      const imageType = document.getElementById('inputStoreImageType').value || 'icon';
+      const imageData = document.getElementById('inputStoreImageData').value || 'supermarket';
+
+      if (!name) {
+        showToast('Por favor ingresa el nombre de la tienda', 'error');
+        return;
+      }
+
+      if (!mapsUrl) {
+        mapsUrl = `https://maps.google.com/?q=${encodeURIComponent(name)}`;
+      }
+
+      const storePayload = {
+        name,
+        maps_url: mapsUrl,
+        lat,
+        lng,
+        description: desc,
+        image_type: imageType,
+        image_data: imageData
+      };
+      if (idVal) {
+        storePayload.id = parseInt(idVal, 10);
+      }
+
+      await window.db.saveStore(storePayload);
+
+      // Notificación si se guardó en un espacio de grupo
+      const activeWs = window.authGroups.getActiveWorkspace();
+      if (activeWs && activeWs.type === 'GROUP' && window.db.addNotification) {
+        try {
+          const user = window.authGroups.getCurrentUser();
+          const uName = user ? (user.displayName || user.email) : 'Un miembro';
+          await window.db.addNotification({
+            recipient_email: 'ALL_GROUP_MEMBERS',
+            sender_email: user ? user.email : null,
+            sender_name: uName,
+            group_id: activeWs.id,
+            group_name: activeWs.name,
+            type: 'CATALOG',
+            title: idVal ? `✏️ Tienda editada en "${activeWs.name}"` : `🏪 Nueva tienda en "${activeWs.name}"`,
+            message: `${uName} ${idVal ? 'actualizó' : 'registró'} la tienda "${name}".`,
+            data: { groupId: activeWs.id, storeName: name }
+          });
+          if (typeof updateNotificationBadge === 'function') updateNotificationBadge();
+        } catch (errNotif) {
+          console.warn('Error al registrar notificación de tienda:', errNotif);
+        }
+      }
+
+      showToast('Tienda guardada con éxito', 'success');
+      closeModal('modalStore');
+      renderStores();
+    } catch (err) {
+      console.error('Error al guardar tienda:', err);
+      showToast('Error al guardar tienda: ' + err.message, 'error');
     }
-    const id = document.getElementById('inputStoreId').value;
-    const name = document.getElementById('inputStoreName').value.trim();
-    let mapsUrl = document.getElementById('inputStoreMapsUrl').value.trim();
-    const lat = parseFloat(document.getElementById('inputStoreLat').value) || null;
-    const lng = parseFloat(document.getElementById('inputStoreLng').value) || null;
-    const desc = document.getElementById('inputStoreDesc').value.trim();
-    const imageType = document.getElementById('inputStoreImageType').value || 'icon';
-    const imageData = document.getElementById('inputStoreImageData').value || 'supermarket';
-
-    if (!mapsUrl) {
-      mapsUrl = `https://maps.google.com/?q=${encodeURIComponent(name)}`;
-    }
-
-    await window.db.saveStore({
-      id: id ? parseInt(id) : undefined,
-      name,
-      maps_url: mapsUrl,
-      lat,
-      lng,
-      description: desc,
-      image_type: imageType,
-      image_data: imageData
-    });
-
-    showToast('Tienda guardada con éxito', 'success');
-    closeModal('modalStore');
-    renderStores();
   });
 
   // ----------------------------------------------------
@@ -1544,7 +1581,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     const stores = await window.db.getStores();
     if (stores.length === 0) {
-      showToast('Debes crear al menos una tienda antes de registrar productos', 'error');
+      showToast('Debes crear al menos una tienda antes de registrar productos', 'info');
+      document.getElementById('modalStoreTitle').textContent = 'Nueva Tienda';
+      document.getElementById('formStore').reset();
+      document.getElementById('inputStoreId').value = '';
+      setStoreMedia('icon', 'supermarket');
       openModal('modalStore');
       return;
     }
@@ -1561,75 +1602,97 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   document.getElementById('formProduct').addEventListener('submit', async (e) => {
     e.preventDefault();
-    if (!window.authGroups.hasPermission('can_manage_catalog')) {
-      showToast('⚠️ No tienes permiso para agregar o editar productos en este grupo.', 'error');
-      return;
-    }
-    const id = document.getElementById('inputProductId').value;
-    const storeId = parseInt(document.getElementById('inputProductStoreId').value);
-    const name = document.getElementById('inputProductName').value.trim();
-    const price = parseFloat(document.getElementById('inputProductPrice').value);
-    const currency = document.getElementById('inputProductCurrency').value;
-    const ratingVal = parseInt(document.getElementById('inputProductRating').value) || null;
-    const desc = document.getElementById('inputProductDesc').value.trim();
-    const imageType = document.getElementById('inputProductImageType').value || 'icon';
-    const imageData = document.getElementById('inputProductImageData').value || 'grain';
-    const currentRate = (window.bcvService && window.bcvService.rate > 0) ? window.bcvService.rate : 45.0;
-
-    // Regla de Oro: Si el usuario ingresó el precio en Bolívares (VES),
-    // se convierte de inmediato a dólares (USD) usando la tasa BCV del día.
-    // El precio en bolívares NO se guarda en la base de datos.
-    let priceInUsd = price;
-    if (currency === 'VES') {
-      priceInUsd = currentRate > 0 ? parseFloat((price / currentRate).toFixed(4)) : price;
-    }
-
-    const saved = await window.db.saveProduct({
-      id: id ? parseInt(id) : undefined,
-      store_id: storeId,
-      name,
-      current_price: priceInUsd,
-      original_currency: 'USD',
-      rating: ratingVal,
-      description: desc,
-      image_type: imageType,
-      image_data: imageData
-    }, 'MANUAL', currentRate);
-
-    // Si se especificó calificación, sincronizarla automáticamente con productos idénticos
-    if (ratingVal && saved && saved.id) {
-      await window.db.updateProductRatingShared(saved.id, ratingVal);
-    }
-
-    const toastMsg = (currency === 'VES')
-      ? `Producto guardado en USD ($ ${priceInUsd.toFixed(2)}) convertido de Bs. ${price.toFixed(2)}`
-      : 'Producto guardado con éxito ($ USD)';
-    showToast(toastMsg, 'success');
-    closeModal('modalProduct');
-    renderProducts();
-    if (currentModalStoreId) renderStoreModalProductsList();
-
-    // Notificación al grupo si se guardó en un espacio grupal
-    const activeWs = window.authGroups.getActiveWorkspace();
-    if (activeWs && activeWs.type === 'GROUP' && window.db.addNotification) {
-      try {
-        const user = window.authGroups.getCurrentUser();
-        const uName = user ? (user.displayName || user.email) : 'Un miembro';
-        await window.db.addNotification({
-          recipient_email: 'ALL_GROUP_MEMBERS',
-          sender_email: user ? user.email : null,
-          sender_name: uName,
-          group_id: activeWs.id,
-          group_name: activeWs.name,
-          type: 'CATALOG',
-          title: id ? `✏️ Producto editado en "${activeWs.name}"` : `📦 Nuevo producto en "${activeWs.name}"`,
-          message: `${uName} ${id ? 'actualizó' : 'registró'} el producto "${name}" a un precio de $ ${priceInUsd.toFixed(2)} USD.`,
-          data: { groupId: activeWs.id, productName: name }
-        });
-        if (typeof updateNotificationBadge === 'function') updateNotificationBadge();
-      } catch (errNotif) {
-        console.warn('Error al registrar notificación de catálogo:', errNotif);
+    try {
+      if (!window.authGroups.hasPermission('can_manage_catalog')) {
+        showToast('⚠️ No tienes permiso para agregar o editar productos en este grupo.', 'error');
+        return;
       }
+      const idVal = document.getElementById('inputProductId').value.trim();
+      const storeId = parseInt(document.getElementById('inputProductStoreId').value, 10);
+      const name = document.getElementById('inputProductName').value.trim();
+      const price = parseFloat(document.getElementById('inputProductPrice').value);
+      const currency = document.getElementById('inputProductCurrency').value;
+      const ratingVal = parseInt(document.getElementById('inputProductRating').value, 10) || null;
+      const desc = document.getElementById('inputProductDesc').value.trim();
+      const imageType = document.getElementById('inputProductImageType').value || 'icon';
+      const imageData = document.getElementById('inputProductImageData').value || 'grain';
+      const currentRate = (window.bcvService && window.bcvService.rate > 0) ? window.bcvService.rate : 45.0;
+
+      if (!name) {
+        showToast('Por favor ingresa el nombre del producto', 'error');
+        return;
+      }
+      if (isNaN(storeId)) {
+        showToast('Por favor selecciona una tienda para el producto', 'error');
+        return;
+      }
+      if (isNaN(price) || price < 0) {
+        showToast('Por favor ingresa un precio válido', 'error');
+        return;
+      }
+
+      // Regla de Oro: Si el usuario ingresó el precio en Bolívares (VES),
+      // se convierte de inmediato a dólares (USD) usando la tasa BCV del día.
+      // El precio en bolívares NO se guarda en la base de datos.
+      let priceInUsd = price;
+      if (currency === 'VES') {
+        priceInUsd = currentRate > 0 ? parseFloat((price / currentRate).toFixed(4)) : price;
+      }
+
+      const prodPayload = {
+        store_id: storeId,
+        name,
+        current_price: priceInUsd,
+        original_currency: 'USD',
+        rating: ratingVal,
+        description: desc,
+        image_type: imageType,
+        image_data: imageData
+      };
+      if (idVal) {
+        prodPayload.id = parseInt(idVal, 10);
+      }
+
+      const saved = await window.db.saveProduct(prodPayload, 'MANUAL', currentRate);
+
+      // Si se especificó calificación, sincronizarla automáticamente con productos idénticos
+      if (ratingVal && saved && saved.id) {
+        await window.db.updateProductRatingShared(saved.id, ratingVal);
+      }
+
+      const toastMsg = (currency === 'VES')
+        ? `Producto guardado en USD ($ ${priceInUsd.toFixed(2)}) convertido de Bs. ${price.toFixed(2)}`
+        : 'Producto guardado con éxito ($ USD)';
+      showToast(toastMsg, 'success');
+      closeModal('modalProduct');
+      renderProducts();
+      if (currentModalStoreId) renderStoreModalProductsList();
+
+      // Notificación al grupo si se guardó en un espacio grupal
+      const activeWs = window.authGroups.getActiveWorkspace();
+      if (activeWs && activeWs.type === 'GROUP' && window.db.addNotification) {
+        try {
+          const user = window.authGroups.getCurrentUser();
+          const uName = user ? (user.displayName || user.email) : 'Un miembro';
+          await window.db.addNotification({
+            recipient_email: 'ALL_GROUP_MEMBERS',
+            sender_email: user ? user.email : null,
+            sender_name: uName,
+            group_id: activeWs.id,
+            group_name: activeWs.name,
+            type: 'CATALOG',
+            title: idVal ? `✏️ Producto editado en "${activeWs.name}"` : `📦 Nuevo producto en "${activeWs.name}"`,
+            message: `${uName} ${idVal ? 'actualizó' : 'registró'} el producto "${name}" a un precio de $ ${priceInUsd.toFixed(2)} USD.`,
+            data: { groupId: activeWs.id, productName: name }
+          });
+          if (typeof updateNotificationBadge === 'function') updateNotificationBadge();
+        } catch (errNotif) {
+          console.warn('Error al registrar notificación de catálogo:', errNotif);
+        }
+      }
+    } catch (err) {
+      console.error('Error al guardar producto:', err);
+      showToast('Error al guardar producto: ' + err.message, 'error');
     }
   });
 
@@ -4118,7 +4181,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // REGISTRO DE SERVICE WORKER (PWA)
   // ----------------------------------------------------
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js?v=25').then((reg) => {
+    navigator.serviceWorker.register('./sw.js?v=26').then((reg) => {
       console.log('Service Worker registrado con éxito:', reg.scope);
       reg.update();
     }).catch((err) => {
