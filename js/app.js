@@ -2459,6 +2459,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const searchFilter = (document.getElementById('plannerSearchInput').value || '').toLowerCase().trim();
     const products = await window.db.getProducts();
+    const stores = await window.db.getStores();
+    const storesById = new Map();
+    stores.forEach(s => storesById.set(s.id, s));
 
     // Group products by unique trimmed name to get a representative item
     const productsByName = new Map();
@@ -2486,6 +2489,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const currentRate = (window.bcvService && window.bcvService.rate > 0) ? window.bcvService.rate : 45.0;
       catalogContainer.innerHTML = filtered.map(name => {
         const prod = productsByName.get(name);
+        const store = prod && prod.store_id ? storesById.get(prod.store_id) : null;
         const mediaHtml = window.AppIcons ? window.AppIcons.renderProductMedia(prod, 'w-8 h-8') : '🏷️';
         const inCartQty = plannerCart.get(name) || 0;
         let priceUsd = prod ? parseFloat(prod.current_price) : 0;
@@ -2495,14 +2499,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         const priceInfo = prod ? formatDisplayPrice(priceUsd) : null;
         const titleHtml = window.ProductUtils ? window.ProductUtils.formatTitleWithQuantity(prod || { name }) : escapeHtml(name);
         const specsHtml = window.ProductUtils ? window.ProductUtils.formatSpecsBadge(prod || {}) : '';
+        const storeBadgeHtml = window.ProductUtils ? window.ProductUtils.formatStoreBadge(store, 14) : '';
 
         return `
           <div class="flex items-center justify-between p-2 rounded-xl bg-slate-800/40 hover:bg-slate-800 border border-slate-800/60 transition gap-2 min-w-0 w-full">
             <div class="flex items-center gap-2.5 min-w-0 flex-1">
               ${mediaHtml}
               <div class="min-w-0 flex-1 truncate">
+                ${storeBadgeHtml ? `<div class="mb-0.5 truncate">${storeBadgeHtml}</div>` : ''}
                 <span class="text-xs font-semibold text-slate-200 truncate flex items-center">${titleHtml}</span>
-                <div class="flex items-center gap-1.5 text-[10px]">
+                <div class="flex items-center gap-1.5 text-[10px] mt-0.5">
                   ${priceInfo ? `<span class="text-slate-300 font-bold">${priceInfo.primary}</span>` : ''}
                   ${specsHtml ? `<span>•</span> ${specsHtml}` : ''}
                   ${inCartQty > 0 ? `<span class="text-emerald-400 font-bold">• ${inCartQty} en canasta</span>` : '<span class="text-slate-500">• Disponible</span>'}
@@ -2546,6 +2552,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!cartContainer) return;
 
     const products = await window.db.getProducts();
+    const stores = await window.db.getStores();
+    const storesById = new Map();
+    stores.forEach(s => storesById.set(s.id, s));
+
     const productsByName = new Map();
     products.forEach(p => {
       const trimmed = p.name.trim();
@@ -2597,21 +2607,24 @@ document.addEventListener('DOMContentLoaded', async () => {
     const cartEntries = Array.from(plannerCart.entries());
     cartContainer.innerHTML = cartEntries.map(([name, qty]) => {
       const prod = productsByName.get(name) || { name };
+      const store = prod && prod.store_id ? storesById.get(prod.store_id) : null;
       let itemUsd = parseFloat(prod.current_price) || 0;
       if (prod.original_currency === 'VES') itemUsd = currentRate > 0 ? itemUsd / currentRate : 0;
       const subtotalFormatted = formatDisplayPrice(itemUsd * qty);
       const mediaHtml = window.AppIcons ? window.AppIcons.renderProductMedia(prod, 'w-8 h-8') : '🛒';
       const titleHtml = window.ProductUtils ? window.ProductUtils.formatTitleWithQuantity(prod) : escapeHtml(name);
       const specsHtml = window.ProductUtils ? window.ProductUtils.formatSpecsBadge(prod) : '';
+      const storeBadgeHtml = window.ProductUtils ? window.ProductUtils.formatStoreBadge(store, 14) : '';
 
       return `
         <div class="flex items-center justify-between p-2 rounded-xl bg-slate-800/80 border border-slate-700/70 gap-2">
-          <div class="flex items-center gap-2.5 min-w-0">
+          <div class="flex items-center gap-2.5 min-w-0 flex-1">
             ${mediaHtml}
-            <div class="truncate">
+            <div class="truncate min-w-0 flex-1">
+              ${storeBadgeHtml ? `<div class="mb-0.5 truncate">${storeBadgeHtml}</div>` : ''}
               <span class="text-xs font-bold text-slate-100 block truncate flex items-center">${titleHtml}</span>
-              <div class="flex items-center gap-1.5 text-[10px] text-slate-400 font-semibold">
-                <span>${subtotalFormatted.primary}</span>
+              <div class="flex items-center gap-1.5 text-[10px] text-slate-400 font-semibold mt-0.5 whitespace-nowrap overflow-hidden">
+                <span class="text-slate-200 font-bold">${subtotalFormatted.primary}</span>
                 ${specsHtml ? `<span>•</span> ${specsHtml}` : ''}
               </div>
             </div>
@@ -4384,7 +4397,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // REGISTRO DE SERVICE WORKER (PWA)
   // ----------------------------------------------------
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js?v=29').then((reg) => {
+    navigator.serviceWorker.register('./sw.js?v=30').then((reg) => {
       console.log('Service Worker registrado con éxito:', reg.scope);
       reg.update();
     }).catch((err) => {
