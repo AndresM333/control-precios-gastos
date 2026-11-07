@@ -1071,6 +1071,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (document.getElementById('inputProductQuantity')) document.getElementById('inputProductQuantity').value = '';
     if (document.getElementById('inputProductWeight')) document.getElementById('inputProductWeight').value = '';
     if (document.getElementById('inputProductVolume')) document.getElementById('inputProductVolume').value = '';
+    if (document.getElementById('productNameSpecsWarning')) document.getElementById('productNameSpecsWarning').classList.add('hidden');
+    document.getElementById('inputProductName').classList.remove('border-red-500', 'border-amber-500', 'focus:ring-red-500');
     document.getElementById('inputProductCurrency').value = 'USD';
     setProductMedia('icon', 'grain');
     setModalRatingStars(0);
@@ -1501,6 +1503,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           setProductMedia(prod.image_type || 'icon', prod.image_data || 'grain');
           setModalRatingStars(prod.rating || 0);
           updateProductPriceHint();
+          if (typeof validateProductNameSpecs === 'function') validateProductNameSpecs();
           openModal('modalProduct');
         }
       });
@@ -1613,6 +1616,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (document.getElementById('inputProductQuantity')) document.getElementById('inputProductQuantity').value = '';
     if (document.getElementById('inputProductWeight')) document.getElementById('inputProductWeight').value = '';
     if (document.getElementById('inputProductVolume')) document.getElementById('inputProductVolume').value = '';
+    if (document.getElementById('productNameSpecsWarning')) document.getElementById('productNameSpecsWarning').classList.add('hidden');
+    document.getElementById('inputProductName').classList.remove('border-red-500', 'border-amber-500', 'focus:ring-red-500');
     document.getElementById('inputProductCurrency').value = 'USD';
     setProductMedia('icon', 'grain');
     setModalRatingStars(0);
@@ -1634,11 +1639,29 @@ document.addEventListener('DOMContentLoaded', async () => {
       const rawWeight = document.getElementById('inputProductWeight') ? document.getElementById('inputProductWeight').value.trim() : '';
       const rawVolume = document.getElementById('inputProductVolume') ? document.getElementById('inputProductVolume').value.trim() : '';
 
-      const sanitized = window.ProductUtils ? window.ProductUtils.sanitizeProductAttributes(rawName, rawWeight, rawVolume, rawQty) : { name: rawName, weight: rawWeight, volume: rawVolume, quantity: rawQty };
-      const name = sanitized.name;
-      const quantity = sanitized.quantity || null;
-      const weight = sanitized.weight || null;
-      const volume = sanitized.volume || null;
+      if (!rawName) {
+        showToast('Por favor ingresa el nombre del producto', 'error');
+        return;
+      }
+
+      // REGLA ESTRICTA: No permitir guardar si el nombre contiene peso, volumen o cantidad
+      const specsDetection = window.ProductUtils ? window.ProductUtils.detectAttributesInName(rawName) : null;
+      if (specsDetection && specsDetection.hasSpecs) {
+        const nameInput = document.getElementById('inputProductName');
+        nameInput.classList.add('border-red-500', 'focus:ring-red-500');
+        nameInput.classList.remove('border-amber-500');
+        nameInput.focus();
+        validateProductNameSpecs();
+
+        const detectedList = specsDetection.detected.map(d => `${d.icon} ${d.label} ("${d.value}")`).join(', ');
+        showToast(`⚠️ No puedes guardar: El nombre contiene ${detectedList}. Por favor colócalo en los campos separados ('⚡ Cantidad / Pack', '⚖️ Peso' o '🧴 Volumen') de abajo.`, 'error', 7000);
+        return; // Detener guardado completamente
+      }
+
+      const name = rawName;
+      const quantity = rawQty || null;
+      const weight = rawWeight || null;
+      const volume = rawVolume || null;
 
       const price = parseFloat(document.getElementById('inputProductPrice').value);
       const currency = document.getElementById('inputProductCurrency').value;
@@ -1728,6 +1751,95 @@ document.addEventListener('DOMContentLoaded', async () => {
       showToast('Error al guardar producto: ' + err.message, 'error');
     }
   });
+
+  // ----------------------------------------------------
+  // VALIDACIÓN Y SEPARACIÓN DE ATRIBUTOS EN MODAL PRODUCTO
+  // ----------------------------------------------------
+  function validateProductNameSpecs() {
+    const nameInput = document.getElementById('inputProductName');
+    const warningBox = document.getElementById('productNameSpecsWarning');
+    const warningDetails = document.getElementById('productNameSpecsWarningDetails');
+    if (!nameInput || !warningBox || !warningDetails) return null;
+
+    const rawName = nameInput.value.trim();
+    if (!rawName) {
+      warningBox.classList.add('hidden');
+      nameInput.classList.remove('border-amber-500', 'border-red-500', 'focus:ring-red-500');
+      return null;
+    }
+
+    const detection = window.ProductUtils ? window.ProductUtils.detectAttributesInName(rawName) : null;
+    if (detection && detection.hasSpecs) {
+      nameInput.classList.add('border-amber-500');
+      warningBox.classList.remove('hidden');
+
+      const itemsHtml = detection.detected.map(d => {
+        return `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-900 border border-slate-700 text-slate-200 font-semibold text-[11px]"><span class="text-amber-400">${d.icon} ${d.label}:</span> <span class="text-white font-mono">"${escapeHtml(d.value)}"</span> &rarr; <span class="text-blue-300">${escapeHtml(d.fieldLabel)}</span></span>`;
+      }).join(' ');
+
+      warningDetails.innerHTML = `
+        <p class="text-slate-300">Para que las búsquedas por catálogo funcionen de forma óptima, el nombre debe estar limpio sin medidas ni packs:</p>
+        <div class="flex flex-wrap gap-1.5 my-1.5">${itemsHtml}</div>
+        <p class="text-[10px] text-amber-300 font-medium">💡 <strong>Recomendación:</strong> Coloca estos datos en los campos dedicados correspondientes justo debajo, o toca el botón para moverlos automáticamente.</p>
+      `;
+      return detection;
+    } else {
+      warningBox.classList.add('hidden');
+      nameInput.classList.remove('border-amber-500', 'border-red-500', 'focus:ring-red-500');
+      return null;
+    }
+  }
+
+  function highlightFieldBriefly(input) {
+    if (!input) return;
+    input.classList.add('ring-2', 'ring-amber-400', 'bg-amber-500/10');
+    setTimeout(() => {
+      input.classList.remove('ring-2', 'ring-amber-400', 'bg-amber-500/10');
+    }, 1500);
+  }
+
+  const inputProductNameEl = document.getElementById('inputProductName');
+  if (inputProductNameEl) {
+    inputProductNameEl.addEventListener('input', () => validateProductNameSpecs());
+    inputProductNameEl.addEventListener('blur', () => validateProductNameSpecs());
+  }
+
+  const btnAutoSeparateSpecsEl = document.getElementById('btnAutoSeparateProductSpecs');
+  if (btnAutoSeparateSpecsEl) {
+    btnAutoSeparateSpecsEl.addEventListener('click', () => {
+      const nameInput = document.getElementById('inputProductName');
+      const rawName = nameInput.value.trim();
+      const detection = window.ProductUtils ? window.ProductUtils.detectAttributesInName(rawName) : null;
+      if (!detection) return;
+
+      nameInput.value = detection.cleanName;
+
+      if (detection.suggestedQty) {
+        const qtyInput = document.getElementById('inputProductQuantity');
+        if (qtyInput) {
+          qtyInput.value = detection.suggestedQty;
+          highlightFieldBriefly(qtyInput);
+        }
+      }
+      if (detection.suggestedWeight) {
+        const weightInput = document.getElementById('inputProductWeight');
+        if (weightInput) {
+          weightInput.value = detection.suggestedWeight;
+          highlightFieldBriefly(weightInput);
+        }
+      }
+      if (detection.suggestedVolume) {
+        const volInput = document.getElementById('inputProductVolume');
+        if (volInput) {
+          volInput.value = detection.suggestedVolume;
+          highlightFieldBriefly(volInput);
+        }
+      }
+
+      validateProductNameSpecs();
+      showToast('✨ Datos separados en sus campos correspondientes. ¡Listo para guardar!', 'success');
+    });
+  }
 
   // ----------------------------------------------------
   // 3. ESCANEO CON IA & COMPRESIÓN EXTREMA (REGISTRO MÚLTIPLE)
@@ -4272,7 +4384,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // REGISTRO DE SERVICE WORKER (PWA)
   // ----------------------------------------------------
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js?v=28').then((reg) => {
+    navigator.serviceWorker.register('./sw.js?v=29').then((reg) => {
       console.log('Service Worker registrado con éxito:', reg.scope);
       reg.update();
     }).catch((err) => {

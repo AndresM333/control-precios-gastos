@@ -23,8 +23,8 @@ window.ProductUtils = {
       quantity = null;
     }
 
-    // 1. Detectar combos o cantidades en el nombre (ej: '2x', 'Combo 2x', 'Pack de 6', 'Pack 6', '6 pack', '3 unid', '12 unidades')
-    const qtyRegex = /(?:\bcombo\s*)?(?:(\d+\s*x|\bpack\s*(?:de\s*)?\d+|\d+\s*(?:pack|unid(?:ades)?|piezas?|pzas?|u))\b)/i;
+    // 1. Detectar combos o cantidades en el nombre (ej: '2x', 'Combo 2x', 'Combo 2', 'Pack de 6', 'Pack 6', '6 pack', '3 unid', '12 unidades')
+    const qtyRegex = /(?:\bcombo\s*(?:x\s*)?\d+\s*x?|\b(\d+\s*x|\bpack\s*(?:de\s*)?\d+|\d+\s*(?:pack|unid(?:ades|s)?|piezas?|pzas?|u\b))\b)/i;
     const qtyMatch = name.match(qtyRegex);
     if (qtyMatch && !quantity) {
       quantity = qtyMatch[0].trim();
@@ -59,6 +59,71 @@ window.ProductUtils = {
       weight: weight || null,
       volume: volume || null,
       quantity: quantity || null
+    };
+  },
+
+  /**
+   * Detecta si un nombre de producto contiene peso, volumen o cantidad incrustados.
+   * Retorna null si el nombre está limpio, o un objeto con los detalles detectados.
+   */
+  detectAttributesInName(rawName) {
+    if (!rawName) return null;
+    const name = String(rawName).trim();
+    if (!name) return null;
+
+    const qtyRegex = /(?:\bcombo\s*(?:x\s*)?\d+\s*x?|\b(\d+\s*x|\bpack\s*(?:de\s*)?\d+|\d+\s*(?:pack|unid(?:ades|s)?|piezas?|pzas?|u\b))\b)/i;
+    const volRegex = /\b(\d+(?:[\.,]\d+)?\s*(?:litros?|lts?|l\b|ml|cc|galones?|gal\b))\b/i;
+    const weightRegex = /\b(\d+(?:[\.,]\d+)?\s*(?:kilos?|kg|gr(?:amos|s)?|g\b|libras?|lbs?|lb\b|onzas?|oz\b)|\d+\/\d+\s*(?:kg|kilos?|g|gr))\b/i;
+
+    const qtyMatch = name.match(qtyRegex);
+    const volMatch = name.match(volRegex);
+    const weightMatch = name.match(weightRegex);
+
+    if (!qtyMatch && !volMatch && !weightMatch) {
+      return null;
+    }
+
+    const detected = [];
+    if (qtyMatch) {
+      detected.push({
+        type: 'quantity',
+        label: 'Cantidad / Combo',
+        icon: '⚡',
+        value: qtyMatch[0].trim(),
+        fieldId: 'inputProductQuantity',
+        fieldLabel: '⚡ Cantidad / Pack'
+      });
+    }
+    if (volMatch) {
+      detected.push({
+        type: 'volume',
+        label: 'Volumen',
+        icon: '🧴',
+        value: volMatch[0].trim(),
+        fieldId: 'inputProductVolume',
+        fieldLabel: '🧴 Volumen'
+      });
+    }
+    if (weightMatch) {
+      detected.push({
+        type: 'weight',
+        label: 'Peso',
+        icon: '⚖️',
+        value: weightMatch[0].trim(),
+        fieldId: 'inputProductWeight',
+        fieldLabel: '⚖️ Peso'
+      });
+    }
+
+    const sanitized = this.sanitizeProductAttributes(name);
+
+    return {
+      hasSpecs: true,
+      detected,
+      cleanName: sanitized.name,
+      suggestedQty: sanitized.quantity,
+      suggestedWeight: sanitized.weight,
+      suggestedVolume: sanitized.volume
     };
   },
 

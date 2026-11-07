@@ -12,7 +12,7 @@
   <link rel="manifest" href="./manifest.json">
   <link rel="icon" type="image/svg+xml" href="./icons/icon.svg">
   <link rel="apple-touch-icon" href="./icons/icon.svg">
-  <link rel="stylesheet" href="./css/styles.css?v=28">
+  <link rel="stylesheet" href="./css/styles.css?v=29">
   <!-- Tailwind Utilities (CDN for instant responsive styling) -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -1031,8 +1031,27 @@
           </select>
         </div>
         <div class="form-group">
-          <label class="form-label">Nombre del Producto *</label>
-          <input type="text" id="inputProductName" class="form-input" required placeholder="Ej: Harina PAN, Arroz Mary, Refresco Cola">
+          <label class="form-label flex items-center justify-between">
+            <span>Nombre del Producto *</span>
+            <span class="text-[10px] text-slate-400 font-normal">Sin peso, volumen ni cantidades</span>
+          </label>
+          <input type="text" id="inputProductName" class="form-input transition" required placeholder="Ej: Harina PAN, Arroz Mary, Refresco Cola">
+
+          <!-- Alerta / Recomendación cuando se escribe peso, volumen o cantidad en el nombre -->
+          <div id="productNameSpecsWarning" class="hidden mt-2 p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-amber-200 text-xs">
+            <div class="flex items-start gap-2.5">
+              <span class="text-base flex-shrink-0 mt-0.5">⚠️</span>
+              <div class="flex-1 min-w-0">
+                <p class="font-bold text-amber-300 text-xs">No incluyas peso, volumen ni cantidades en el nombre</p>
+                <div id="productNameSpecsWarningDetails" class="mt-1 text-slate-300 text-[11px] leading-relaxed"></div>
+                <div class="mt-2.5 flex flex-wrap items-center gap-2">
+                  <button type="button" id="btnAutoSeparateProductSpecs" class="px-2.5 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-500/40 rounded-lg text-xs font-bold flex items-center gap-1.5 transition active:scale-95 shadow">
+                    <span>✨</span> Mover a campos separados automáticamente
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
         <!-- Atributos Opcionales: Cantidad / Combo, Peso y Volumen -->
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
@@ -1745,16 +1764,16 @@
   <div id="toastContainer" class="toast-container"></div>
 
   <!-- Core Scripts -->
-  <script src="./js/db.js?v=28"></script>
-  <script src="./js/icons-library.js?v=28"></script>
-  <script src="./js/bcv.js?v=28"></script>
-  <script src="./js/image-compressor.js?v=28"></script>
-  <script src="./js/ai-scanner.js?v=28"></script>
-  <script src="./js/charts.js?v=28"></script>
-  <script src="./js/grocery-planner.js?v=28"></script>
-  <script src="./js/accounting.js?v=28"></script>
-  <script src="./js/backup-drive.js?v=28"></script>
-  <script src="./js/auth-groups.js?v=28"></script>
-  <script src="./js/app.js?v=28"></script>
+  <script src="./js/db.js?v=29"></script>
+  <script src="./js/icons-library.js?v=29"></script>
+  <script src="./js/bcv.js?v=29"></script>
+  <script src="./js/image-compressor.js?v=29"></script>
+  <script src="./js/ai-scanner.js?v=29"></script>
+  <script src="./js/charts.js?v=29"></script>
+  <script src="./js/grocery-planner.js?v=29"></script>
+  <script src="./js/accounting.js?v=29"></script>
+  <script src="./js/backup-drive.js?v=29"></script>
+  <script src="./js/auth-groups.js?v=29"></script>
+  <script src="./js/app.js?v=29"></script>
 </body>
 </html>
