@@ -976,7 +976,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (p.original_currency === 'VES') {
         rawUsd = currentRate > 0 ? rawUsd / currentRate : 0;
       }
-      const priceFormatted = formatDisplayPrice(rawUsd);
+      const priceFormatted = (window.ProductUtils && typeof window.ProductUtils.formatProductPricing === 'function')
+        ? window.ProductUtils.formatProductPricing(p, currentRate, activeDisplayCurrency)
+        : formatDisplayPrice(rawUsd);
 
       const mediaHtml = window.AppIcons ? window.AppIcons.renderProductMedia(p, 'w-10 h-10') : '🏷️';
 
@@ -996,7 +998,7 @@ document.addEventListener('DOMContentLoaded', async () => {
               <h4 class="font-bold text-slate-100 text-xs truncate flex items-center">${titleHtml}</h4>
               <div class="flex items-center gap-2 mt-0.5 whitespace-nowrap">
                 <span class="text-xs font-black text-slate-200">${priceFormatted.primary}</span>
-                <span class="text-[10px] font-semibold ${priceFormatted.isVes ? 'text-blue-400' : 'text-emerald-400'}">${priceFormatted.secondary}</span>
+                <span class="text-[10px] font-semibold ${activeDisplayCurrency === 'VES' ? 'text-blue-400' : 'text-emerald-400'}">${priceFormatted.secondary}</span>
                 ${specsHtml ? `<span>•</span> ${specsHtml}` : ''}
               </div>
             </div>
@@ -1077,6 +1079,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (gHintA) gHintA.textContent = 'Automático';
     const gIconA = document.getElementById('productGroupMatchIcon');
     if (gIconA) gIconA.textContent = '📦';
+    userManuallyToggledFreeQuantity = false;
+    setProductMeasureType('unidad');
+    if (document.getElementById('inputProductMeasureAmount')) document.getElementById('inputProductMeasureAmount').value = '1';
+    if (document.getElementById('chkProductFreeQuantity')) document.getElementById('chkProductFreeQuantity').checked = false;
+    if (document.getElementById('badgeFreeQuantityAi')) document.getElementById('badgeFreeQuantityAi').classList.add('hidden');
+    updateProductMeasureAmountFieldState();
     if (document.getElementById('inputProductQuantity')) document.getElementById('inputProductQuantity').value = '';
     if (document.getElementById('inputProductWeight')) document.getElementById('inputProductWeight').value = '';
     if (document.getElementById('inputProductVolume')) document.getElementById('inputProductVolume').value = '';
@@ -1357,12 +1365,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     productsGrid.innerHTML = filtered.map(prod => {
       const store = storesMap.get(prod.store_id) || { name: 'Tienda sin asignar' };
 
-      // Conversión de precio según moneda de visualización seleccionada (USD o Bs)
-      let rawUsd = parseFloat(prod.current_price) || 0;
-      if (prod.original_currency === 'VES') {
-        rawUsd = currentRate > 0 ? rawUsd / currentRate : 0;
-      }
-      const priceFormatted = formatDisplayPrice(rawUsd);
+      // Conversión y formateo de precio según regla:
+      // Si tiene cantidad libre: precio unitario (/Kg, /L, /Und) sin paréntesis
+      // Si es empaque fijo: precio unitario y al lado entre paréntesis el precio original
+      const priceFormatted = (window.ProductUtils && typeof window.ProductUtils.formatProductPricing === 'function')
+        ? window.ProductUtils.formatProductPricing(prod, currentRate, activeDisplayCurrency)
+        : formatDisplayPrice(rawUsd);
 
       const mediaHtml = window.AppIcons ? window.AppIcons.renderProductMedia(prod) : '🏷️';
 
@@ -1390,7 +1398,7 @@ document.addEventListener('DOMContentLoaded', async () => {
               <!-- Price Badge according to selected display currency -->
               <div class="text-right flex-shrink-0 pl-1">
                 <span class="text-sm sm:text-base font-extrabold text-slate-100 block whitespace-nowrap">${priceFormatted.primary}</span>
-                <span class="text-[10px] sm:text-[11px] font-semibold whitespace-nowrap ${priceFormatted.isVes ? 'text-blue-400' : 'text-emerald-400'}">${priceFormatted.secondary}</span>
+                <span class="text-[10px] sm:text-[11px] font-semibold whitespace-nowrap ${activeDisplayCurrency === 'VES' ? 'text-blue-400' : 'text-emerald-400'}">${priceFormatted.secondary}</span>
               </div>
             </div>
 
@@ -1503,6 +1511,17 @@ document.addEventListener('DOMContentLoaded', async () => {
           document.getElementById('modalProductTitle').textContent = 'Editar Producto';
           document.getElementById('inputProductId').value = prod.id;
           document.getElementById('inputProductName').value = prod.name;
+          const m = (window.ProductUtils && typeof window.ProductUtils.normalizeProductMeasure === 'function')
+            ? window.ProductUtils.normalizeProductMeasure(prod)
+            : { type: prod.measure_type || 'unidad', amount: parseFloat(prod.measure_amount) || 1, isFree: !!prod.is_free_quantity };
+
+          userManuallyToggledFreeQuantity = true;
+          setProductMeasureType(m.type);
+          if (document.getElementById('inputProductMeasureAmount')) document.getElementById('inputProductMeasureAmount').value = m.amount;
+          if (document.getElementById('chkProductFreeQuantity')) document.getElementById('chkProductFreeQuantity').checked = m.isFree;
+          if (document.getElementById('badgeFreeQuantityAi')) document.getElementById('badgeFreeQuantityAi').classList.add('hidden');
+          updateProductMeasureAmountFieldState();
+
           if (document.getElementById('inputProductQuantity')) document.getElementById('inputProductQuantity').value = prod.quantity || '';
           if (document.getElementById('inputProductWeight')) document.getElementById('inputProductWeight').value = prod.weight || '';
           if (document.getElementById('inputProductVolume')) document.getElementById('inputProductVolume').value = prod.volume || '';
@@ -1655,6 +1674,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (gHintA) gHintA.textContent = 'Automático';
     const gIconA = document.getElementById('productGroupMatchIcon');
     if (gIconA) gIconA.textContent = '📦';
+    userManuallyToggledFreeQuantity = false;
+    setProductMeasureType('unidad');
+    if (document.getElementById('inputProductMeasureAmount')) document.getElementById('inputProductMeasureAmount').value = '1';
+    if (document.getElementById('chkProductFreeQuantity')) document.getElementById('chkProductFreeQuantity').checked = false;
+    if (document.getElementById('badgeFreeQuantityAi')) document.getElementById('badgeFreeQuantityAi').classList.add('hidden');
+    updateProductMeasureAmountFieldState();
     if (document.getElementById('inputProductQuantity')) document.getElementById('inputProductQuantity').value = '';
     if (document.getElementById('inputProductWeight')) document.getElementById('inputProductWeight').value = '';
     if (document.getElementById('inputProductVolume')) document.getElementById('inputProductVolume').value = '';
@@ -1696,14 +1721,21 @@ document.addEventListener('DOMContentLoaded', async () => {
         validateProductNameSpecs();
 
         const detectedList = specsDetection.detected.map(d => `${d.icon} ${d.label} ("${d.value}")`).join(', ');
-        showToast(`⚠️ No puedes guardar: El nombre contiene ${detectedList}. Por favor colócalo en los campos separados ('⚡ Cantidad / Pack', '⚖️ Peso' o '🧴 Volumen') de abajo.`, 'error', 7000);
+        showToast(`⚠️ No puedes guardar: El nombre contiene ${detectedList}. Por favor colócalo en el selector de Tipo de Medida y Cantidad de abajo.`, 'error', 7000);
         return; // Detener guardado completamente
       }
 
+      const rawType = document.getElementById('inputProductMeasureType') ? document.getElementById('inputProductMeasureType').value : 'unidad';
+      const measureType = (rawType === 'peso' || rawType === 'volumen') ? rawType : 'unidad';
+      const chkFree = document.getElementById('chkProductFreeQuantity');
+      const isFreeQuantity = chkFree ? chkFree.checked : false;
+      const amountInputVal = parseFloat(document.getElementById('inputProductMeasureAmount')?.value);
+      const measureAmount = isFreeQuantity ? 1 : (amountInputVal > 0 ? amountInputVal : 1);
+
       const name = rawName;
-      const quantity = rawQty || null;
-      const weight = rawWeight || null;
-      const volume = rawVolume || null;
+      const quantity = measureType === 'unidad' ? (measureAmount > 1 ? `${measureAmount} und` : null) : null;
+      const weight = measureType === 'peso' ? (isFreeQuantity ? 'Por Kilo' : `${measureAmount} kg`) : null;
+      const volume = measureType === 'volumen' ? (isFreeQuantity ? 'Por Litro' : `${measureAmount} L`) : null;
 
       const price = parseFloat(document.getElementById('inputProductPrice').value);
       const currency = document.getElementById('inputProductCurrency').value;
@@ -1737,6 +1769,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       const prodPayload = {
         store_id: storeId,
         name,
+        measure_type: measureType,
+        measure_amount: measureAmount,
+        is_free_quantity: isFreeQuantity,
         quantity,
         weight,
         volume,
@@ -1838,6 +1873,151 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   // ----------------------------------------------------
+  // GESTIÓN DEL SISTEMA DE MEDIDA (PESO, VOLUMEN, UNIDAD, CANTIDAD LIBRE)
+  // ----------------------------------------------------
+  let userManuallyToggledFreeQuantity = false;
+
+  function setProductMeasureType(type, triggerAiHint = false) {
+    const valid = (type === 'peso' || type === 'volumen') ? type : 'unidad';
+    const typeInput = document.getElementById('inputProductMeasureType');
+    if (typeInput) typeInput.value = valid;
+
+    const btnPeso = document.getElementById('btnMeasurePeso');
+    const btnVol = document.getElementById('btnMeasureVolumen');
+    const btnUnd = document.getElementById('btnMeasureUnidad');
+    const hintAi = document.getElementById('measureTypeAiHint');
+    const unitHint = document.getElementById('unitProductMeasureHint');
+    const unitBadge = document.getElementById('badgeProductMeasureUnit');
+    const helpAmount = document.getElementById('helpProductMeasureAmount');
+    const amountInput = document.getElementById('inputProductMeasureAmount');
+
+    const activeClass = 'btn-measure-type py-2 px-2 rounded-xl font-bold text-xs flex flex-col items-center justify-center gap-1 transition border-2 border-blue-500 bg-blue-600/20 text-blue-300 shadow-sm';
+    const inactiveClass = 'btn-measure-type py-2 px-2 rounded-xl font-bold text-xs flex flex-col items-center justify-center gap-1 transition border border-slate-700 bg-slate-800 text-slate-300 hover:border-slate-600';
+
+    if (btnPeso) btnPeso.className = valid === 'peso' ? activeClass : inactiveClass;
+    if (btnVol) btnVol.className = valid === 'volumen' ? activeClass : inactiveClass;
+    if (btnUnd) btnUnd.className = valid === 'unidad' ? activeClass : inactiveClass;
+
+    if (hintAi) {
+      if (triggerAiHint) hintAi.classList.remove('hidden');
+      else hintAi.classList.add('hidden');
+    }
+
+    if (valid === 'peso') {
+      if (unitHint) unitHint.textContent = 'Kg';
+      if (unitBadge) unitBadge.textContent = 'Kg';
+      if (helpAmount) helpAmount.textContent = 'Ej: 1 (1 Kg), 0.500 (500g), 0.250 (250g)...';
+    } else if (valid === 'volumen') {
+      if (unitHint) unitHint.textContent = 'Litros (L)';
+      if (unitBadge) unitBadge.textContent = 'L';
+      if (helpAmount) helpAmount.textContent = 'Ej: 1.5 (1.5L), 0.355 (355ml), 2 (2L)...';
+    } else {
+      if (unitHint) unitHint.textContent = 'Und';
+      if (unitBadge) unitBadge.textContent = 'Und';
+      if (helpAmount) helpAmount.textContent = 'Ej: 1 (1 und), 6 (Pack 6), 2 (2x)...';
+    }
+
+    updateProductMeasureAmountFieldState();
+    if (typeof updateProductPriceHint === 'function') updateProductPriceHint();
+  }
+
+  function updateProductMeasureAmountFieldState() {
+    const chkFree = document.getElementById('chkProductFreeQuantity');
+    const amountField = document.getElementById('fieldProductMeasureAmount');
+    const amountInput = document.getElementById('inputProductMeasureAmount');
+    const isFree = chkFree ? chkFree.checked : false;
+
+    if (isFree) {
+      if (amountField) amountField.classList.add('opacity-50', 'pointer-events-none');
+      if (amountInput) {
+        amountInput.value = '1';
+        amountInput.setAttribute('disabled', 'true');
+      }
+    } else {
+      if (amountField) amountField.classList.remove('opacity-50', 'pointer-events-none');
+      if (amountInput) amountInput.removeAttribute('disabled');
+    }
+  }
+
+  function autoDetectProductMeasure() {
+    const nameInput = document.getElementById('inputProductName');
+    if (!nameInput) return;
+    const rawName = nameInput.value.trim();
+    if (!rawName) return;
+
+    if (!window.ProductUtils || typeof window.ProductUtils.detectMeasureAndFreeQuantity !== 'function') return;
+
+    const detected = window.ProductUtils.detectMeasureAndFreeQuantity(rawName);
+    const chkFree = document.getElementById('chkProductFreeQuantity');
+    const badgeAi = document.getElementById('badgeFreeQuantityAi');
+    const amountInput = document.getElementById('inputProductMeasureAmount');
+
+    setProductMeasureType(detected.type, !!detected.detectedByAi);
+
+    // REGLA CRÍTICA DEL USUARIO:
+    // "En el caso de los productos por Unidad es muy raro que se deba activar la opcion
+    //  asi que si la IA detecta que el producto es de tipo unidad la opcion de cantidad libre
+    //  solo la debe poder activar el usuario por cuenta propia."
+    if (detected.type === 'unidad') {
+      if (chkFree) chkFree.checked = false;
+      if (badgeAi) badgeAi.classList.add('hidden');
+    } else if (detected.isFree && detected.detectedByAi) {
+      if (chkFree) chkFree.checked = true;
+      if (badgeAi) {
+        badgeAi.classList.remove('hidden');
+        badgeAi.textContent = detected.type === 'peso' ? '✨ Charcutería / A granel (IA)' : '✨ Recarga libre (IA)';
+      }
+    } else {
+      if (chkFree && !userManuallyToggledFreeQuantity) chkFree.checked = false;
+      if (badgeAi) badgeAi.classList.add('hidden');
+    }
+
+    if (!chkFree || !chkFree.checked) {
+      if (detected.amount && amountInput) amountInput.value = detected.amount;
+    }
+
+    updateProductMeasureAmountFieldState();
+  }
+
+  // Event Listeners para selector de medida y switch de cantidad libre
+  const btnMeasurePesoEl = document.getElementById('btnMeasurePeso');
+  if (btnMeasurePesoEl) {
+    btnMeasurePesoEl.addEventListener('click', () => {
+      setProductMeasureType('peso');
+    });
+  }
+  const btnMeasureVolumenEl = document.getElementById('btnMeasureVolumen');
+  if (btnMeasureVolumenEl) {
+    btnMeasureVolumenEl.addEventListener('click', () => {
+      setProductMeasureType('volumen');
+    });
+  }
+  const btnMeasureUnidadEl = document.getElementById('btnMeasureUnidad');
+  if (btnMeasureUnidadEl) {
+    btnMeasureUnidadEl.addEventListener('click', () => {
+      setProductMeasureType('unidad');
+      const chk = document.getElementById('chkProductFreeQuantity');
+      if (chk && !userManuallyToggledFreeQuantity) {
+        chk.checked = false;
+        const b = document.getElementById('badgeFreeQuantityAi');
+        if (b) b.classList.add('hidden');
+        updateProductMeasureAmountFieldState();
+      }
+    });
+  }
+
+  const chkProductFreeQtyEl = document.getElementById('chkProductFreeQuantity');
+  if (chkProductFreeQtyEl) {
+    chkProductFreeQtyEl.addEventListener('change', () => {
+      userManuallyToggledFreeQuantity = true;
+      const b = document.getElementById('badgeFreeQuantityAi');
+      if (b) b.classList.add('hidden');
+      updateProductMeasureAmountFieldState();
+      if (typeof updateProductPriceHint === 'function') updateProductPriceHint();
+    });
+  }
+
+  // ----------------------------------------------------
   // VALIDACIÓN Y SEPARACIÓN DE ATRIBUTOS EN MODAL PRODUCTO
   // ----------------------------------------------------
   function validateProductNameSpecs() {
@@ -1865,7 +2045,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       warningDetails.innerHTML = `
         <p class="text-slate-300">Para que las búsquedas por catálogo funcionen de forma óptima, el nombre debe estar limpio sin medidas ni packs:</p>
         <div class="flex flex-wrap gap-1.5 my-1.5">${itemsHtml}</div>
-        <p class="text-[10px] text-amber-300 font-medium">💡 <strong>Recomendación:</strong> Coloca estos datos en los campos dedicados correspondientes justo debajo, o toca el botón para moverlos automáticamente.</p>
+        <p class="text-[10px] text-amber-300 font-medium">💡 <strong>Recomendación:</strong> Coloca estos datos en el selector de Tipo de Medida y Cantidad de abajo, o toca el botón para moverlos automáticamente.</p>
       `;
       return detection;
     } else {
@@ -1887,10 +2067,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (inputProductNameEl) {
     inputProductNameEl.addEventListener('input', () => {
       validateProductNameSpecs();
+      autoDetectProductMeasure();
       autoPredictProductGroup();
     });
     inputProductNameEl.addEventListener('blur', () => {
       validateProductNameSpecs();
+      autoDetectProductMeasure();
       autoPredictProductGroup();
     });
   }
@@ -2087,31 +2269,38 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       nameInput.value = detection.cleanName;
 
+      // Asignar en el nuevo sistema de medidas (peso, volumen o unidad)
+      if (detection.measureType) {
+        setProductMeasureType(detection.measureType);
+        const amountInput = document.getElementById('inputProductMeasureAmount');
+        if (amountInput) {
+          amountInput.value = detection.measureAmount || 1;
+          highlightFieldBriefly(amountInput);
+        }
+        const chkFree = document.getElementById('chkProductFreeQuantity');
+        if (chkFree) {
+          chkFree.checked = !!detection.isFreeQuantity;
+          updateProductMeasureAmountFieldState();
+        }
+      }
+
+      // Legacy fallback
       if (detection.suggestedQty) {
         const qtyInput = document.getElementById('inputProductQuantity');
-        if (qtyInput) {
-          qtyInput.value = detection.suggestedQty;
-          highlightFieldBriefly(qtyInput);
-        }
+        if (qtyInput) qtyInput.value = detection.suggestedQty;
       }
       if (detection.suggestedWeight) {
         const weightInput = document.getElementById('inputProductWeight');
-        if (weightInput) {
-          weightInput.value = detection.suggestedWeight;
-          highlightFieldBriefly(weightInput);
-        }
+        if (weightInput) weightInput.value = detection.suggestedWeight;
       }
       if (detection.suggestedVolume) {
         const volInput = document.getElementById('inputProductVolume');
-        if (volInput) {
-          volInput.value = detection.suggestedVolume;
-          highlightFieldBriefly(volInput);
-        }
+        if (volInput) volInput.value = detection.suggestedVolume;
       }
 
       validateProductNameSpecs();
       autoPredictProductGroup();
-      showToast('✨ Datos separados en sus campos correspondientes. ¡Listo para guardar!', 'success');
+      showToast('✨ Medidas separadas en el nuevo sistema. ¡Listo para guardar!', 'success');
     });
   }
 
@@ -2725,9 +2914,217 @@ document.addEventListener('DOMContentLoaded', async () => {
   // ----------------------------------------------------
   // 4. PROGRAMAR MERCADO (CANASTA CON + Y - Y MODO GRUPOS)
   // ----------------------------------------------------
-  const plannerCart = new Map(); // productNameOrGroupName -> quantity
+  const plannerCart = new Map(); // productNameOrGroupName -> cartItemData or quantity
   let plannerCatalogMode = localStorage.getItem('app_planner_catalog_mode') || 'groups';
   let currentDetailGroup = null;
+  let activeFreeQtyConfig = null;
+
+  function getCartItemInfo(key) {
+    const val = plannerCart.get(key);
+    if (!val) return null;
+    if (typeof val === 'number') {
+      return {
+        key,
+        name: key,
+        qty: val,
+        amount: val,
+        isFree: false,
+        unit: 'Und',
+        measureType: 'unidad',
+        isGroup: false,
+        unitPriceUsd: 0
+      };
+    }
+    return val;
+  }
+
+  function openOrderFreeQuantityModal(config) {
+    activeFreeQtyConfig = config;
+    const { key, name, isGroup, measureType, unitPriceUsd, currentAmount, rawProduct, storeName } = config;
+
+    const unit = measureType === 'peso' ? 'Kg' : (measureType === 'volumen' ? 'L' : 'Und');
+    const unitName = measureType === 'peso' ? 'Kilos' : (measureType === 'volumen' ? 'Litros' : 'Unidades');
+
+    const modal = document.getElementById('modalOrderFreeQuantity');
+    if (!modal) return;
+
+    const itemKeyInput = document.getElementById('inputFreeQtyItemKey');
+    const measureTypeInput = document.getElementById('inputFreeQtyMeasureType');
+    const unitPriceInput = document.getElementById('inputFreeQtyUnitPriceUsd');
+    const targetNameEl = document.getElementById('freeQtyTargetName');
+    const unitPriceBadgeEl = document.getElementById('freeQtyUnitPriceBadge');
+    const storeNoteEl = document.getElementById('freeQtyStoreNote');
+    const inputLabelEl = document.getElementById('freeQtyInputLabel');
+    const inputHintEl = document.getElementById('freeQtyInputHint');
+    const unitSuffixEl = document.getElementById('freeQtyUnitSuffix');
+    const valueInput = document.getElementById('inputFreeQtyValue');
+    const chipsContainer = document.getElementById('freeQtyQuickChips');
+    const modalIconEl = document.getElementById('freeQtyModalIcon');
+    const modalTitleEl = document.getElementById('freeQtyModalTitle');
+
+    if (itemKeyInput) itemKeyInput.value = key || name;
+    if (measureTypeInput) measureTypeInput.value = measureType || 'peso';
+    if (unitPriceInput) unitPriceInput.value = unitPriceUsd || 0;
+    if (targetNameEl) targetNameEl.textContent = name;
+
+    const currentRate = (window.bcvService && window.bcvService.rate > 0) ? window.bcvService.rate : 45.0;
+    const isVes = (activeDisplayCurrency === 'VES');
+    const unitPriceVes = unitPriceUsd * currentRate;
+    const unitPriceStr = isVes
+      ? `Bs. ${unitPriceVes.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/${unit}`
+      : `$ ${unitPriceUsd.toFixed(2)}/${unit}`;
+
+    if (unitPriceBadgeEl) unitPriceBadgeEl.textContent = unitPriceStr;
+    if (storeNoteEl) {
+      storeNoteEl.textContent = storeName ? `🏬 ${storeName}` : (isGroup ? '📦 Selección optimizada entre tiendas' : '🏬 Tienda asignada');
+    }
+    if (modalIconEl) {
+      modalIconEl.textContent = measureType === 'peso' ? '⚖️' : (measureType === 'volumen' ? '💧' : '🔢');
+    }
+    if (modalTitleEl) {
+      modalTitleEl.textContent = `Indicar Cantidad (${unit})`;
+    }
+    if (inputLabelEl) {
+      inputLabelEl.innerHTML = `¿Cuánto deseas pedir en <strong>${unitName} (${unit})</strong>? *`;
+    }
+    if (inputHintEl) inputHintEl.textContent = unitName;
+    if (unitSuffixEl) unitSuffixEl.textContent = unit;
+
+    // Valor inicial por defecto o actual
+    let initialVal = currentAmount;
+    if (!initialVal || initialVal <= 0) {
+      initialVal = (measureType === 'peso' ? 0.500 : (measureType === 'volumen' ? 1 : 1));
+    }
+    if (valueInput) {
+      valueInput.value = initialVal;
+      valueInput.step = (measureType === 'peso' ? '0.05' : (measureType === 'volumen' ? '0.1' : '1'));
+    }
+
+    // Chips dinámicos según medida
+    if (chipsContainer) {
+      let chipsData = [];
+      if (measureType === 'peso') {
+        chipsData = [
+          { val: 0.100, label: '100g' },
+          { val: 0.250, label: '250g' },
+          { val: 0.500, label: '1/2 Kg' },
+          { val: 0.750, label: '750g' },
+          { val: 1.000, label: '1 Kg' },
+          { val: 1.500, label: '1.5 Kg' },
+          { val: 2.000, label: '2 Kg' }
+        ];
+      } else if (measureType === 'volumen') {
+        chipsData = [
+          { val: 0.5, label: '500 ml' },
+          { val: 1.0, label: '1 L' },
+          { val: 2.0, label: '2 L' },
+          { val: 5.0, label: '5 L' },
+          { val: 10.0, label: '10 L' },
+          { val: 19.0, label: '19 L (Botellón)' }
+        ];
+      } else {
+        chipsData = [
+          { val: 1, label: '1 Und' },
+          { val: 2, label: '2 Und' },
+          { val: 3, label: '3 Und' },
+          { val: 5, label: '5 Und' },
+          { val: 6, label: 'Media Docena' },
+          { val: 12, label: '1 Docena' }
+        ];
+      }
+
+      chipsContainer.innerHTML = chipsData.map(c => `
+        <button type="button" class="btn-free-qty-chip px-2.5 py-1 rounded-lg text-[11px] font-bold bg-slate-800 hover:bg-blue-600 text-slate-300 hover:text-white border border-slate-700 transition" data-val="${c.val}">
+          ${c.label}
+        </button>
+      `).join('');
+
+      chipsContainer.querySelectorAll('.btn-free-qty-chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+          const v = parseFloat(chip.dataset.val);
+          if (valueInput && !isNaN(v)) {
+            valueInput.value = v;
+            updateFreeQtyLiveCalculations();
+          }
+        });
+      });
+    }
+
+    function updateFreeQtyLiveCalculations() {
+      const val = parseFloat(valueInput ? valueInput.value : 0) || 0;
+      const subUsd = val * (unitPriceUsd || 0);
+      const subVes = subUsd * currentRate;
+
+      const liveAmountEl = document.getElementById('freeQtyLiveAmountText');
+      const livePrimaryEl = document.getElementById('freeQtyLiveTotalPrimary');
+      const liveSecondaryEl = document.getElementById('freeQtyLiveTotalSecondary');
+
+      if (liveAmountEl) {
+        liveAmountEl.textContent = `${val} ${unit} seleccionados`;
+      }
+      if (isVes) {
+        if (livePrimaryEl) livePrimaryEl.textContent = `Bs. ${subVes.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        if (liveSecondaryEl) liveSecondaryEl.textContent = `$ ${subUsd.toFixed(2)}`;
+      } else {
+        if (livePrimaryEl) livePrimaryEl.textContent = `$ ${subUsd.toFixed(2)}`;
+        if (liveSecondaryEl) liveSecondaryEl.textContent = `Bs. ${subVes.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      }
+    }
+
+    if (valueInput) {
+      valueInput.oninput = updateFreeQtyLiveCalculations;
+    }
+    updateFreeQtyLiveCalculations();
+
+    openModal('modalOrderFreeQuantity');
+    setTimeout(() => {
+      if (valueInput) {
+        valueInput.focus();
+        valueInput.select();
+      }
+    }, 150);
+  }
+
+  // Listener para confirmar modal de cantidad libre
+  const formOrderFreeQtyEl = document.getElementById('formOrderFreeQuantity');
+  if (formOrderFreeQtyEl) {
+    formOrderFreeQtyEl.addEventListener('submit', (e) => {
+      e.preventDefault();
+      if (!window.authGroups.hasPermission('can_manage_cart')) {
+        showToast('⚠️ No tienes permiso para agregar productos al carro de compras.', 'error');
+        return;
+      }
+      if (!activeFreeQtyConfig) return;
+
+      const amountVal = parseFloat(document.getElementById('inputFreeQtyValue').value) || 0;
+      if (amountVal <= 0) {
+        showToast('⚠️ Por favor indica una cantidad mayor a cero.', 'error');
+        return;
+      }
+
+      const cfg = activeFreeQtyConfig;
+      const unit = cfg.measureType === 'peso' ? 'Kg' : (cfg.measureType === 'volumen' ? 'L' : 'Und');
+
+      plannerCart.set(cfg.key, {
+        key: cfg.key,
+        name: cfg.name,
+        isGroup: !!cfg.isGroup,
+        isFree: true,
+        measureType: cfg.measureType,
+        amount: amountVal,
+        unit: unit,
+        qty: 1,
+        unitPriceUsd: cfg.unitPriceUsd,
+        storeName: cfg.storeName || ''
+      });
+
+      closeModal('modalOrderFreeQuantity');
+      renderPlannerCart();
+      loadPlannerProductList();
+      showToast(`🛒 Se agregaron ${amountVal} ${unit} de "${cfg.name}" a la canasta`, 'success');
+      activeFreeQtyConfig = null;
+    });
+  }
 
   function updatePlannerModeUI() {
     const btnInd = document.getElementById('btnPlannerModeIndividual');
@@ -2802,15 +3199,35 @@ document.addEventListener('DOMContentLoaded', async () => {
         const prod = productsByName.get(name);
         const store = prod && prod.store_id ? storesById.get(prod.store_id) : null;
         const mediaHtml = window.AppIcons ? window.AppIcons.renderProductMedia(prod, 'w-8 h-8') : '🏷️';
-        const inCartQty = plannerCart.get(name) || 0;
+        const cartItem = getCartItemInfo(name);
+        const norm = (window.ProductUtils && typeof window.ProductUtils.normalizeProductMeasure === 'function')
+          ? window.ProductUtils.normalizeProductMeasure(prod || { name })
+          : { type: 'unidad', amount: 1, isFree: false, unit: 'Und' };
+
         let priceUsd = prod ? parseFloat(prod.current_price) : 0;
         if (prod && prod.original_currency === 'VES') {
           priceUsd = currentRate > 0 ? priceUsd / currentRate : 0;
         }
-        const priceInfo = prod ? formatDisplayPrice(priceUsd) : null;
+        const priceInfo = (window.ProductUtils && typeof window.ProductUtils.formatProductPricing === 'function')
+          ? window.ProductUtils.formatProductPricing(prod || { name }, currentRate, activeDisplayCurrency)
+          : (prod ? formatDisplayPrice(priceUsd) : null);
+
         const titleHtml = window.ProductUtils ? window.ProductUtils.formatTitleWithQuantity(prod || { name }) : escapeHtml(name);
         const specsHtml = window.ProductUtils ? window.ProductUtils.formatSpecsBadge(prod || {}) : '';
         const storeBadgeHtml = window.ProductUtils ? window.ProductUtils.formatStoreBadge(store, 14) : '';
+
+        let inCartBadgeHtml = '<span class="text-slate-500">• Disponible</span>';
+        if (cartItem) {
+          if (cartItem.isFree) {
+            inCartBadgeHtml = `<span class="text-amber-400 font-bold">• ⚖️ ${cartItem.amount} ${cartItem.unit} en canasta</span>`;
+          } else {
+            inCartBadgeHtml = `<span class="text-emerald-400 font-bold">• x${cartItem.qty} en canasta</span>`;
+          }
+        }
+
+        const btnTitle = norm.isFree
+          ? `Indicar cantidad a pedir en ${norm.unit} para calcular precio`
+          : 'Agregar 1 unidad a la canasta';
 
         return `
           <div class="flex items-center justify-between p-2 rounded-xl bg-slate-800/40 hover:bg-slate-800 border border-slate-800/60 transition gap-2 min-w-0 w-full">
@@ -2822,12 +3239,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                 <div class="flex items-center gap-1.5 text-[10px] mt-0.5">
                   ${priceInfo ? `<span class="text-slate-300 font-bold">${priceInfo.primary}</span>` : ''}
                   ${specsHtml ? `<span>•</span> ${specsHtml}` : ''}
-                  ${inCartQty > 0 ? `<span class="text-emerald-400 font-bold">• ${inCartQty} en canasta</span>` : '<span class="text-slate-500">• Disponible</span>'}
+                  ${inCartBadgeHtml}
                 </div>
               </div>
             </div>
-            <button class="btn-planner-add-item w-8 h-8 rounded-full bg-emerald-500/20 hover:bg-emerald-500 text-emerald-400 hover:text-white font-bold flex items-center justify-center flex-shrink-0 transition shadow" data-name="${escapeHtml(name)}" title="Agregar 1 unidad a la canasta">
-              <svg class="w-4 h-4 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+            <button class="btn-planner-add-item w-8 h-8 rounded-full ${norm.isFree ? 'bg-amber-500/20 hover:bg-amber-500 text-amber-400' : 'bg-emerald-500/20 hover:bg-emerald-500 text-emerald-400'} hover:text-white font-bold flex items-center justify-center flex-shrink-0 transition shadow" data-name="${escapeHtml(name)}" title="${escapeHtml(btnTitle)}">
+              ${norm.isFree ? '<span class="text-xs font-black">⚖️</span>' : '<svg class="w-4 h-4 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>'}
             </button>
           </div>
         `;
@@ -2842,8 +3259,49 @@ document.addEventListener('DOMContentLoaded', async () => {
           return;
         }
         const name = btn.dataset.name;
-        const current = plannerCart.get(name) || 0;
-        plannerCart.set(name, current + 1);
+        const prod = productsByName.get(name);
+        const norm = (window.ProductUtils && typeof window.ProductUtils.normalizeProductMeasure === 'function')
+          ? window.ProductUtils.normalizeProductMeasure(prod || { name })
+          : { type: 'unidad', amount: 1, isFree: false, unit: 'Und' };
+
+        const currentRate = (window.bcvService && window.bcvService.rate > 0) ? window.bcvService.rate : 45.0;
+
+        if (norm.isFree) {
+          let pUsd = prod ? parseFloat(prod.current_price) || 0 : 0;
+          if (prod && prod.original_currency === 'VES' && currentRate > 0) pUsd = pUsd / currentRate;
+          const store = prod && prod.store_id ? storesById.get(prod.store_id) : null;
+          const existing = getCartItemInfo(name);
+
+          openOrderFreeQuantityModal({
+            key: name,
+            name: name,
+            isGroup: false,
+            measureType: norm.type,
+            unitPriceUsd: pUsd,
+            currentAmount: existing ? existing.amount : (norm.type === 'peso' ? 0.500 : 1),
+            rawProduct: prod,
+            storeName: store ? store.name : ''
+          });
+          return;
+        }
+
+        const existing = getCartItemInfo(name);
+        const nextQty = existing ? (existing.qty + 1) : 1;
+        let pUsd = prod ? parseFloat(prod.current_price) || 0 : 0;
+        if (prod && prod.original_currency === 'VES' && currentRate > 0) pUsd = pUsd / currentRate;
+
+        plannerCart.set(name, {
+          key: name,
+          name: name,
+          isGroup: false,
+          isFree: false,
+          measureType: norm.type || 'unidad',
+          amount: nextQty,
+          unit: norm.unit || 'Und',
+          qty: nextQty,
+          unitPriceUsd: pUsd
+        });
+
         renderPlannerCart();
         loadPlannerProductList(); // refresh counts
         showToast(`+1 "${name}" en la canasta`, 'info');
@@ -2887,9 +3345,22 @@ document.addEventListener('DOMContentLoaded', async () => {
       `;
     } else {
       catalogContainer.innerHTML = filtered.map(g => {
-        const inCartQty = plannerCart.get(g.name) || 0;
+        const cartItem = getCartItemInfo(g.name);
         const specsParts = [g.weightStr, g.volumeStr, g.quantityStr].filter(Boolean);
         const specsSummary = specsParts.length > 0 ? specsParts.join(' • ') : '';
+
+        let inCartBadgeHtml = '<span class="text-slate-500">• Toca para editar</span>';
+        if (cartItem) {
+          if (cartItem.isFree) {
+            inCartBadgeHtml = `<span class="text-amber-400 font-bold">• ⚖️ ${cartItem.amount} ${cartItem.unit} en canasta</span>`;
+          } else {
+            inCartBadgeHtml = `<span class="text-emerald-400 font-bold">• x${cartItem.qty} en canasta</span>`;
+          }
+        }
+
+        const btnTitle = g.isFree
+          ? 'Indicar cantidad a pedir para este grupo'
+          : 'Añadir grupo a la canasta (+1)';
 
         return `
           <div class="group-planner-card flex items-center justify-between p-2.5 rounded-xl bg-slate-800/40 hover:bg-slate-800 border border-slate-700/60 hover:border-blue-500/50 transition gap-2.5 min-w-0 w-full cursor-pointer" data-group-name="${escapeHtml(g.name)}" title="Toca para ver o editar los productos de este grupo">
@@ -2901,6 +3372,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 <div class="flex items-center gap-1.5 mb-0.5">
                   <span class="text-xs font-bold text-slate-100 truncate">${escapeHtml(g.name)}</span>
                   ${g.isManual ? '<span class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-blue-500/20 text-blue-300 border border-blue-500/30">Manual</span>' : ''}
+                  ${g.isFree ? '<span class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">⚖️ Granel</span>' : ''}
                 </div>
                 <div class="flex items-center gap-2 text-[11px] font-bold text-emerald-400 truncate">
                   <span>${g.priceStr}</span>
@@ -2910,12 +3382,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                   <span>${g.productCount} ${g.productCount === 1 ? 'opción' : 'opciones'}</span>
                   <span>•</span>
                   <span>${g.storeCount} ${g.storeCount === 1 ? 'tienda' : 'tiendas'}</span>
-                  ${inCartQty > 0 ? `<span class="text-emerald-400 font-bold">• ${inCartQty} en canasta</span>` : '<span class="text-slate-500">• Toca para editar</span>'}
+                  ${inCartBadgeHtml}
                 </div>
               </div>
             </div>
-            <button type="button" class="btn-planner-add-group w-8 h-8 rounded-full bg-emerald-500/20 hover:bg-emerald-500 text-emerald-400 hover:text-white font-bold flex items-center justify-center flex-shrink-0 transition shadow" data-name="${escapeHtml(g.name)}" title="Añadir grupo a la canasta (+1)">
-              <svg class="w-4 h-4 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+            <button type="button" class="btn-planner-add-group w-8 h-8 rounded-full ${g.isFree ? 'bg-amber-500/20 hover:bg-amber-500 text-amber-400' : 'bg-emerald-500/20 hover:bg-emerald-500 text-emerald-400'} hover:text-white font-bold flex items-center justify-center flex-shrink-0 transition shadow" data-name="${escapeHtml(g.name)}" title="${escapeHtml(btnTitle)}">
+              ${g.isFree ? '<span class="text-xs font-black">⚖️</span>' : '<svg class="w-4 h-4 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>'}
             </button>
           </div>
         `;
@@ -2934,8 +3406,36 @@ document.addEventListener('DOMContentLoaded', async () => {
             return;
           }
           const name = addBtn.dataset.name;
-          const current = plannerCart.get(name) || 0;
-          plannerCart.set(name, current + 1);
+          const targetGroup = builtGroups.find(g => g.name === name);
+
+          if (targetGroup && targetGroup.isFree) {
+            const existing = getCartItemInfo(name);
+            openOrderFreeQuantityModal({
+              key: name,
+              name: name,
+              isGroup: true,
+              measureType: targetGroup.dominantType || 'peso',
+              unitPriceUsd: targetGroup.minUsd || 0,
+              currentAmount: existing ? existing.amount : (targetGroup.dominantType === 'peso' ? 0.500 : 1),
+              group: targetGroup,
+              storeName: `${targetGroup.storeCount} tiendas disponibles`
+            });
+            return;
+          }
+
+          const existing = getCartItemInfo(name);
+          const nextQty = existing ? (existing.qty + 1) : 1;
+          plannerCart.set(name, {
+            key: name,
+            name: name,
+            isGroup: true,
+            isFree: false,
+            measureType: (targetGroup && targetGroup.dominantType) || 'unidad',
+            amount: nextQty,
+            unit: 'Und',
+            qty: nextQty,
+            unitPriceUsd: targetGroup ? (targetGroup.minUsd || 0) : 0
+          });
           renderPlannerCart();
           loadPlannerProductList();
           showToast(`+1 Grupo "${name}" en la canasta`, 'info');
@@ -2989,9 +3489,14 @@ document.addEventListener('DOMContentLoaded', async () => {
           const mediaHtml = window.AppIcons ? window.AppIcons.renderProductMedia(p, 'w-8 h-8') : '🏷️';
           let pUsd = parseFloat(p.current_price) || 0;
           if (p.original_currency === 'VES') pUsd = currentRate > 0 ? pUsd / currentRate : 0;
-          const priceInfo = formatDisplayPrice(pUsd);
+          const priceInfo = (window.ProductUtils && typeof window.ProductUtils.formatProductPricing === 'function')
+            ? window.ProductUtils.formatProductPricing(p, currentRate, activeDisplayCurrency)
+            : formatDisplayPrice(pUsd);
           const titleHtml = window.ProductUtils ? window.ProductUtils.formatTitleWithQuantity(p) : escapeHtml(p.name);
           const specsHtml = window.ProductUtils ? window.ProductUtils.formatSpecsBadge(p) : '';
+          const norm = (window.ProductUtils && typeof window.ProductUtils.normalizeProductMeasure === 'function')
+            ? window.ProductUtils.normalizeProductMeasure(p)
+            : { type: 'unidad', amount: 1, isFree: false, unit: 'Und' };
 
           return `
             <div class="flex items-center justify-between p-2 rounded-xl bg-slate-900 border border-slate-800 gap-2">
@@ -3007,8 +3512,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 </div>
               </div>
               <div class="flex items-center gap-1 flex-shrink-0">
-                <button type="button" class="btn-group-add-cart p-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500 text-emerald-400 hover:text-white transition text-xs font-bold" data-product-name="${escapeHtml(p.name)}" title="Añadir producto específico a la canasta (+1)">
-                  🛒 +1
+                <button type="button" class="btn-group-add-cart p-1.5 rounded-lg ${norm.isFree ? 'bg-amber-500/20 hover:bg-amber-500 text-amber-400' : 'bg-emerald-500/20 hover:bg-emerald-500 text-emerald-400'} hover:text-white transition text-xs font-bold" data-product-id="${p.id}" data-product-name="${escapeHtml(p.name)}" title="${norm.isFree ? 'Indicar cantidad a pedir (' + norm.unit + ')' : 'Añadir 1 unidad a la canasta'}">
+                  ${norm.isFree ? '⚖️ Pedir' : '🛒 +1'}
                 </button>
                 <button type="button" class="btn-group-remove-prod p-1.5 rounded-lg bg-red-500/20 hover:bg-red-500 text-red-400 hover:text-white transition text-xs font-bold" data-product-id="${p.id}" title="Quitar este producto del grupo">
                   ❌
@@ -3027,7 +3532,48 @@ document.addEventListener('DOMContentLoaded', async () => {
               return;
             }
             const pName = btn.dataset.productName;
-            plannerCart.set(pName, (plannerCart.get(pName) || 0) + 1);
+            const pId = parseInt(btn.dataset.productId, 10);
+            const p = (currentDetailGroup && currentDetailGroup.products) ? currentDetailGroup.products.find(item => item.id === pId || item.name === pName) : null;
+            const norm = (window.ProductUtils && typeof window.ProductUtils.normalizeProductMeasure === 'function')
+              ? window.ProductUtils.normalizeProductMeasure(p || { name: pName })
+              : { type: 'unidad', amount: 1, isFree: false, unit: 'Und' };
+
+            if (norm.isFree) {
+              let pUsd = p ? parseFloat(p.current_price) || 0 : 0;
+              if (p && p.original_currency === 'VES' && currentRate > 0) pUsd = pUsd / currentRate;
+              const store = p && p.store_id ? storesById.get(p.store_id) : null;
+              const existing = getCartItemInfo(pName);
+
+              openOrderFreeQuantityModal({
+                key: pName,
+                name: pName,
+                isGroup: false,
+                measureType: norm.type,
+                unitPriceUsd: pUsd,
+                currentAmount: existing ? existing.amount : (norm.type === 'peso' ? 0.500 : 1),
+                rawProduct: p,
+                storeName: store ? store.name : ''
+              });
+              return;
+            }
+
+            const existing = getCartItemInfo(pName);
+            const nextQty = existing ? (existing.qty + 1) : 1;
+            let pUsd = p ? parseFloat(p.current_price) || 0 : 0;
+            if (p && p.original_currency === 'VES' && currentRate > 0) pUsd = pUsd / currentRate;
+
+            plannerCart.set(pName, {
+              key: pName,
+              name: pName,
+              isGroup: false,
+              isFree: false,
+              measureType: norm.type || 'unidad',
+              amount: nextQty,
+              unit: norm.unit || 'Und',
+              qty: nextQty,
+              unitPriceUsd: pUsd
+            });
+
             renderPlannerCart();
             loadPlannerProductList();
             showToast(`+1 "${pName}" en la canasta`, 'info');
@@ -3117,7 +3663,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         <div class="text-center py-10 text-slate-500">
           <p class="text-3xl mb-2">🛒</p>
           <p class="font-semibold text-slate-300 text-xs">Tu canasta está vacía</p>
-          <p class="text-[11px] text-slate-500 mt-1 max-w-[220px] mx-auto">Toca el botón <span class="text-emerald-400 font-bold">+</span> en cualquier producto o grupo del catálogo para agregarlo.</p>
+          <p class="text-[11px] text-slate-500 mt-1 max-w-[220px] mx-auto">Toca el botón <span class="text-emerald-400 font-bold">+</span> o <span class="text-amber-400 font-bold">⚖️</span> en cualquier producto o grupo del catálogo para agregarlo.</p>
         </div>
       `;
       if (summaryEl) summaryEl.textContent = '0 unidades (0 items)';
@@ -3132,20 +3678,42 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     let totalUnits = 0;
+    let totalFreeItemsCount = 0;
     let totalUsdCost = 0;
 
-    plannerCart.forEach((qty, name) => {
-      totalUnits += qty;
-      const nameClean = name.trim().toLowerCase();
+    plannerCart.forEach((itemVal, key) => {
+      const item = (typeof itemVal === 'number')
+        ? { key, name: key, qty: itemVal, amount: itemVal, isFree: false, unit: 'Und', measureType: 'unidad', isGroup: false }
+        : itemVal;
+
+      const nameClean = (item.name || key).trim().toLowerCase();
       const group = groupsByName.get(nameClean);
-      if (group) {
-        totalUsdCost += ((group.minUsd || 0) * qty);
+
+      if (item.isFree) {
+        totalFreeItemsCount++;
+        let unitUsd = item.unitPriceUsd;
+        if (!unitUsd || unitUsd <= 0) {
+          if (group) unitUsd = group.minUsd || 0;
+          else {
+            const p = productsByName.get(item.name || key);
+            if (p) {
+              unitUsd = parseFloat(p.current_price) || 0;
+              if (p.original_currency === 'VES' && currentRate > 0) unitUsd = unitUsd / currentRate;
+            }
+          }
+        }
+        totalUsdCost += (unitUsd * (item.amount || 1));
       } else {
-        const prod = productsByName.get(name);
-        if (prod && prod.current_price) {
-          let pUsd = parseFloat(prod.current_price) || 0;
-          if (prod.original_currency === 'VES') pUsd = currentRate > 0 ? pUsd / currentRate : 0;
-          totalUsdCost += (pUsd * qty);
+        totalUnits += (item.qty || 1);
+        if (group) {
+          totalUsdCost += ((group.minUsd || 0) * (item.qty || 1));
+        } else {
+          const prod = productsByName.get(item.name || key);
+          if (prod && prod.current_price) {
+            let pUsd = parseFloat(prod.current_price) || 0;
+            if (prod.original_currency === 'VES' && currentRate > 0) pUsd = pUsd / currentRate;
+            totalUsdCost += (pUsd * (item.qty || 1));
+          }
         }
       }
     });
@@ -3153,19 +3721,82 @@ document.addEventListener('DOMContentLoaded', async () => {
     const totalCostFormatted = formatDisplayPrice(totalUsdCost);
 
     if (summaryEl) {
+      const itemsLabel = totalFreeItemsCount > 0
+        ? `${plannerCart.size} items (${totalUnits} und + ${totalFreeItemsCount} a granel)`
+        : `${totalUnits} und (${plannerCart.size} items)`;
+
       summaryEl.innerHTML = `
-        <span>${totalUnits} und (${plannerCart.size} items)</span>
+        <span>${itemsLabel}</span>
         <span class="text-emerald-400 font-extrabold ml-1.5">${totalCostFormatted.primary}</span>
       `;
     }
 
     const cartEntries = Array.from(plannerCart.entries());
-    cartContainer.innerHTML = cartEntries.map(([name, qty]) => {
+    cartContainer.innerHTML = cartEntries.map(([key, itemVal]) => {
+      const item = (typeof itemVal === 'number')
+        ? { key, name: key, qty: itemVal, amount: itemVal, isFree: false, unit: 'Und', measureType: 'unidad', isGroup: false }
+        : itemVal;
+
+      const name = item.name || key;
       const nameClean = name.trim().toLowerCase();
       const group = groupsByName.get(nameClean);
+      const isVes = (activeDisplayCurrency === 'VES');
+
+      // Si es un artículo con cantidad libre (a granel)
+      if (item.isFree) {
+        let unitUsd = item.unitPriceUsd;
+        if (!unitUsd || unitUsd <= 0) {
+          if (group) unitUsd = group.minUsd || 0;
+          else {
+            const p = productsByName.get(name);
+            if (p) {
+              unitUsd = parseFloat(p.current_price) || 0;
+              if (p.original_currency === 'VES' && currentRate > 0) unitUsd = unitUsd / currentRate;
+            }
+          }
+        }
+        const itemSubtotalUsd = unitUsd * (item.amount || 1);
+        const subtotalFormatted = formatDisplayPrice(itemSubtotalUsd);
+        const unitVes = unitUsd * currentRate;
+        const unitPriceStr = isVes
+          ? `Bs. ${unitVes.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/${item.unit}`
+          : `$ ${unitUsd.toFixed(2)}/${item.unit}`;
+
+        const iconHtml = group
+          ? `<div class="w-8 h-8 rounded-lg bg-amber-500/20 text-amber-300 flex items-center justify-center text-sm font-bold flex-shrink-0">📦</div>`
+          : (window.AppIcons ? window.AppIcons.renderProductMedia(productsByName.get(name) || { name }, 'w-8 h-8') : '⚖️');
+
+        return `
+          <div class="flex items-center justify-between p-2 rounded-xl bg-slate-800/80 border border-amber-500/40 gap-2">
+            <div class="flex items-center gap-2.5 min-w-0 flex-1">
+              ${iconHtml}
+              <div class="truncate min-w-0 flex-1">
+                <div class="mb-0.5 truncate flex items-center gap-1">
+                  <span class="px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">⚖️ A GRANEL (${item.amount} ${item.unit})</span>
+                  ${item.isGroup ? '<span class="px-1 py-0.2 rounded text-[9px] font-bold bg-blue-500/20 text-blue-300 border border-blue-500/30">GRUPO</span>' : ''}
+                </div>
+                <span class="text-xs font-bold text-slate-100 block truncate flex items-center">${escapeHtml(name)}</span>
+                <div class="flex items-center gap-1.5 text-[10px] text-slate-400 font-semibold mt-0.5 whitespace-nowrap overflow-hidden">
+                  <span class="text-emerald-400 font-bold">${subtotalFormatted.primary}</span>
+                  <span class="text-slate-400 text-[10px]">(${unitPriceStr})</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-1.5 flex-shrink-0">
+              <button class="btn-cart-edit-free-qty px-2 py-1 rounded-lg bg-blue-500/20 hover:bg-blue-500 text-blue-300 hover:text-white text-xs font-bold transition flex items-center gap-1 shadow-sm" data-key="${escapeHtml(key)}" title="Toca para editar la cantidad a comprar">
+                ✏️ ${item.amount} ${item.unit}
+              </button>
+              <button class="btn-cart-remove-item w-7 h-7 rounded-lg bg-slate-700 hover:bg-red-500/30 text-slate-200 hover:text-red-400 font-black flex items-center justify-center transition" data-key="${escapeHtml(key)}" title="Quitar de la canasta">
+                <svg class="w-3.5 h-3.5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+              </button>
+            </div>
+          </div>
+        `;
+      }
 
       if (group) {
-        const itemSubtotalUsd = (group.minUsd || 0) * qty;
+        const itemSubtotalUsd = (group.minUsd || 0) * (item.qty || 1);
         const subtotalFormatted = formatDisplayPrice(itemSubtotalUsd);
         const specs = [group.weightStr, group.volumeStr, group.quantityStr].filter(Boolean).join(' • ');
 
@@ -3188,13 +3819,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             </div>
 
             <div class="flex items-center gap-1.5 flex-shrink-0">
-              <button class="btn-cart-minus w-7 h-7 rounded-lg bg-slate-700 hover:bg-red-500/30 text-slate-200 hover:text-red-400 font-black flex items-center justify-center transition" data-name="${escapeHtml(name)}" title="Restar 1 unidad">
+              <button class="btn-cart-minus w-7 h-7 rounded-lg bg-slate-700 hover:bg-red-500/30 text-slate-200 hover:text-red-400 font-black flex items-center justify-center transition" data-key="${escapeHtml(key)}" title="Restar 1 unidad">
                 <svg class="w-3.5 h-3.5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M20 12H4"/></svg>
               </button>
               <span class="px-2 py-0.5 rounded-md bg-slate-900 border border-slate-700 text-xs font-black text-blue-400 min-w-[28px] text-center">
-                x${qty}
+                x${item.qty || 1}
               </span>
-              <button class="btn-cart-plus w-7 h-7 rounded-lg bg-slate-700 hover:bg-emerald-500/30 text-slate-200 hover:text-emerald-400 font-black flex items-center justify-center transition" data-name="${escapeHtml(name)}" title="Añadir 1 unidad más">
+              <button class="btn-cart-plus w-7 h-7 rounded-lg bg-slate-700 hover:bg-emerald-500/30 text-slate-200 hover:text-emerald-400 font-black flex items-center justify-center transition" data-key="${escapeHtml(key)}" title="Añadir 1 unidad más">
                 <svg class="w-3.5 h-3.5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
               </button>
             </div>
@@ -3207,7 +3838,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const store = prod && prod.store_id ? storesById.get(prod.store_id) : null;
       let itemUsd = parseFloat(prod.current_price) || 0;
       if (prod.original_currency === 'VES') itemUsd = currentRate > 0 ? itemUsd / currentRate : 0;
-      const subtotalFormatted = formatDisplayPrice(itemUsd * qty);
+      const subtotalFormatted = formatDisplayPrice(itemUsd * (item.qty || 1));
       const mediaHtml = window.AppIcons ? window.AppIcons.renderProductMedia(prod, 'w-8 h-8') : '🛒';
       const titleHtml = window.ProductUtils ? window.ProductUtils.formatTitleWithQuantity(prod) : escapeHtml(name);
       const specsHtml = window.ProductUtils ? window.ProductUtils.formatSpecsBadge(prod) : '';
@@ -3229,17 +3860,17 @@ document.addEventListener('DOMContentLoaded', async () => {
 
           <div class="flex items-center gap-1.5 flex-shrink-0">
             <!-- Botón - para restar 1 (si llega a 0 se elimina) -->
-            <button class="btn-cart-minus w-7 h-7 rounded-lg bg-slate-700 hover:bg-red-500/30 text-slate-200 hover:text-red-400 font-black flex items-center justify-center transition" data-name="${escapeHtml(name)}" title="Restar 1 unidad">
+            <button class="btn-cart-minus w-7 h-7 rounded-lg bg-slate-700 hover:bg-red-500/30 text-slate-200 hover:text-red-400 font-black flex items-center justify-center transition" data-key="${escapeHtml(key)}" title="Restar 1 unidad">
               <svg class="w-3.5 h-3.5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M20 12H4"/></svg>
             </button>
 
             <!-- Contador de unidades -->
             <span class="px-2 py-0.5 rounded-md bg-slate-900 border border-slate-700 text-xs font-black text-blue-400 min-w-[28px] text-center">
-              x${qty}
+              x${item.qty || 1}
             </span>
 
             <!-- Botón + para sumar 1 -->
-            <button class="btn-cart-plus w-7 h-7 rounded-lg bg-slate-700 hover:bg-emerald-500/30 text-slate-200 hover:text-emerald-400 font-black flex items-center justify-center transition" data-name="${escapeHtml(name)}" title="Añadir 1 unidad más">
+            <button class="btn-cart-plus w-7 h-7 rounded-lg bg-slate-700 hover:bg-emerald-500/30 text-slate-200 hover:text-emerald-400 font-black flex items-center justify-center transition" data-key="${escapeHtml(key)}" title="Añadir 1 unidad más">
               <svg class="w-3.5 h-3.5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
             </button>
           </div>
@@ -3254,9 +3885,16 @@ document.addEventListener('DOMContentLoaded', async () => {
           showToast('⚠️ No tienes permiso para modificar el carro de compras en este grupo.', 'error');
           return;
         }
-        const name = btn.dataset.name;
-        const current = plannerCart.get(name) || 0;
-        plannerCart.set(name, current + 1);
+        const key = btn.dataset.key;
+        const item = getCartItemInfo(key);
+        if (item) {
+          item.qty = (item.qty || 1) + 1;
+          item.amount = item.qty;
+          plannerCart.set(key, item);
+        } else {
+          const current = plannerCart.get(key) || 0;
+          plannerCart.set(key, current + 1);
+        }
         renderPlannerCart();
         loadPlannerProductList();
       });
@@ -3268,16 +3906,58 @@ document.addEventListener('DOMContentLoaded', async () => {
           showToast('⚠️ No tienes permiso para modificar el carro de compras en este grupo.', 'error');
           return;
         }
-        const name = btn.dataset.name;
-        const current = plannerCart.get(name) || 0;
-        if (current <= 1) {
-          plannerCart.delete(name);
-          showToast(`"${name}" quitado de la canasta`, 'info');
+        const key = btn.dataset.key;
+        const item = getCartItemInfo(key);
+        const currentQty = item ? (item.qty || 1) : (plannerCart.get(key) || 0);
+
+        if (currentQty <= 1) {
+          plannerCart.delete(key);
+          showToast(`"${key}" quitado de la canasta`, 'info');
         } else {
-          plannerCart.set(name, current - 1);
+          if (item) {
+            item.qty = currentQty - 1;
+            item.amount = item.qty;
+            plannerCart.set(key, item);
+          } else {
+            plannerCart.set(key, currentQty - 1);
+          }
         }
         renderPlannerCart();
         loadPlannerProductList();
+      });
+    });
+
+    // Listener para editar cantidad libre desde la canasta
+    cartContainer.querySelectorAll('.btn-cart-edit-free-qty').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const key = btn.dataset.key;
+        const item = getCartItemInfo(key);
+        if (!item) return;
+
+        openOrderFreeQuantityModal({
+          key: item.key || key,
+          name: item.name || key,
+          isGroup: !!item.isGroup,
+          measureType: item.measureType || 'peso',
+          unitPriceUsd: item.unitPriceUsd || 0,
+          currentAmount: item.amount,
+          storeName: item.storeName || ''
+        });
+      });
+    });
+
+    // Listener para eliminar producto a granel directamente
+    cartContainer.querySelectorAll('.btn-cart-remove-item').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (!window.authGroups.hasPermission('can_manage_cart')) {
+          showToast('⚠️ No tienes permiso para modificar el carro de compras.', 'error');
+          return;
+        }
+        const key = btn.dataset.key;
+        plannerCart.delete(key);
+        renderPlannerCart();
+        loadPlannerProductList();
+        showToast(`"${key}" quitado de la canasta`, 'info');
       });
     });
   }
@@ -3492,10 +4172,22 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
 
       let totalUnits = 0;
-      plannerCart.forEach(q => totalUnits += q);
+      let totalFreeItems = 0;
+      plannerCart.forEach(itemVal => {
+        if (typeof itemVal === 'number') {
+          totalUnits += itemVal;
+        } else if (itemVal && itemVal.isFree) {
+          totalFreeItems++;
+        } else if (itemVal) {
+          totalUnits += (itemVal.qty || 1);
+        }
+      });
       const itemsCount = plannerCart.size;
+      const countDescription = totalFreeItems > 0
+        ? `${itemsCount} productos (${totalUnits} und fijas + ${totalFreeItems} a granel)`
+        : `${totalUnits} unidades de ${itemsCount} productos`;
 
-      const ok = confirm(`¿Deseas enviar una notificación a todos los miembros de "${activeWs.name}" avisando sobre la canasta actual (${totalUnits} unidades de ${itemsCount} productos)?`);
+      const ok = confirm(`¿Deseas enviar una notificación a todos los miembros de "${activeWs.name}" avisando sobre la canasta actual (${countDescription})?`);
       if (!ok) return;
 
       const user = window.authGroups.getCurrentUser();
@@ -3510,7 +4202,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           group_name: activeWs.name,
           type: 'CART',
           title: `🛒 Carro de compras actualizado en "${activeWs.name}"`,
-          message: `${uName} preparó y actualizó la canasta con ${totalUnits} unidades de ${itemsCount} productos. ¡Ya pueden revisarla u optimizarla en el planificador!`,
+          message: `${uName} preparó y actualizó la canasta con ${countDescription}. ¡Ya pueden revisarla u optimizarla en el planificador!`,
           data: { groupId: activeWs.id, totalUnits, itemsCount }
         });
 
@@ -3526,11 +4218,23 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   document.getElementById('btnExecutePlanner').addEventListener('click', async () => {
     if (plannerCart.size === 0) {
-      showToast('Añade al menos un producto a tu canasta usando el botón +', 'error');
+      showToast('Añade al menos un producto a tu canasta usando el botón + o ⚖️', 'error');
       return;
     }
 
-    const items = Array.from(plannerCart.entries()).map(([name, qty]) => ({ name, qty }));
+    const items = Array.from(plannerCart.entries()).map(([key, itemVal]) => {
+      if (typeof itemVal === 'number') {
+        return { name: key, qty: itemVal, amount: itemVal, isFree: false, unit: 'Und', measureType: 'unidad' };
+      }
+      return {
+        name: itemVal.name || key,
+        qty: itemVal.qty || 1,
+        amount: itemVal.amount !== undefined ? itemVal.amount : (itemVal.qty || 1),
+        isFree: !!itemVal.isFree,
+        unit: itemVal.unit || '',
+        measureType: itemVal.measureType || 'unidad'
+      };
+    });
     const totalSelectedCount = items.length;
 
     showToast('Optimizando compra con las cantidades elegidas...', 'info');
@@ -5298,13 +6002,26 @@ document.addEventListener('DOMContentLoaded', async () => {
           prod.quantity = sanitized.quantity;
           changed = true;
         }
+
+        // Migración hacia el nuevo sistema de medidas (peso, volumen, unidad y cantidad libre)
+        if (!prod.measure_type || prod.measure_amount === undefined || prod.is_free_quantity === undefined) {
+          const detected = (window.ProductUtils && typeof window.ProductUtils.detectMeasureAndFreeQuantity === 'function')
+            ? window.ProductUtils.detectMeasureAndFreeQuantity(prod.name, prod.weight, prod.volume, prod.quantity)
+            : { measureType: 'unidad', measureAmount: 1, isFreeQuantity: false };
+
+          prod.measure_type = prod.measure_type || detected.measureType;
+          prod.measure_amount = (prod.measure_amount !== undefined && prod.measure_amount !== null) ? prod.measure_amount : detected.measureAmount;
+          prod.is_free_quantity = (prod.is_free_quantity !== undefined && prod.is_free_quantity !== null) ? prod.is_free_quantity : detected.isFreeQuantity;
+          changed = true;
+        }
+
         if (changed) {
           await window.db.put('products', prod);
           updatedCount++;
         }
       }
       if (updatedCount > 0) {
-        console.log(`[ProductUtils] Migración automática: ${updatedCount} productos normalizados con peso/volumen/cantidad.`);
+        console.log(`[ProductUtils] Migración automática: ${updatedCount} productos normalizados con nuevo sistema de medidas (peso/volumen/unidad/libre).`);
       }
     } catch (err) {
       console.warn('Error en migrateExistingProductAttributes:', err);

@@ -12,7 +12,7 @@
   <link rel="manifest" href="./manifest.json">
   <link rel="icon" type="image/svg+xml" href="./icons/icon.svg">
   <link rel="apple-touch-icon" href="./icons/icon.svg">
-  <link rel="stylesheet" href="./css/styles.css?v=34">
+  <link rel="stylesheet" href="./css/styles.css?v=35">
   <!-- Tailwind Utilities (CDN for instant responsive styling) -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -1096,28 +1096,70 @@
           </p>
         </div>
 
-        <!-- Atributos Opcionales: Cantidad / Combo, Peso y Volumen -->
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-          <div class="form-group">
-            <label class="form-label flex items-center justify-between">
-              <span>⚡ Cantidad / Pack</span>
-              <span class="text-[10px] text-slate-500 font-normal">Opcional</span>
-            </label>
-            <input type="text" id="inputProductQuantity" class="form-input text-xs" placeholder="Ej: 2x, Pack 6, Combo 3x">
+        <!-- SISTEMA DE MEDIDA: Peso (Kg), Volumen (L) o Unidad (Und) -->
+        <div class="form-group space-y-2">
+          <label class="form-label flex items-center justify-between">
+            <span class="flex items-center gap-1.5 font-bold">
+              <span>📏</span> Tipo de Medida *
+            </span>
+            <span id="measureTypeAiHint" class="hidden text-[10px] text-emerald-400 font-bold items-center gap-1">
+              <span>✨</span> Sugerido por IA
+            </span>
+          </label>
+          <div class="grid grid-cols-3 gap-2">
+            <button type="button" id="btnMeasurePeso" class="btn-measure-type py-2 px-2 rounded-xl border border-slate-700 bg-slate-800 text-slate-300 font-bold text-xs flex flex-col items-center justify-center gap-1 transition hover:border-slate-600">
+              <span class="text-base">⚖️</span>
+              <span>Peso (Kg)</span>
+            </button>
+            <button type="button" id="btnMeasureVolumen" class="btn-measure-type py-2 px-2 rounded-xl border border-slate-700 bg-slate-800 text-slate-300 font-bold text-xs flex flex-col items-center justify-center gap-1 transition hover:border-slate-600">
+              <span class="text-base">🧴</span>
+              <span>Volumen (L)</span>
+            </button>
+            <button type="button" id="btnMeasureUnidad" class="btn-measure-type py-2 px-2 rounded-xl border-2 border-blue-500 bg-blue-600/20 text-blue-300 font-bold text-xs flex flex-col items-center justify-center gap-1 transition shadow-sm">
+              <span class="text-base">⚡</span>
+              <span>Unidad (Und)</span>
+            </button>
           </div>
-          <div class="form-group">
-            <label class="form-label flex items-center justify-between">
-              <span>⚖️ Peso</span>
-              <span class="text-[10px] text-slate-500 font-normal">Opcional</span>
+          <input type="hidden" id="inputProductMeasureType" value="unidad">
+          <!-- Inputs legacy invisibles para compatibilidad interna de código existente -->
+          <input type="hidden" id="inputProductQuantity" value="">
+          <input type="hidden" id="inputProductWeight" value="">
+          <input type="hidden" id="inputProductVolume" value="">
+        </div>
+
+        <!-- Cantidad por Empaque y Switch Cantidad Libre -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          <!-- Campo Cantidad por Empaque (desactivado si es cantidad libre) -->
+          <div class="form-group" id="fieldProductMeasureAmount">
+            <label class="form-label flex items-center justify-between" id="labelProductMeasureAmount">
+              <span id="textProductMeasureAmount">Cantidad del Empaque *</span>
+              <span id="unitProductMeasureHint" class="text-[10px] text-blue-400 font-bold">Und</span>
             </label>
-            <input type="text" id="inputProductWeight" class="form-input text-xs" placeholder="Ej: 400g, 1kg, 2 lb">
+            <div class="relative">
+              <input type="number" step="any" min="0.001" id="inputProductMeasureAmount" class="form-input text-xs pr-12 font-bold" value="1" placeholder="1" required>
+              <span id="badgeProductMeasureUnit" class="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-black text-slate-400 pointer-events-none">Und</span>
+            </div>
+            <p id="helpProductMeasureAmount" class="text-[10px] text-slate-400 mt-1">
+              Ej: 1 und, pack de 6...
+            </p>
           </div>
-          <div class="form-group">
-            <label class="form-label flex items-center justify-between">
-              <span>🧴 Volumen</span>
-              <span class="text-[10px] text-slate-500 font-normal">Opcional</span>
-            </label>
-            <input type="text" id="inputProductVolume" class="form-input text-xs" placeholder="Ej: 1.5L, 355ml, 2 L">
+
+          <!-- Opción: Cantidad Libre (A granel / Variable) -->
+          <div class="form-group flex flex-col justify-between p-2.5 rounded-xl bg-slate-800/60 border border-slate-700/70 hover:border-slate-600 transition">
+            <div class="flex items-start justify-between gap-2">
+              <div class="min-w-0 flex-1">
+                <label for="chkProductFreeQuantity" class="text-xs font-bold text-slate-200 cursor-pointer flex items-center gap-1.5">
+                  <span>🛒</span> Cantidad Libre
+                </label>
+                <p class="text-[10px] text-slate-400 mt-0.5 leading-snug">
+                  El cliente elige cuánto pedir: por kilo, litro o unidad variable (charcutería, recarga, a granel).
+                </p>
+              </div>
+              <input type="checkbox" id="chkProductFreeQuantity" class="w-4 h-4 mt-0.5 rounded text-blue-600 focus:ring-blue-500 bg-slate-700 border-slate-600 cursor-pointer flex-shrink-0">
+            </div>
+            <div id="badgeFreeQuantityAi" class="hidden mt-1.5 inline-flex items-center gap-1 text-[10px] font-bold text-amber-300 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded-md w-fit">
+              <span>✨</span> Activado por IA (Charcutería/Recarga)
+            </div>
           </div>
         </div>
         <div class="grid grid-cols-2 gap-3">
@@ -1496,6 +1538,76 @@
         <div class="modal-footer pt-3">
           <button type="button" class="btn btn-secondary" data-modal="modalCreateProductGroup">Cancelar</button>
           <button type="submit" class="btn btn-primary font-bold shadow-lg shadow-blue-500/20">Guardar Grupo</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: INDICAR CANTIDAD LIBRE (PESO, VOLUMEN O UNIDAD) -->
+  <div id="modalOrderFreeQuantity" class="modal-overlay">
+    <div class="modal-content max-w-sm">
+      <div class="modal-header border-b border-slate-800 pb-3">
+        <div class="flex items-center gap-2.5">
+          <span class="w-9 h-9 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center text-xl flex-shrink-0 shadow-inner" id="freeQtyModalIcon">⚖️</span>
+          <div>
+            <h3 class="modal-title text-sm font-bold text-slate-100" id="freeQtyModalTitle">Indicar Cantidad a Comprar</h3>
+            <p class="text-[11px] text-slate-400" id="freeQtyModalSubtitle">Producto con cantidad libre / a granel</p>
+          </div>
+        </div>
+        <button class="modal-close" data-modal="modalOrderFreeQuantity">&times;</button>
+      </div>
+
+      <form id="formOrderFreeQuantity" class="modal-body space-y-4 pt-3">
+        <input type="hidden" id="inputFreeQtyItemKey">
+        <input type="hidden" id="inputFreeQtyMeasureType" value="peso">
+        <input type="hidden" id="inputFreeQtyUnitPriceUsd" value="0">
+
+        <!-- Ficha de Referencia del Producto -->
+        <div class="p-3 bg-slate-900/90 rounded-xl border border-slate-800 space-y-1">
+          <div class="flex items-start justify-between gap-2">
+            <span id="freeQtyTargetName" class="text-xs font-bold text-slate-100 truncate block"></span>
+            <span id="freeQtyUnitPriceBadge" class="text-xs font-black text-emerald-400 whitespace-nowrap"></span>
+          </div>
+          <p id="freeQtyStoreNote" class="text-[10px] text-slate-400 truncate"></p>
+        </div>
+
+        <!-- Campo Numérico con Sufijo de Unidad -->
+        <div class="form-group">
+          <label class="form-label flex items-center justify-between">
+            <span id="freeQtyInputLabel" class="font-bold text-slate-200">¿Cuánto deseas pedir en Kilos (Kg)? *</span>
+            <span id="freeQtyInputHint" class="text-[10px] text-blue-400 font-extrabold uppercase">Kilos</span>
+          </label>
+          <div class="relative">
+            <input type="number" step="any" min="0.001" id="inputFreeQtyValue" class="form-input text-lg font-black text-center py-2.5 text-blue-300" required placeholder="0.500">
+            <span id="freeQtyUnitSuffix" class="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-black text-slate-400 uppercase pointer-events-none">Kg</span>
+          </div>
+
+          <!-- Botones de selección rápida (Chips) -->
+          <div class="mt-2.5">
+            <span class="text-[10px] text-slate-400 font-semibold block mb-1">Opciones rápidas frecuentes:</span>
+            <div id="freeQtyQuickChips" class="flex flex-wrap gap-1.5">
+              <!-- Se generan dinámicamente según peso, volumen o unidad -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Resumen de Costo Estimado en Vivo -->
+        <div class="p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-between">
+          <div>
+            <span class="text-[10px] text-blue-300 uppercase font-black tracking-wider block">Total Calculado</span>
+            <span id="freeQtyLiveAmountText" class="text-xs text-slate-300 font-medium">0.500 Kg seleccionados</span>
+          </div>
+          <div class="text-right">
+            <span id="freeQtyLiveTotalPrimary" class="text-sm font-black text-emerald-400 block">$ 0.00</span>
+            <span id="freeQtyLiveTotalSecondary" class="text-[10px] font-semibold text-slate-400 block">Bs. 0.00</span>
+          </div>
+        </div>
+
+        <div class="modal-footer pt-1 flex items-center justify-end gap-2">
+          <button type="button" class="btn btn-secondary btn-sm" data-modal="modalOrderFreeQuantity">Cancelar</button>
+          <button type="submit" class="btn btn-primary btn-sm flex items-center gap-1.5 font-bold shadow-lg shadow-blue-500/20">
+            <span>🛒</span> Confirmar y Añadir
+          </button>
         </div>
       </form>
     </div>

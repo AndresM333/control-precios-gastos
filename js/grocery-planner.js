@@ -50,13 +50,31 @@ class GroceryPlannerService {
     if (Array.isArray(selectedInput)) {
       for (const item of selectedInput) {
         if (typeof item === 'string') {
-          itemsMap[item] = (itemsMap[item] || 0) + 1;
+          itemsMap[item] = { qty: (itemsMap[item]?.qty || 0) + 1, amount: (itemsMap[item]?.amount || 0) + 1, isFree: false };
         } else if (item && item.name) {
-          itemsMap[item.name] = (itemsMap[item.name] || 0) + (parseInt(item.quantity) || 1);
+          itemsMap[item.name] = {
+            qty: parseFloat(item.qty || item.quantity) || 1,
+            amount: parseFloat(item.amount !== undefined ? item.amount : (item.qty || item.quantity)) || 1,
+            isFree: !!item.isFree,
+            unit: item.unit || '',
+            measureType: item.measureType || 'unidad'
+          };
         }
       }
     } else if (selectedInput && typeof selectedInput === 'object') {
-      itemsMap = { ...selectedInput };
+      for (const [k, v] of Object.entries(selectedInput)) {
+        if (typeof v === 'number') {
+          itemsMap[k] = { qty: v, amount: v, isFree: false };
+        } else if (v && typeof v === 'object') {
+          itemsMap[k] = {
+            qty: parseFloat(v.qty) || 1,
+            amount: parseFloat(v.amount !== undefined ? v.amount : v.qty) || 1,
+            isFree: !!v.isFree,
+            unit: v.unit || '',
+            measureType: v.measureType || 'unidad'
+          };
+        }
+      }
     }
 
     const selectedProductNames = Object.keys(itemsMap);
@@ -103,7 +121,7 @@ class GroceryPlannerService {
       let ratingsCount = 0;
 
       for (const targetName of selectedProductNames) {
-        const qty = itemsMap[targetName] || 1;
+        const itemEntry = itemsMap[targetName] || { qty: 1, amount: 1, isFree: false };
         const targetClean = targetName.trim().toLowerCase();
 
         // Buscar coincidencia en los productos de la tienda (por nombre exacto, subcadena o grupo)
@@ -124,6 +142,13 @@ class GroceryPlannerService {
         }
 
         if (found) {
+          const m = (window.ProductUtils && typeof window.ProductUtils.normalizeProductMeasure === 'function')
+            ? window.ProductUtils.normalizeProductMeasure(found)
+            : { isFree: !!found.is_free_quantity, type: found.measure_type || 'unidad', amount: 1 };
+
+          const isFree = itemEntry.isFree || m.isFree;
+          const orderAmount = isFree ? (itemEntry.amount || 1) : (itemEntry.qty || 1);
+
           let priceUsd = parseFloat(found.current_price);
           let priceVes = priceUsd;
 
@@ -133,26 +158,37 @@ class GroceryPlannerService {
             priceVes = priceUsd * currentRate;
           }
 
-          totalCostUSD += (priceUsd * qty);
-          totalCostVES += (priceVes * qty);
+          const itemTotalUSD = priceUsd * orderAmount;
+          const itemTotalVES = priceVes * orderAmount;
+
+          totalCostUSD += itemTotalUSD;
+          totalCostVES += itemTotalVES;
 
           if (found.rating && !isNaN(found.rating) && found.rating > 0) {
             ratingsSum += parseInt(found.rating);
             ratingsCount++;
           }
 
+          const unitStr = isFree ? (itemEntry.unit || (m.type === 'peso' ? 'Kg' : (m.type === 'volumen' ? 'L' : 'Und'))) : '';
+          const qtyLabel = isFree ? `${orderAmount} ${unitStr}`.trim() : `x${orderAmount}`;
+
           available.push({
             requestedName: targetName,
-            quantity: qty,
+            quantity: qtyLabel,
+            orderAmount: orderAmount,
+            isFree: isFree,
             matchedProduct: found,
             unitPriceUSD: priceUsd,
             unitPriceVES: priceVes,
-            totalPriceUSD: priceUsd * qty,
-            totalPriceVES: priceVes * qty,
+            totalPriceUSD: itemTotalUSD,
+            totalPriceVES: itemTotalVES,
             rating: found.rating || null
           });
         } else {
-          missing.push({ name: targetName, quantity: qty });
+          missing.push({
+            name: targetName,
+            quantity: itemEntry.isFree ? `${itemEntry.amount} ${itemEntry.unit || ''}`.trim() : `x${itemEntry.qty}`
+          });
         }
       }
 

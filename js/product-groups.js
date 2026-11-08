@@ -121,75 +121,116 @@ class ProductGroupingService {
       };
     }
 
-    // 1. Rango de Precios
     const isVes = activeCurrency === 'VES';
-    const pricesUsd = products.map(p => {
+    const rate = activeRate > 0 ? activeRate : 45.0;
+
+    // Normalizar medidas de cada producto
+    const normalizedProds = products.map(p => {
       let pUsd = parseFloat(p.current_price) || 0;
-      if (p.original_currency === 'VES' && activeRate > 0) {
-        pUsd = pUsd / activeRate;
+      if (p.original_currency === 'VES' && rate > 0) {
+        pUsd = pUsd / rate;
       }
-      return pUsd;
+      const m = (window.ProductUtils && typeof window.ProductUtils.normalizeProductMeasure === 'function')
+        ? window.ProductUtils.normalizeProductMeasure(p)
+        : { type: p.measure_type || 'unidad', amount: parseFloat(p.measure_amount) || 1, isFree: !!p.is_free_quantity, unit: 'Und', unitTag: '/Und' };
+
+      const unitPriceUsd = m.isFree ? pUsd : (m.amount > 0 ? (pUsd / m.amount) : pUsd);
+      return {
+        raw: p,
+        pUsd,
+        unitPriceUsd,
+        measure: m
+      };
     });
 
-    const minUsd = Math.min(...pricesUsd);
-    const maxUsd = Math.max(...pricesUsd);
+    // 1. Rango de Precios Unitarios
+    const unitPricesUsd = normalizedProds.map(np => np.unitPriceUsd);
+    const minUnitUsd = Math.min(...unitPricesUsd);
+    const maxUnitUsd = Math.max(...unitPricesUsd);
+
+    const origPricesUsd = normalizedProds.map(np => np.pUsd);
+    const minOrigUsd = Math.min(...origPricesUsd);
+    const maxOrigUsd = Math.max(...origPricesUsd);
+
+    // Determinar etiqueta de unidad predominante (/Kg, /L, /Und)
+    const typeCount = { peso: 0, volumen: 0, unidad: 0 };
+    normalizedProds.forEach(np => { typeCount[np.measure.type] = (typeCount[np.measure.type] || 0) + 1; });
+    const dominantType = Object.keys(typeCount).reduce((a, b) => typeCount[a] >= typeCount[b] ? a : b);
+    const unitTag = dominantType === 'peso' ? '/Kg' : (dominantType === 'volumen' ? '/L' : '/Und');
+
+    const allFree = normalizedProds.every(np => np.measure.isFree);
+    const hasAnyFree = normalizedProds.some(np => np.measure.isFree);
 
     let priceStr = '';
-    if (isVes) {
-      const minVes = minUsd * activeRate;
-      const maxVes = maxUsd * activeRate;
-      if (Math.abs(minVes - maxVes) < 0.01 || products.length === 1) {
-        priceStr = `Bs. ${minVes.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    const sym = isVes ? 'Bs. ' : '$ ';
+    const mult = isVes ? rate : 1;
+
+    const minUnitVal = minUnitUsd * mult;
+    const maxUnitVal = maxUnitUsd * mult;
+    const minOrigVal = minOrigUsd * mult;
+    const maxOrigVal = maxOrigUsd * mult;
+
+    const formatNum = (num) => isVes
+      ? num.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+      : num.toFixed(2);
+
+    if (allFree || hasAnyFree) {
+      // Regla: Productos con cantidad libre NO muestran precio original, solo precio por unidad/litro/kilo
+      if (Math.abs(minUnitVal - maxUnitVal) < 0.01 || products.length === 1) {
+        priceStr = `${sym}${formatNum(minUnitVal)}${unitTag}`;
       } else {
-        priceStr = `Bs. ${minVes.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} - Bs. ${maxVes.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        priceStr = `${sym}${formatNum(minUnitVal)}${unitTag} - ${sym}${formatNum(maxUnitVal)}${unitTag}`;
       }
     } else {
-      if (Math.abs(minUsd - maxUsd) < 0.005 || products.length === 1) {
-        priceStr = `$ ${minUsd.toFixed(2)}`;
+      // Productos con empaque fijo: precio unitario y al lado entre paréntesis el precio original
+      let unitRangeStr = '';
+      if (Math.abs(minUnitVal - maxUnitVal) < 0.01 || products.length === 1) {
+        unitRangeStr = `${sym}${formatNum(minUnitVal)}${unitTag}`;
       } else {
-        priceStr = `$ ${minUsd.toFixed(2)} - $ ${maxUsd.toFixed(2)}`;
+        unitRangeStr = `${sym}${formatNum(minUnitVal)} - ${sym}${formatNum(maxUnitVal)}${unitTag}`;
       }
+
+      let origRangeStr = '';
+      if (Math.abs(minOrigVal - maxOrigVal) < 0.01 || products.length === 1) {
+        origRangeStr = `${sym}${formatNum(minOrigVal)}`;
+      } else {
+        origRangeStr = `${sym}${formatNum(minOrigVal)} - ${sym}${formatNum(maxOrigVal)}`;
+      }
+
+      priceStr = `${unitRangeStr} (${origRangeStr})`;
     }
 
-    // 2. Rango de Peso
-    const parsedWeights = products.map(p => this.parseWeight(p.weight)).filter(Boolean);
+    // 2. Medidas y especificaciones del grupo
     let weightStr = '';
-    if (parsedWeights.length > 0) {
-      parsedWeights.sort((a, b) => a.grams - b.grams);
-      const minW = parsedWeights[0].original;
-      const maxW = parsedWeights[parsedWeights.length - 1].original;
-      if (minW.toLowerCase() === maxW.toLowerCase() || products.length === 1 || parsedWeights.length === 1) {
-        weightStr = `⚖️ ${minW}`;
-      } else {
-        weightStr = `⚖️ ${minW} - ${maxW}`;
-      }
-    }
-
-    // 3. Rango de Volumen
-    const parsedVols = products.map(p => this.parseVolume(p.volume)).filter(Boolean);
     let volumeStr = '';
-    if (parsedVols.length > 0) {
-      parsedVols.sort((a, b) => a.ml - b.ml);
-      const minV = parsedVols[0].original;
-      const maxV = parsedVols[parsedVols.length - 1].original;
-      if (minV.toLowerCase() === maxV.toLowerCase() || products.length === 1 || parsedVols.length === 1) {
-        volumeStr = `🧴 ${minV}`;
-      } else {
-        volumeStr = `🧴 ${minV} - ${maxV}`;
-      }
-    }
-
-    // 4. Rango de Cantidad / Combo
-    const parsedQtys = products.map(p => this.parseQuantity(p.quantity)).filter(Boolean);
     let quantityStr = '';
-    if (parsedQtys.length > 0) {
-      parsedQtys.sort((a, b) => a.count - b.count);
-      const minQ = parsedQtys[0].original;
-      const maxQ = parsedQtys[parsedQtys.length - 1].original;
-      if (minQ.toLowerCase() === maxQ.toLowerCase() || products.length === 1 || parsedQtys.length === 1) {
-        quantityStr = `⚡ ${minQ}`;
+
+    if (dominantType === 'peso') {
+      if (allFree) {
+        weightStr = '⚖️ Por Kilo (Cantidad Libre)';
       } else {
-        quantityStr = `⚡ ${minQ} - ${maxQ}`;
+        const amounts = normalizedProds.map(np => np.measure.amount).sort((a, b) => a - b);
+        const minA = amounts[0];
+        const maxA = amounts[amounts.length - 1];
+        weightStr = minA === maxA ? `⚖️ ${minA} Kg` : `⚖️ ${minA} Kg - ${maxA} Kg`;
+      }
+    } else if (dominantType === 'volumen') {
+      if (allFree) {
+        volumeStr = '🧴 Por Litro (Recarga Libre)';
+      } else {
+        const amounts = normalizedProds.map(np => np.measure.amount).sort((a, b) => a - b);
+        const minA = amounts[0];
+        const maxA = amounts[amounts.length - 1];
+        volumeStr = minA === maxA ? `🧴 ${minA} L` : `🧴 ${minA} L - ${maxA} L`;
+      }
+    } else {
+      if (allFree) {
+        quantityStr = '⚡ Cantidad Libre (Und)';
+      } else {
+        const amounts = normalizedProds.map(np => np.measure.amount).sort((a, b) => a - b);
+        const minA = amounts[0];
+        const maxA = amounts[amounts.length - 1];
+        quantityStr = minA === maxA ? `⚡ ${minA} Und` : `⚡ ${minA} - ${maxA} Und`;
       }
     }
 
@@ -198,8 +239,10 @@ class ProductGroupingService {
       weightStr,
       volumeStr,
       quantityStr,
-      minUsd,
-      maxUsd
+      minUsd: minOrigUsd,
+      maxUsd: maxOrigUsd,
+      dominantType,
+      isFree: hasAnyFree
     };
   }
 

@@ -13,6 +13,229 @@ function escapeProductHtml(str) {
 }
 
 window.ProductUtils = {
+  // Normaliza el producto devolviendo { type: 'peso'|'volumen'|'unidad', amount: number, isFree: boolean, unit: 'Kg'|'L'|'Und', unitTag: '/Kg'|'/L'|'/Und' }
+  normalizeProductMeasure(prod) {
+    if (!prod) return { type: 'unidad', amount: 1, isFree: false, unit: 'Und', unitTag: '/Und' };
+
+    // Si ya posee los campos explícitos de medida
+    if (prod.measure_type) {
+      const type = (prod.measure_type === 'peso' || prod.measure_type === 'volumen') ? prod.measure_type : 'unidad';
+      const amount = parseFloat(prod.measure_amount) > 0 ? parseFloat(prod.measure_amount) : 1;
+      const isFree = !!prod.is_free_quantity;
+      const unit = type === 'peso' ? 'Kg' : (type === 'volumen' ? 'L' : 'Und');
+      const unitTag = `/${unit}`;
+      return { type, amount, isFree, unit, unitTag };
+    }
+
+    // Heurística inteligente y retrocompatible
+    const detected = this.detectMeasureAndFreeQuantity(prod.name, prod.weight, prod.volume, prod.quantity);
+    return {
+      type: detected.type,
+      amount: detected.amount,
+      isFree: detected.isFree,
+      unit: detected.unit,
+      unitTag: `/${detected.unit}`
+    };
+  },
+
+  // Analiza el nombre y especificaciones para detectar tipo de medida y si debe activar Cantidad Libre
+  detectMeasureAndFreeQuantity(rawName, existingWeight = null, existingVolume = null, existingQuantity = null, categoryHint = null) {
+    const name = (rawName || '').trim();
+    const nameLower = name.toLowerCase();
+
+    // 1. Detección de Cantidad Libre para Charcutería, Carnicería, Pescadería o Frutas/Verduras a granel
+    // REGLA: Los productos pedidos por peso exacto al corte/a granel son 'peso' y activan 'is_free_quantity = true'
+    const charcuterieRegex = /\b(jam[oó]n|queso|tocineta|bacon|mortadela|salchich[oó]n|salchicha|chuleta|chorizo|lomo|pernil|pastrami|salami|pechuga|fiambre|jamonada|carne|bistec|bife|molida|solomo|costilla|pollo|milanesa|muslo|alas|cerdo|cochino|pescado|merluza|salm[oó]n|at[uú]n\s*fresco|camar[oó]n|marisco|papas?|tomates?|cebollas?|pl[aá]tanos?|zanahorias?|piment[oó]n|aguacates?|lim[oó]n|limones|cambur|manzanas?|naranjas?|mandarinas?|lechugas?|repollo|yuca|auyama|br[oó]coli|ajo|a\s*granel|al\s*peso|pesad[oa]|por\s*kilo|por\s*kg)\b/i;
+
+    // 2. Detección de Cantidad Libre para Líquidos a granel / Recarga de agua
+    // REGLA: Recarga de botellón / líquidos por litro donde el comprador elige cuánto cargar son 'volumen' y activan 'is_free_quantity = true'
+    const refillRegex = /\b(botell[oó]n|recarga|llenar|agua\s*mineral|agua\s*potable|gasolina|gasoil|diesel|cloro\s*a\s*granel|desinfectante\s*a\s*granel|por\s*litro|por\s*lts?)\b/i;
+
+    // Extraer pesos y volúmenes si vienen en el nombre o en campos previos
+    const parsedWeight = this.parseWeightNumber(existingWeight || name);
+    const parsedVolume = this.parseVolumeNumber(existingVolume || name);
+    const parsedQty = this.parseQuantityNumber(existingQuantity || name);
+
+    // ¿Es recarga de botellón o líquido a granel?
+    if (refillRegex.test(nameLower) && (!parsedVolume || parsedVolume <= 1 || nameLower.includes('recarga') || nameLower.includes('botellon') || nameLower.includes('botellón'))) {
+      return {
+        type: 'volumen',
+        amount: 1,
+        isFree: true,
+        unit: 'L',
+        detectedByAi: true,
+        reason: 'Recarga de botellón o líquido a granel detectado por IA'
+      };
+    }
+
+    // ¿Es charcutería / carnicería / frutas a granel?
+    if (charcuterieRegex.test(nameLower) || ((categoryHint === 'meat' || categoryHint === 'produce') && !parsedWeight)) {
+      return {
+        type: 'peso',
+        amount: 1,
+        isFree: true,
+        unit: 'Kg',
+        detectedByAi: true,
+        reason: 'Charcutería, carnicería o producto a granel detectado por IA'
+      };
+    }
+
+    // Si tiene volumen explícito empaquetado (ej: 1.5L, 355ml)
+    if (parsedVolume !== null && parsedVolume > 0) {
+      return {
+        type: 'volumen',
+        amount: parsedVolume,
+        isFree: false,
+        unit: 'L',
+        detectedByAi: false,
+        reason: 'Volumen de empaque detectado'
+      };
+    }
+
+    // Si tiene peso explícito empaquetado (ej: 1kg, 500g, 400g)
+    if (parsedWeight !== null && parsedWeight > 0) {
+      return {
+        type: 'peso',
+        amount: parsedWeight,
+        isFree: false,
+        unit: 'Kg',
+        detectedByAi: false,
+        reason: 'Peso de empaque detectado'
+      };
+    }
+
+    // REGLA CRÍTICA DEL USUARIO:
+    // "En el caso de los productos por Unidad es muy raro que se deba activar la opcion
+    //  asi que si la IA detecta que el producto es de tipo unidad la opcion de cantidad libre
+    //  solo la debe poder activar el usuario por cuenta propia."
+    return {
+      type: 'unidad',
+      amount: parsedQty !== null && parsedQty > 0 ? parsedQty : 1,
+      isFree: false, // ¡SIEMPRE FALSE para tipo unidad en detección automática!
+      unit: 'Und',
+      detectedByAi: false,
+      reason: 'Producto individual / empaque por unidad'
+    };
+  },
+
+  // Extrae el valor numérico en Kilos (Kg) desde un texto (ej: '500g' -> 0.5, '1kg' -> 1.0, '2 lb' -> 0.907)
+  parseWeightNumber(str) {
+    if (!str) return null;
+    const m = String(str).toLowerCase().match(/([\d\.,]+)\s*(kg|kilos?|g\b|gr(?:amos)?|libras?|lbs?|lb\b|onzas?|oz\b)/);
+    if (!m) return null;
+    const num = parseFloat(m[1].replace(',', '.'));
+    if (isNaN(num)) return null;
+    const unit = m[2];
+    if (unit.startsWith('k')) return num;
+    if (unit.startsWith('g')) return parseFloat((num / 1000).toFixed(4));
+    if (unit.startsWith('l')) return parseFloat((num * 0.453592).toFixed(4));
+    if (unit.startsWith('o')) return parseFloat((num * 0.0283495).toFixed(4));
+    return num;
+  },
+
+  // Extrae el valor numérico en Litros (L) desde un texto (ej: '1.5L' -> 1.5, '355ml' -> 0.355)
+  parseVolumeNumber(str) {
+    if (!str) return null;
+    const m = String(str).toLowerCase().match(/([\d\.,]+)\s*(litros?|lts?|l\b|ml|cc|galones?|gal\b)/);
+    if (!m) return null;
+    const num = parseFloat(m[1].replace(',', '.'));
+    if (isNaN(num)) return null;
+    const unit = m[2];
+    if (unit.startsWith('l')) return num;
+    if (unit === 'ml' || unit === 'cc') return parseFloat((num / 1000).toFixed(4));
+    if (unit.startsWith('gal')) return parseFloat((num * 3.78541).toFixed(4));
+    return num;
+  },
+
+  // Extrae la cantidad numérica desde un texto (ej: 'pack 6' -> 6, '2x' -> 2)
+  parseQuantityNumber(str) {
+    if (!str) return null;
+    const m = String(str).toLowerCase().match(/(\d+(?:[\.,]\d+)?)/);
+    if (!m) return null;
+    const num = parseFloat(m[1].replace(',', '.'));
+    return isNaN(num) ? 1 : num;
+  },
+
+  // FORMATEO DE PRECIO SEGÚN REGLA EXACTA:
+  // "todos los productos deben mostrar su precio por unidad, litro o kilo (precio/cantidad)
+  //  y justo al lado derecho entre parentesis el precio orginal.
+  //  Pero si el producto tiene activa la opcion de 'Cantidad libre' no se debe mostrar el precio orginal
+  //  solo el precio por unidad, litro o kilo."
+  formatProductPricing(prod, activeRate = 45.0, activeCurrency = 'USD') {
+    if (!prod) {
+      return { primary: '$ 0.00', secondary: 'Bs. 0.00', unitPriceUsd: 0, isFree: false };
+    }
+
+    const m = this.normalizeProductMeasure(prod);
+    const isVes = (activeCurrency === 'VES');
+    const rate = (activeRate > 0) ? activeRate : 45.0;
+
+    let rawUsd = parseFloat(prod.current_price) || 0;
+    if (prod.original_currency === 'VES' && rate > 0) {
+      rawUsd = rawUsd / rate;
+    }
+
+    const priceMain = isVes ? (rawUsd * rate) : rawUsd;
+    const priceSec = isVes ? rawUsd : (rawUsd * rate);
+    const symMain = isVes ? 'Bs. ' : '$ ';
+    const symSec = isVes ? '$ ' : 'Bs. ';
+
+    // CASO A: Cantidad libre activada
+    // NO mostrar precio original, SOLO precio por unidad, litro o kilo
+    if (m.isFree) {
+      const formattedMain = isVes
+        ? priceMain.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+        : priceMain.toFixed(2);
+      const formattedSec = isVes
+        ? priceSec.toFixed(2)
+        : priceSec.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+      return {
+        primary: `${symMain}${formattedMain}${m.unitTag}`,
+        secondary: `${symSec}${formattedSec}${m.unitTag}`,
+        unitPriceUsd: rawUsd,
+        originalPriceUsd: rawUsd,
+        isFree: true,
+        measureType: m.type,
+        measureAmount: 1,
+        unit: m.unit,
+        unitTag: m.unitTag
+      };
+    }
+
+    // CASO B: Cantidad fija de empaque
+    // Mostrar precio por unidad, litro o kilo (precio / cantidad) y entre paréntesis el precio original
+    const amount = (m.amount > 0) ? m.amount : 1;
+    const unitPriceMain = priceMain / amount;
+    const unitPriceSec = priceSec / amount;
+
+    const unitPriceMainStr = isVes
+      ? `${symMain}${unitPriceMain.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+      : `${symMain}${unitPriceMain.toFixed(2)}`;
+    const origPriceMainStr = isVes
+      ? `${symMain}${priceMain.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+      : `${symMain}${priceMain.toFixed(2)}`;
+
+    const unitPriceSecStr = isVes
+      ? `${symSec}${unitPriceSec.toFixed(2)}`
+      : `${symSec}${unitPriceSec.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    const origPriceSecStr = isVes
+      ? `${symSec}${priceSec.toFixed(2)}`
+      : `${symSec}${priceSec.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+    return {
+      primary: `${unitPriceMainStr}${m.unitTag} (${origPriceMainStr})`,
+      secondary: `${unitPriceSecStr}${m.unitTag} (${origPriceSecStr})`,
+      unitPriceUsd: rawUsd / amount,
+      originalPriceUsd: rawUsd,
+      isFree: false,
+      measureType: m.type,
+      measureAmount: amount,
+      unit: m.unit,
+      unitTag: m.unitTag
+    };
+  },
+
   sanitizeProductAttributes(rawName, existingWeight = null, existingVolume = null, existingQuantity = null) {
     let name = (rawName || '').trim();
     let weight = (existingWeight !== null && existingWeight !== undefined && String(existingWeight).trim()) ? String(existingWeight).trim() : null;
@@ -90,8 +313,8 @@ window.ProductUtils = {
         label: 'Cantidad / Combo',
         icon: '⚡',
         value: qtyMatch[0].trim(),
-        fieldId: 'inputProductQuantity',
-        fieldLabel: '⚡ Cantidad / Pack'
+        fieldId: 'inputProductMeasureAmount',
+        fieldLabel: '⚡ Cantidad'
       });
     }
     if (volMatch) {
@@ -100,7 +323,7 @@ window.ProductUtils = {
         label: 'Volumen',
         icon: '🧴',
         value: volMatch[0].trim(),
-        fieldId: 'inputProductVolume',
+        fieldId: 'inputProductMeasureAmount',
         fieldLabel: '🧴 Volumen'
       });
     }
@@ -110,12 +333,13 @@ window.ProductUtils = {
         label: 'Peso',
         icon: '⚖️',
         value: weightMatch[0].trim(),
-        fieldId: 'inputProductWeight',
+        fieldId: 'inputProductMeasureAmount',
         fieldLabel: '⚖️ Peso'
       });
     }
 
     const sanitized = this.sanitizeProductAttributes(name);
+    const measureInfo = this.detectMeasureAndFreeQuantity(sanitized.name, sanitized.weight, sanitized.volume, sanitized.quantity);
 
     return {
       hasSpecs: true,
@@ -123,7 +347,10 @@ window.ProductUtils = {
       cleanName: sanitized.name,
       suggestedQty: sanitized.quantity,
       suggestedWeight: sanitized.weight,
-      suggestedVolume: sanitized.volume
+      suggestedVolume: sanitized.volume,
+      measureType: measureInfo.type,
+      measureAmount: measureInfo.amount,
+      isFreeQuantity: measureInfo.isFree
     };
   },
 
@@ -140,11 +367,28 @@ window.ProductUtils = {
 
   formatSpecsBadge(prod) {
     if (!prod) return '';
-    const specs = [];
-    if (prod.weight && String(prod.weight).trim()) specs.push(`⚖️ ${escapeProductHtml(String(prod.weight).trim())}`);
-    if (prod.volume && String(prod.volume).trim()) specs.push(`🧴 ${escapeProductHtml(String(prod.volume).trim())}`);
-    if (specs.length === 0) return '';
-    return `<span class="text-[10px] text-slate-400 font-medium inline-flex items-center gap-1">${specs.join(' <span class="text-slate-600">•</span> ')}</span>`;
+    const m = this.normalizeProductMeasure(prod);
+
+    if (m.isFree) {
+      if (m.type === 'peso') {
+        return `<span class="inline-flex items-center gap-1 text-[10px] text-amber-300 font-bold bg-amber-500/15 border border-amber-500/30 px-1.5 py-0.5 rounded-md">⚖️ Por Kilo (Cantidad Libre)</span>`;
+      }
+      if (m.type === 'volumen') {
+        return `<span class="inline-flex items-center gap-1 text-[10px] text-cyan-300 font-bold bg-cyan-500/15 border border-cyan-500/30 px-1.5 py-0.5 rounded-md">🧴 Por Litro (Recarga Libre)</span>`;
+      }
+      return `<span class="inline-flex items-center gap-1 text-[10px] text-blue-300 font-bold bg-blue-500/15 border border-blue-500/30 px-1.5 py-0.5 rounded-md">⚡ Cantidad Libre (Und)</span>`;
+    }
+
+    if (m.type === 'peso') {
+      const amountStr = m.amount < 1 ? `${Math.round(m.amount * 1000)}g` : `${m.amount} Kg`;
+      return `<span class="text-[10px] text-slate-400 font-medium inline-flex items-center gap-1">⚖️ ${escapeProductHtml(amountStr)}</span>`;
+    }
+    if (m.type === 'volumen') {
+      const amountStr = m.amount < 1 ? `${Math.round(m.amount * 1000)} ml` : `${m.amount} L`;
+      return `<span class="text-[10px] text-slate-400 font-medium inline-flex items-center gap-1">🧴 ${escapeProductHtml(amountStr)}</span>`;
+    }
+    const amountStr = `${m.amount} Und`;
+    return `<span class="text-[10px] text-slate-400 font-medium inline-flex items-center gap-1">⚡ ${escapeProductHtml(amountStr)}</span>`;
   },
 
   formatStoreBadge(store, maxChars = 14) {
@@ -743,6 +987,9 @@ REGLAS CRÍTICAS:
         ? (currentBcvRate > 0 ? parseFloat((unitPrice / currentBcvRate).toFixed(4)) : unitPrice)
         : unitPrice;
 
+      // Detectar tipo de medida (peso, volumen, unidad) y opción de cantidad libre con IA
+      const measureInfo = window.ProductUtils.detectMeasureAndFreeQuantity(cleanName, weight, volume, quantity, item.category_hint);
+
       // Buscar si ya existe en esta tienda
       const existingProduct = await window.db.findProductByStoreAndName(store.id, cleanName);
 
@@ -754,6 +1001,9 @@ REGLAS CRÍTICAS:
         if (weight) existingProduct.weight = weight;
         if (volume) existingProduct.volume = volume;
         if (quantity) existingProduct.quantity = quantity;
+        existingProduct.measure_type = measureInfo.type;
+        existingProduct.measure_amount = measureInfo.amount;
+        existingProduct.is_free_quantity = measureInfo.isFree;
 
         await window.db.saveProduct(existingProduct, docType, currentBcvRate);
         updatedProductsCount++;
@@ -763,6 +1013,9 @@ REGLAS CRÍTICAS:
           weight,
           volume,
           quantity,
+          measure_type: measureInfo.type,
+          measure_amount: measureInfo.amount,
+          is_free_quantity: measureInfo.isFree,
           productId: existingProduct.id,
           status: 'actualizado',
           rating: existingProduct.rating
@@ -778,6 +1031,9 @@ REGLAS CRÍTICAS:
           weight: weight,
           volume: volume,
           quantity: quantity,
+          measure_type: measureInfo.type,
+          measure_amount: measureInfo.amount,
+          is_free_quantity: measureInfo.isFree,
           current_price: unitPriceUsd,
           original_currency: 'USD',
           image_type: 'icon',
@@ -794,6 +1050,9 @@ REGLAS CRÍTICAS:
           weight,
           volume,
           quantity,
+          measure_type: measureInfo.type,
+          measure_amount: measureInfo.amount,
+          is_free_quantity: measureInfo.isFree,
           productId: savedProd.id,
           status: 'nuevo',
           rating: savedProd.rating || null
