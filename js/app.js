@@ -1080,6 +1080,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const gIconA = document.getElementById('productGroupMatchIcon');
     if (gIconA) gIconA.textContent = '📦';
     userManuallyToggledFreeQuantity = false;
+    userManuallySelectedMeasureType = false;
     setProductMeasureType('unidad');
     if (document.getElementById('inputProductMeasureAmount')) document.getElementById('inputProductMeasureAmount').value = '1';
     if (document.getElementById('chkProductFreeQuantity')) document.getElementById('chkProductFreeQuantity').checked = false;
@@ -1516,6 +1517,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             : { type: prod.measure_type || 'unidad', amount: parseFloat(prod.measure_amount) || 1, isFree: !!prod.is_free_quantity };
 
           userManuallyToggledFreeQuantity = true;
+          userManuallySelectedMeasureType = true;
           setProductMeasureType(m.type);
           if (document.getElementById('inputProductMeasureAmount')) document.getElementById('inputProductMeasureAmount').value = m.amount;
           if (document.getElementById('chkProductFreeQuantity')) document.getElementById('chkProductFreeQuantity').checked = m.isFree;
@@ -1675,6 +1677,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const gIconA = document.getElementById('productGroupMatchIcon');
     if (gIconA) gIconA.textContent = '📦';
     userManuallyToggledFreeQuantity = false;
+    userManuallySelectedMeasureType = false;
     setProductMeasureType('unidad');
     if (document.getElementById('inputProductMeasureAmount')) document.getElementById('inputProductMeasureAmount').value = '1';
     if (document.getElementById('chkProductFreeQuantity')) document.getElementById('chkProductFreeQuantity').checked = false;
@@ -1876,6 +1879,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // GESTIÓN DEL SISTEMA DE MEDIDA (PESO, VOLUMEN, UNIDAD, CANTIDAD LIBRE)
   // ----------------------------------------------------
   let userManuallyToggledFreeQuantity = false;
+  let userManuallySelectedMeasureType = false;
 
   function setProductMeasureType(type, triggerAiHint = false) {
     const valid = (type === 'peso' || type === 'volumen') ? type : 'unidad';
@@ -1940,6 +1944,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function autoDetectProductMeasure() {
+    // 1. Si estamos editando un producto existente, NUNCA cambiar las medidas automáticamente
+    const idInput = document.getElementById('inputProductId');
+    if (idInput && idInput.value.trim() !== '') return;
+
+    // 2. Si el usuario ya seleccionó manualmente una medida (peso, volumen o unidad), NUNCA sobrescribir
+    if (userManuallySelectedMeasureType) return;
+
     const nameInput = document.getElementById('inputProductName');
     if (!nameInput) return;
     const rawName = nameInput.value.trim();
@@ -1948,28 +1959,26 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!window.ProductUtils || typeof window.ProductUtils.detectMeasureAndFreeQuantity !== 'function') return;
 
     const detected = window.ProductUtils.detectMeasureAndFreeQuantity(rawName);
+
+    // 3. REGLA ESTRICTA: NUNCA cambiar a 'unidad' automáticamente al escribir o editar.
+    // Solo cambiar si la IA detectó positivamente Peso (charcutería/carnes/a granel) o Volumen (recarga botellón/líquidos).
+    if (!detected || !detected.detectedByAi || detected.type === 'unidad') {
+      return;
+    }
+
     const chkFree = document.getElementById('chkProductFreeQuantity');
     const badgeAi = document.getElementById('badgeFreeQuantityAi');
     const amountInput = document.getElementById('inputProductMeasureAmount');
 
-    setProductMeasureType(detected.type, !!detected.detectedByAi);
+    // Cambiar a Peso o Volumen porque la IA detectó charcutería o recarga en un producto nuevo
+    setProductMeasureType(detected.type, true);
 
-    // REGLA CRÍTICA DEL USUARIO:
-    // "En el caso de los productos por Unidad es muy raro que se deba activar la opcion
-    //  asi que si la IA detecta que el producto es de tipo unidad la opcion de cantidad libre
-    //  solo la debe poder activar el usuario por cuenta propia."
-    if (detected.type === 'unidad') {
-      if (chkFree) chkFree.checked = false;
-      if (badgeAi) badgeAi.classList.add('hidden');
-    } else if (detected.isFree && detected.detectedByAi) {
+    if (detected.isFree) {
       if (chkFree) chkFree.checked = true;
       if (badgeAi) {
         badgeAi.classList.remove('hidden');
         badgeAi.textContent = detected.type === 'peso' ? '✨ Charcutería / A granel (IA)' : '✨ Recarga libre (IA)';
       }
-    } else {
-      if (chkFree && !userManuallyToggledFreeQuantity) chkFree.checked = false;
-      if (badgeAi) badgeAi.classList.add('hidden');
     }
 
     if (!chkFree || !chkFree.checked) {
@@ -1983,18 +1992,21 @@ document.addEventListener('DOMContentLoaded', async () => {
   const btnMeasurePesoEl = document.getElementById('btnMeasurePeso');
   if (btnMeasurePesoEl) {
     btnMeasurePesoEl.addEventListener('click', () => {
+      userManuallySelectedMeasureType = true;
       setProductMeasureType('peso');
     });
   }
   const btnMeasureVolumenEl = document.getElementById('btnMeasureVolumen');
   if (btnMeasureVolumenEl) {
     btnMeasureVolumenEl.addEventListener('click', () => {
+      userManuallySelectedMeasureType = true;
       setProductMeasureType('volumen');
     });
   }
   const btnMeasureUnidadEl = document.getElementById('btnMeasureUnidad');
   if (btnMeasureUnidadEl) {
     btnMeasureUnidadEl.addEventListener('click', () => {
+      userManuallySelectedMeasureType = true;
       setProductMeasureType('unidad');
       const chk = document.getElementById('chkProductFreeQuantity');
       if (chk && !userManuallyToggledFreeQuantity) {
@@ -2067,7 +2079,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (inputProductNameEl) {
     inputProductNameEl.addEventListener('input', () => {
       validateProductNameSpecs();
-      autoDetectProductMeasure();
       autoPredictProductGroup();
     });
     inputProductNameEl.addEventListener('blur', () => {
@@ -2271,6 +2282,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       // Asignar en el nuevo sistema de medidas (peso, volumen o unidad)
       if (detection.measureType) {
+        userManuallySelectedMeasureType = true;
         setProductMeasureType(detection.measureType);
         const amountInput = document.getElementById('inputProductMeasureAmount');
         if (amountInput) {
