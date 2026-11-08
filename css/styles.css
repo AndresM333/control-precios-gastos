@@ -56,7 +56,7 @@ body {
 .app-header {
   position: sticky;
   top: 0;
-  z-index: 40;
+  z-index: 60;
   background-color: rgba(11, 15, 25, 0.96);
   backdrop-filter: blur(14px);
   border-bottom: 1px solid var(--border-color);
@@ -69,13 +69,14 @@ body {
   width: 100%;
   max-width: 100vw;
   box-sizing: border-box;
-  overflow-x: hidden;
+  overflow: visible !important;
 }
 
 @media (max-width: 400px) {
   .app-header {
     padding: 6px 8px;
     gap: 4px;
+    overflow: visible !important;
   }
 }
 
@@ -84,6 +85,7 @@ body {
     padding: 10px 20px;
     flex-wrap: nowrap;
     gap: 16px;
+    overflow: visible !important;
   }
 }
 
@@ -203,6 +205,12 @@ body {
     padding: 6px 14px;
     border-radius: 12px;
   }
+}
+
+#workspaceDropdown {
+  top: 100%;
+  margin-top: 6px;
+  z-index: 100;
 }
 
 /* BCV Badge Pill */
@@ -883,6 +891,7 @@ body {
     gap: 8px;
     flex-wrap: nowrap;
     align-items: center;
+    overflow: visible !important;
   }
 
   .brand-wrapper {
